@@ -1,0 +1,14 @@
+{
+  "name": "aster",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @aster/web dev",
+    "build": "pnpm --filter @aster/web build",
+    "lint": "pnpm --filter @aster/web lint",
+    "typecheck": "pnpm --filter @aster/web typecheck"
+  },
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=10"
+  }
+}

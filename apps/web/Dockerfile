@@ -1,0 +1,24 @@
+FROM node:22-alpine AS build
+
+WORKDIR /app
+RUN corepack enable
+
+COPY package.json pnpm-workspace.yaml ./
+COPY apps/web/package.json apps/web/package.json
+RUN pnpm install --no-frozen-lockfile
+
+COPY apps/web apps/web
+RUN pnpm --filter @aster/web build
+
+FROM node:22-alpine AS runner
+
+ENV NODE_ENV=production
+WORKDIR /app
+RUN corepack enable
+
+COPY --from=build --chown=node:node /app /app
+USER node
+
+EXPOSE 3000
+
+CMD ["pnpm", "--filter", "@aster/web", "start"]
