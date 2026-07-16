@@ -24,6 +24,10 @@ All notable changes to Aster are documented in this file.
 
 ### Changed
 
+- Interface hierarchy now derives from a neutral base, restrained accent, and shared contrast system.
+- Sidebar and primary view chrome now form one continuous application frame.
+- Navigation, conversation rows, controls, labels, and icons use denser shared alignment rules.
+- Surface elevation and selection rely on opacity and tonal separation instead of heavy borders and shadows.
 - Chat now uses a compact workspace layout with clearer conversation selection, message hierarchy, contextual actions, and a focused composer.
 - Model, persona, account, setup, and sign-in screens now share one dense interface system.
 - Forms, endpoint metadata, model browsing, empty states, notices, and responsive behavior use consistent tokens and interaction states.
