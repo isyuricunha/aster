@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
 import { apiRequest, type AuthUser } from "../lib/api";
+import { AsterMark, Icon } from "./ui/icons";
 
 export function AuthForm({
   mode,
@@ -42,68 +43,103 @@ export function AuthForm({
 
   return (
     <main className="auth-page">
-      <section className="auth-card">
-        <Link className="brand" href="/">
-          Aster
-        </Link>
-        <div className="auth-heading">
-          <p className="eyebrow">{setup ? "First sign-up" : "Welcome back"}</p>
-          <h1>{setup ? "Create the owner account" : "Sign in"}</h1>
-          <p>
-            {setup
-              ? "This account becomes the only Aster owner. Public sign-up closes immediately after it is created."
-              : "Use the owner account created during the first Aster setup."}
-          </p>
-        </div>
+      <div className="auth-shell">
+        <aside className="auth-context">
+          <Link className="auth-brand" href="/">
+            <AsterMark size={28} />
+            <span>Aster</span>
+          </Link>
+          <div className="auth-context-copy">
+            <p className="eyebrow">Private workspace</p>
+            <h2>{setup ? "Your assistant, on your server." : "Welcome back to your workspace."}</h2>
+            <p>
+              Conversations, endpoint credentials, persona settings, and sessions remain under your
+              control.
+            </p>
+          </div>
+          <div className="auth-assurances">
+            <span>
+              <Icon name="lock" />
+              Single-owner access
+            </span>
+            <span>
+              <Icon name="chat" />
+              Persistent private conversations
+            </span>
+            <span>
+              <Icon name="models" />
+              Your own model endpoints
+            </span>
+          </div>
+        </aside>
 
-        {error && <div className="banner banner-error">{error}</div>}
+        <section className="auth-card">
+          <div className="auth-card-mark">
+            <AsterMark size={32} />
+          </div>
+          <div className="auth-heading">
+            <p className="eyebrow">{setup ? "First sign-up" : "Owner access"}</p>
+            <h1>{setup ? "Create the owner account" : "Sign in"}</h1>
+            <p>
+              {setup
+                ? "This account becomes the only owner. New sign-ups close as soon as setup is complete."
+                : "Use the owner account created during the first Aster setup."}
+            </p>
+          </div>
 
-        <form className="auth-form" onSubmit={submit}>
-          <label>
-            <span>Username</span>
-            <input
-              autoCapitalize="none"
-              autoComplete="username"
-              autoFocus
-              minLength={setup ? 3 : 1}
-              maxLength={64}
-              onChange={(event) => setUsername(event.target.value)}
-              pattern="[A-Za-z0-9._-]+"
-              required
-              value={username}
-            />
-          </label>
-          <label>
-            <span>Password</span>
-            <input
-              autoComplete={setup ? "new-password" : "current-password"}
-              minLength={setup ? 12 : 1}
-              maxLength={256}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              type="password"
-              value={password}
-            />
-          </label>
-          {setup && (
+          {error && <div className="banner banner-error">{error}</div>}
+
+          <form className="auth-form" onSubmit={submit}>
             <label>
-              <span>Confirm password</span>
+              <span>Username</span>
               <input
-                autoComplete="new-password"
-                minLength={12}
-                maxLength={256}
-                onChange={(event) => setConfirmation(event.target.value)}
+                autoCapitalize="none"
+                autoComplete="username"
+                autoFocus
+                minLength={setup ? 3 : 1}
+                maxLength={64}
+                onChange={(event) => setUsername(event.target.value)}
+                pattern="[A-Za-z0-9._-]+"
+                placeholder="owner"
                 required
-                type="password"
-                value={confirmation}
+                value={username}
               />
             </label>
-          )}
-          <button className="button" disabled={busy} type="submit">
-            {busy ? (setup ? "Creating owner" : "Signing in") : setup ? "Create owner" : "Sign in"}
-          </button>
-        </form>
-      </section>
+            <label>
+              <span>Password</span>
+              <input
+                autoComplete={setup ? "new-password" : "current-password"}
+                minLength={setup ? 12 : 1}
+                maxLength={256}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder={setup ? "At least 12 characters" : "Enter your password"}
+                required
+                type="password"
+                value={password}
+              />
+            </label>
+            {setup && (
+              <label>
+                <span>Confirm password</span>
+                <input
+                  autoComplete="new-password"
+                  minLength={12}
+                  maxLength={256}
+                  onChange={(event) => setConfirmation(event.target.value)}
+                  placeholder="Repeat the password"
+                  required
+                  type="password"
+                  value={confirmation}
+                />
+              </label>
+            )}
+            <button className="button auth-submit" disabled={busy} type="submit">
+              {busy ? (setup ? "Creating owner" : "Signing in") : setup ? "Create owner" : "Sign in"}
+              {!busy && <Icon name="arrow-up" size={14} />}
+            </button>
+          </form>
+        </section>
+      </div>
     </main>
   );
 }
