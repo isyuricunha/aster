@@ -50,6 +50,8 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_ASTER_API_URL: ${NEXT_PUBLIC_ASTER_API_URL:-http://localhost:8000}
     restart: unless-stopped
     environment:
       ASTER_API_INTERNAL_URL: ${ASTER_API_INTERNAL_URL:-http://api:8000}
