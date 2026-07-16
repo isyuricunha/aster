@@ -92,15 +92,15 @@ The example environment enables the `local-db` Compose profile:
 
 ```env
 COMPOSE_PROFILES=local-db
-POSTGRES_HOST=postgres
-POSTGRES_PORT=5432
 POSTGRES_DB=aster
 POSTGRES_USER=aster
 POSTGRES_PASSWORD=aster
 DATABASE_URL=
 ```
 
-When `DATABASE_URL` is empty, the API builds the local connection URL from the `POSTGRES_*` values. Existing installations can keep their current PostgreSQL password without copying it into a second setting.
+When `DATABASE_URL` is empty, the API builds the local connection URL from the bundled PostgreSQL settings. Existing installations can keep their current database name, user, and password without copying credentials into a second setting.
+
+The bundled database always uses port 5432 inside the Compose network and does not publish a database port to the host. An old `POSTGRES_PORT` entry may remain in an existing `.env`; it is no longer used by the Compose deployment.
 
 Start Aster:
 
@@ -108,7 +108,7 @@ Start Aster:
 docker compose up -d --build
 ```
 
-The bundled database is stored in the `postgres-data` Docker volume. PostgreSQL port 5432 is not published to the host.
+The bundled database is stored in the `postgres-data` Docker volume.
 
 ## Use an external PostgreSQL database
 
@@ -119,7 +119,7 @@ COMPOSE_PROFILES=
 DATABASE_URL=postgresql+asyncpg://user:password@database-host:5432/aster
 ```
 
-An explicit `DATABASE_URL` takes precedence over every `POSTGRES_*` value. The database host must be reachable from the API container.
+An explicit `DATABASE_URL` takes precedence over every local PostgreSQL setting. The database host must be reachable from the API container.
 
 Start the same stack:
 
