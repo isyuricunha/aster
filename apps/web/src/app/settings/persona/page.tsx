@@ -1,7 +1,6 @@
-import Link from "next/link";
-
 import type { PersonaSettings } from "../../../lib/api";
 import { requireServerAuth, serverApiFetch } from "../../../lib/server-api";
+import { AppFrame } from "../../ui/app-frame";
 import { PersonaSettingsForm } from "./persona-settings";
 
 export const dynamic = "force-dynamic";
@@ -35,31 +34,16 @@ export default async function PersonaSettingsPage() {
   const initialData = await getPersona();
 
   return (
-    <main className="settings-page">
-      <nav className="top-nav">
-        <Link className="brand" href="/">
-          Aster
-        </Link>
-        <div className="nav-links">
-          <Link href="/settings/models">Models</Link>
-          <span>Persona</span>
-          <Link href="/settings/account">Account</Link>
-        </div>
-      </nav>
-
-      <header className="page-header">
-        <p className="eyebrow">Settings</p>
-        <h1>Persona</h1>
-        <p className="lead">
-          Define the identity and instruction layer Aster will place before the real conversation.
-          The user message remains a separate user message.
-        </p>
-      </header>
-
+    <AppFrame
+      active="persona"
+      kicker="Configuration"
+      title="Persona"
+      description="Define the identity and instruction layer applied before the real conversation while preserving the user message as its own role."
+    >
       <PersonaSettingsForm
         initialPersona={initialData.persona}
         initialError={initialData.error}
       />
-    </main>
+    </AppFrame>
   );
 }

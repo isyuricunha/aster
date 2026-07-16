@@ -1,35 +1,39 @@
 .browser {
-  margin-top: 18px;
-  padding-top: 18px;
+  margin-top: 14px;
   border-top: 1px solid var(--border);
 }
 
 .controls {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
+  padding: 14px 18px 0;
 }
 
 .toggle {
   display: flex;
-  min-height: 44px;
+  min-height: 38px;
   align-items: center;
-  gap: 9px;
-  padding: 0 13px;
+  gap: 8px;
+  padding: 0 11px;
   border: 1px solid var(--border-strong);
-  border-radius: 10px;
-  background: #0d0d10;
-  color: var(--muted);
+  border-radius: var(--radius-md);
+  background: #0b0d10;
+  color: var(--text-muted);
   cursor: pointer;
-  font-size: 0.84rem;
-  font-weight: 700;
+  font-size: 0.73rem;
+  font-weight: 560;
   white-space: nowrap;
 }
 
+.toggle:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
 .toggle input {
-  width: 17px;
-  min-height: 17px;
+  width: 15px;
+  min-height: 15px;
   margin: 0;
   padding: 0;
   border: 0;
@@ -43,43 +47,43 @@
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  margin-top: 12px;
-  color: var(--muted);
-  font-size: 0.78rem;
+  padding: 9px 18px 10px;
+  color: var(--text-faint);
+  font-size: 0.68rem;
 }
 
 .list {
   display: grid;
-  max-height: 560px;
-  gap: 8px;
-  margin-top: 14px;
-  padding-right: 4px;
+  max-height: 520px;
   overflow-y: auto;
+  border-top: 1px solid var(--border);
 }
 
 .empty {
-  margin-top: 14px;
-  padding: 24px;
+  margin: 0 18px 16px;
+  padding: 22px;
   border: 1px dashed var(--border);
-  border-radius: 12px;
-  color: var(--muted);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: 0.76rem;
   text-align: center;
 }
 
 .actions {
   display: flex;
   justify-content: center;
-  margin-top: 14px;
+  padding: 12px 18px 16px;
+  border-top: 1px solid var(--border);
 }
 
 .selectStack {
   display: grid;
-  gap: 8px;
+  gap: 7px;
 }
 
 .hint {
-  color: var(--muted) !important;
-  font-size: 0.76rem !important;
+  color: var(--text-faint) !important;
+  font-size: 0.67rem !important;
   font-weight: 400 !important;
   line-height: 1.45;
 }
@@ -91,6 +95,6 @@
 
   .summary {
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
   }
 }

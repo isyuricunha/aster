@@ -11,6 +11,7 @@ import {
   type ConversationSummary,
   type ModelPreferences,
 } from "../lib/api";
+import { AsterMark, Icon } from "./ui/icons";
 
 type StreamEvent = {
   event: string;
@@ -395,15 +396,34 @@ export function ChatShell({
     <div className="chat-app">
       <aside className="chat-sidebar">
         <div className="sidebar-header">
-          <span className="brand">Aster</span>
-          <button className="new-chat-button" disabled={streaming} onClick={startNewChat}>
-            New chat
+          <Link className="workspace-brand" href="/">
+            <AsterMark />
+            <span>Aster</span>
+          </Link>
+          <button
+            aria-label="Start a new conversation"
+            className="new-chat-button"
+            disabled={streaming}
+            onClick={startNewChat}
+            title="New conversation"
+          >
+            <Icon name="new-chat" />
           </button>
+        </div>
+
+        <div className="chat-navigation-item active">
+          <Icon name="chat" />
+          <span>Chat</span>
+        </div>
+
+        <div className="sidebar-section-heading">
+          <span>Conversations</span>
+          <small>{conversations.length}</small>
         </div>
 
         <div className="conversation-list" aria-label="Conversations">
           {conversations.length === 0 ? (
-            <p className="conversation-empty">No conversations yet.</p>
+            <p className="conversation-empty">Your conversations will appear here.</p>
           ) : (
             conversations.map((item) => (
               <button
@@ -412,32 +432,71 @@ export function ChatShell({
                 key={item.id}
                 onClick={() => void selectConversation(item.id)}
               >
-                <span>{item.title}</span>
-                <small>{item.message_count} messages</small>
+                <span className="conversation-icon">
+                  <Icon name="chat" size={14} />
+                </span>
+                <span className="conversation-copy">
+                  <strong>{item.title}</strong>
+                  <small>{item.message_count} messages</small>
+                </span>
               </button>
             ))
           )}
         </div>
 
-        <nav className="sidebar-settings">
-          <Link href="/settings/models">Models</Link>
-          <Link href="/settings/persona">Persona</Link>
+        <nav className="sidebar-settings" aria-label="Configuration">
+          <p>Configuration</p>
+          <Link href="/settings/models">
+            <Icon name="models" />
+            <span>Models</span>
+          </Link>
+          <Link href="/settings/persona">
+            <Icon name="persona" />
+            <span>Persona</span>
+          </Link>
+          <Link href="/settings/account">
+            <Icon name="account" />
+            <span>Account</span>
+          </Link>
         </nav>
+
+        <div className="chat-sidebar-footer">
+          <span className="workspace-state-dot" />
+          <div>
+            <strong>Private workspace</strong>
+            <small>Stored on your server</small>
+          </div>
+        </div>
       </aside>
 
-      <main className="chat-main">
+      <section className="chat-workspace">
         <header className="chat-header">
-          <div>
-            <p className="chat-title">{conversation?.title ?? "New chat"}</p>
-            <p className="chat-model">{primaryLabel ?? "Primary model not configured"}</p>
+          <div className="chat-header-context">
+            <span className="chat-header-section">Chat</span>
+            <Icon name="chevron-right" size={13} />
+            <div>
+              <p className="chat-title">{conversation?.title ?? "New conversation"}</p>
+              <p className="chat-model">{primaryLabel ?? "Primary model not configured"}</p>
+            </div>
           </div>
           {conversation && (
             <div className="chat-actions">
-              <button disabled={streaming} onClick={() => void renameConversation()}>
-                Rename
+              <button
+                aria-label="Rename conversation"
+                disabled={streaming}
+                onClick={() => void renameConversation()}
+                title="Rename conversation"
+              >
+                <Icon name="edit" />
               </button>
-              <button className="danger" disabled={streaming} onClick={() => void deleteConversation()}>
-                Delete
+              <button
+                aria-label="Delete conversation"
+                className="danger"
+                disabled={streaming}
+                onClick={() => void deleteConversation()}
+                title="Delete conversation"
+              >
+                <Icon name="trash" />
               </button>
             </div>
           )}
@@ -446,14 +505,16 @@ export function ChatShell({
         <section className="chat-transcript" aria-live="polite">
           {!conversation || conversation.messages.length === 0 ? (
             <div className="chat-welcome">
-              <p className="eyebrow">Persistent chat</p>
-              <h1>What are we working on?</h1>
+              <AsterMark size={38} />
+              <p className="eyebrow">New conversation</p>
+              <h1>How can Aster help?</h1>
               <p>
-                Messages are stored locally. The configured persona is sent as an instruction, and
-                the primary model handles the response.
+                Start a private conversation using your configured persona and primary model. Messages
+                stay in this workspace and remain available after restarts.
               </p>
               {!primaryLabel && (
                 <Link className="button" href="/settings/models">
+                  <Icon name="models" />
                   Configure a primary model
                 </Link>
               )}
@@ -462,56 +523,75 @@ export function ChatShell({
             <div className="message-stack">
               {conversation.messages.map((message) => (
                 <article className={`chat-message ${message.role}`} key={message.id}>
-                  <div className="message-label">
-                    <span>{message.role === "user" ? "You" : "Assistant"}</span>
-                    {message.status === "streaming" && <small>Streaming</small>}
-                    {message.status === "failed" && <small>Failed</small>}
-                    {message.status === "stopped" && <small>Stopped</small>}
+                  <div className="message-avatar">
+                    {message.role === "user" ? <span>Y</span> : <AsterMark size={26} />}
                   </div>
+                  <div className="message-body">
+                    <div className="message-label">
+                      <span>{message.role === "user" ? "You" : "Aster"}</span>
+                      {message.status === "streaming" && <small>Generating</small>}
+                      {message.status === "failed" && <small className="failed">Failed</small>}
+                      {message.status === "stopped" && <small>Stopped</small>}
+                    </div>
 
-                  {editingMessageId === message.id ? (
-                    <form className="message-edit-form" onSubmit={(event) => void editAndResend(event, message)}>
-                      <textarea
-                        autoFocus
-                        onChange={(event) => setEditingDraft(event.target.value)}
-                        rows={4}
-                        value={editingDraft}
-                      />
-                      <div className="message-edit-actions">
-                        <button
-                          className="message-action"
-                          type="button"
-                          onClick={() => setEditingMessageId(null)}
-                        >
-                          Cancel
-                        </button>
-                        <button className="message-action primary" disabled={!editingDraft.trim()} type="submit">
-                          Save and resend
-                        </button>
-                      </div>
-                    </form>
-                  ) : (
-                    <>
-                      <div className="message-content">
-                        {message.content || (message.status === "streaming" ? "…" : "")}
-                      </div>
-                      {message.error_message && <p className="message-error">{message.error_message}</p>}
-                      {!streaming && (
-                        <div className="message-actions">
-                          {message.role === "user" && message.status === "completed" && (
-                            <button className="message-action" onClick={() => startEditing(message)}>
-                              Edit
-                            </button>
-                          )}
-                          {message.role === "assistant" && message.status !== "streaming" && (
-                            <button className="message-action" onClick={() => void regenerate(message)}>
-                              Regenerate
-                            </button>
-                          )}
+                    {editingMessageId === message.id ? (
+                      <form
+                        className="message-edit-form"
+                        onSubmit={(event) => void editAndResend(event, message)}
+                      >
+                        <textarea
+                          autoFocus
+                          onChange={(event) => setEditingDraft(event.target.value)}
+                          rows={4}
+                          value={editingDraft}
+                        />
+                        <div className="message-edit-actions">
+                          <button
+                            className="message-action"
+                            type="button"
+                            onClick={() => setEditingMessageId(null)}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            className="message-action primary"
+                            disabled={!editingDraft.trim()}
+                            type="submit"
+                          >
+                            Save and resend
+                          </button>
                         </div>
-                      )}
-                    </>
-                  )}
+                      </form>
+                    ) : (
+                      <>
+                        <div className="message-content">
+                          {message.content || (message.status === "streaming" ? "…" : "")}
+                        </div>
+                        {message.error_message && (
+                          <p className="message-error">{message.error_message}</p>
+                        )}
+                        {!streaming && (
+                          <div className="message-actions">
+                            {message.role === "user" && message.status === "completed" && (
+                              <button className="message-action" onClick={() => startEditing(message)}>
+                                <Icon name="edit" size={13} />
+                                Edit
+                              </button>
+                            )}
+                            {message.role === "assistant" && message.status !== "streaming" && (
+                              <button
+                                className="message-action"
+                                onClick={() => void regenerate(message)}
+                              >
+                                <Icon name="refresh" size={13} />
+                                Regenerate
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </article>
               ))}
             </div>
@@ -521,29 +601,46 @@ export function ChatShell({
         <footer className="chat-composer-wrap">
           {error && <div className="chat-error">{error}</div>}
           <form className="chat-composer" onSubmit={sendMessage}>
-            <textarea
-              aria-label="Message"
-              disabled={streaming}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={handleComposerKeyDown}
-              placeholder={primaryLabel ? "Message Aster" : "Configure a primary model first"}
-              ref={composerRef}
-              rows={1}
-              value={draft}
-            />
-            {streaming ? (
-              <button className="stop-generation" disabled={!activeAssistantId || stopping} type="button" onClick={() => void stopGeneration()}>
-                {stopping ? "Stopping" : "Stop"}
-              </button>
-            ) : (
-              <button disabled={!draft.trim() || !primaryLabel} type="submit">
-                Send
-              </button>
-            )}
+            <div className="composer-status">
+              <span className={primaryLabel ? "configured" : ""} />
+              <p>{primaryLabel ?? "Configure a primary model to start chatting"}</p>
+            </div>
+            <div className="composer-row">
+              <textarea
+                aria-label="Message"
+                disabled={streaming}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={handleComposerKeyDown}
+                placeholder={primaryLabel ? "Message Aster…" : "Primary model required"}
+                ref={composerRef}
+                rows={1}
+                value={draft}
+              />
+              {streaming ? (
+                <button
+                  aria-label="Stop generation"
+                  className="stop-generation"
+                  disabled={!activeAssistantId || stopping}
+                  type="button"
+                  onClick={() => void stopGeneration()}
+                >
+                  <Icon name="stop" />
+                </button>
+              ) : (
+                <button
+                  aria-label="Send message"
+                  className="send-message"
+                  disabled={!draft.trim() || !primaryLabel}
+                  type="submit"
+                >
+                  <Icon name="arrow-up" />
+                </button>
+              )}
+            </div>
           </form>
           <p className="composer-hint">Enter to send · Shift+Enter for a new line</p>
         </footer>
-      </main>
+      </section>
     </div>
   );
 }

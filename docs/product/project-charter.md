@@ -1,6 +1,6 @@
 # Aster Project Charter
 
-Status: Accepted through Stage 7
+Status: Accepted through Stage 8
 
 ## Product vision
 
@@ -33,6 +33,12 @@ The MVP must solve a small set of problems reliably. Future architecture should 
 ### Observable behavior
 
 Failures must be explicit. Endpoint errors, unavailable models, interrupted streams, stale model caches, and authentication failures must be visible to the user without exposing secrets.
+
+### Workspace clarity
+
+Aster is a daily-use workspace, not a collection of disconnected forms. Navigation, hierarchy, density, interaction states, and responsive behavior must remain consistent across chat, configuration, authentication, and security screens.
+
+Visual design should clarify product state before adding decoration. New screens reuse the shared interface foundation unless a documented product requirement demands a different interaction model.
 
 ## MVP 1 capabilities
 
@@ -88,6 +94,16 @@ Multiple personas, persona versioning, and per-conversation personas are deferre
 - Change the owner password and revoke sessions
 - Recover access through an administrative container command
 
+### Interface and UX
+
+- Use one consistent workspace navigation model
+- Keep chat optimized for long-running desktop use
+- Preserve usable navigation and controls on narrow screens
+- Share typography, spacing, surfaces, status colors, and focus states
+- Make selected conversations and active settings unambiguous
+- Keep high-volume model lists bounded and searchable
+- Avoid external UI dependencies for the Stage 8 foundation
+
 ## Current non-goals
 
 - Agents or autonomous execution
@@ -138,6 +154,8 @@ Aster is stable only when:
 - First sign-up cannot create more than one owner
 - Private routes reject unauthenticated requests
 - Password changes revoke existing sessions
+- Desktop and narrow-screen navigation remain usable
+- Keyboard focus states remain visible
 - A clean Docker Compose installation is reproducible
 - Database migrations work against an empty database
 - Required lint, type checks, builds, and tests pass
@@ -150,6 +168,7 @@ Aster is stable only when:
 - Persistent chat and generation controls: implemented
 - Production-ready deployment: implemented
 - Single-owner authentication: implemented in Stage 7
+- Interface and UX foundation: implemented in Stage 8
 
 ## Change control
 
