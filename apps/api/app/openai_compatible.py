@@ -16,7 +16,7 @@ class OpenAICompatibleClient:
     def __init__(
         self,
         *,
-        timeout_seconds: float = 10.0,
+        timeout_seconds: float = 30.0,
         stream_timeout_seconds: float = 120.0,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
