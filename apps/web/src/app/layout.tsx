@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import "./globals.css";
+import "./shell.css";
 import "./persona.css";
 import "./chat.css";
 import "./chat-controls.css";
