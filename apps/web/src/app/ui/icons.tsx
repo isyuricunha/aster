@@ -4,7 +4,11 @@ export type IconName =
   | "account"
   | "arrow-up"
   | "chat"
+  | "check"
   | "chevron-right"
+  | "close"
+  | "copy"
+  | "download"
   | "edit"
   | "lock"
   | "models"
@@ -15,7 +19,8 @@ export type IconName =
   | "search"
   | "settings"
   | "stop"
-  | "trash";
+  | "trash"
+  | "upload";
 
 type IconProps = Omit<SVGProps<SVGSVGElement>, "children"> & {
   name: IconName;
@@ -42,7 +47,21 @@ export function Icon({ name, size = 16, ...props }: IconProps) {
         <path d="M8.5 9h7M8.5 12h4.5" />
       </>
     ),
+    check: <path d="m5 12.5 4.2 4.2L19 7" />,
     "chevron-right": <path d="m9 6 6 6-6 6" />,
+    close: <path d="m7 7 10 10M17 7 7 17" />,
+    copy: (
+      <>
+        <rect x="8" y="8" width="11" height="11" rx="2" />
+        <path d="M16 8V5H5v11h3" />
+      </>
+    ),
+    download: (
+      <>
+        <path d="M12 4v11" />
+        <path d="m8 11 4 4 4-4M5 20h14" />
+      </>
+    ),
     edit: (
       <>
         <path d="m14.5 5.5 4 4L9 19H5v-4l9.5-9.5Z" />
@@ -108,6 +127,12 @@ export function Icon({ name, size = 16, ...props }: IconProps) {
         <path d="M5 7h14" />
         <path d="m9 7 .5-2h5l.5 2M7 7l1 13h8l1-13" />
         <path d="M10 10v6M14 10v6" />
+      </>
+    ),
+    upload: (
+      <>
+        <path d="M12 20V9" />
+        <path d="m8 13 4-4 4 4M5 4h14" />
       </>
     ),
   };
