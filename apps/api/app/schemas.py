@@ -278,7 +278,8 @@ class ConversationImportMessage(BaseModel):
     def validate_role_metadata(self) -> "ConversationImportMessage":
         if self.role == "user" and self.status != "completed":
             raise ValueError("Imported user messages must be completed")
-        if self.role == "user" and (self.error_message is not None or self.model_id is not None):
+        has_assistant_metadata = self.error_message is not None or self.model_id is not None
+        if self.role == "user" and has_assistant_metadata:
             raise ValueError("Imported user messages cannot contain assistant metadata")
         if self.status == "completed" and not self.content:
             raise ValueError("Completed imported messages cannot be empty")
@@ -288,8 +289,8 @@ class ConversationImportMessage(BaseModel):
 class ConversationImportRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    format: Literal["aster-conversation"] = "aster-conversation"
-    version: Literal[1] = 1
+    format: Literal["aster-conversation"]
+    version: Literal[1]
     title: Annotated[str, Field(min_length=1, max_length=200)]
     messages: Annotated[list[ConversationImportMessage], Field(max_length=2_000)]
 
