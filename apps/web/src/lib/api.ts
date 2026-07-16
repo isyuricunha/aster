@@ -90,6 +90,21 @@ export type Conversation = {
   updated_at: string;
 };
 
+export type ConversationTransferMessage = {
+  role: "user" | "assistant";
+  content: string;
+  status: "completed" | "failed" | "stopped";
+  error_message: string | null;
+  model_id: string | null;
+};
+
+export type ConversationTransfer = {
+  format: "aster-conversation";
+  version: 1;
+  title: string;
+  messages: ConversationTransferMessage[];
+};
+
 export type AuthStatus = {
   setup_required: boolean;
   authenticated: boolean;
