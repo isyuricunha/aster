@@ -96,6 +96,10 @@ uv run alembic upgrade head
 - API keys must never be included in logs, error payloads, fixtures, or documentation.
 - Model-provider behavior must be implemented through generic capabilities and API adapters rather than hard-coded provider names.
 
+## License
+
+Aster is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+
 ## Status
 
 Foundation work only. Chat, persona management, endpoint management, and model caching will be implemented in subsequent milestones.
