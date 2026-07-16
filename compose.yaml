@@ -3,13 +3,13 @@ name: aster
 services:
   postgres:
     image: postgres:17-alpine
+    profiles:
+      - local-db
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-aster}
       POSTGRES_USER: ${POSTGRES_USER:-aster}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aster}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -26,15 +26,18 @@ services:
       context: ./apps/api
     restart: unless-stopped
     environment:
-      APP_ENVIRONMENT: development
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-aster}:${POSTGRES_PASSWORD:-aster}@postgres:5432/${POSTGRES_DB:-aster}
+      APP_ENVIRONMENT: ${APP_ENVIRONMENT:-development}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-aster}:${POSTGRES_PASSWORD:-aster}@postgres:5432/${POSTGRES_DB:-aster}}
       ASTER_ENCRYPTION_KEY: ${ASTER_ENCRYPTION_KEY}
       ASTER_CORS_ORIGINS: ${ASTER_CORS_ORIGINS:-http://localhost:3000}
+      ASTER_ENDPOINT_TIMEOUT_SECONDS: ${ASTER_ENDPOINT_TIMEOUT_SECONDS:-30}
+      ASTER_STREAM_TIMEOUT_SECONDS: ${ASTER_STREAM_TIMEOUT_SECONDS:-120}
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy
+        required: false
     healthcheck:
       test:
         - CMD
