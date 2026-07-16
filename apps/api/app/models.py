@@ -138,7 +138,8 @@ class ChatMessage(TimestampMixin, Base):
         UniqueConstraint("conversation_id", "position", name="uq_chat_message_position"),
         CheckConstraint("role IN ('user', 'assistant')", name="ck_chat_message_role"),
         CheckConstraint(
-            "status IN ('completed', 'streaming', 'failed')", name="ck_chat_message_status"
+            "status IN ('completed', 'streaming', 'failed', 'stopped')",
+            name="ck_chat_message_status",
         ),
     )
 

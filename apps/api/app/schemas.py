@@ -233,7 +233,7 @@ class ChatMessageResponse(BaseModel):
     conversation_id: UUID
     role: Literal["user", "assistant"]
     content: str
-    status: Literal["completed", "streaming", "failed"]
+    status: Literal["completed", "streaming", "failed", "stopped"]
     error_message: str | None
     model_id: str | None
     position: int
@@ -266,3 +266,8 @@ class SendMessageRequest(BaseModel):
         if not value.strip():
             raise ValueError("Message cannot be empty")
         return value
+
+
+class StopGenerationResponse(BaseModel):
+    stopped: bool = True
+    message_id: UUID

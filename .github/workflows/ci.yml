@@ -66,7 +66,16 @@ jobs:
         run: uv run ruff check .
 
       - name: Test
-        run: uv run pytest
+        run: |
+          set -o pipefail
+          uv run pytest 2>&1 | tee /tmp/pytest.log
+
+      - name: Upload test log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-log
+          path: /tmp/pytest.log
 
       - name: Validate migrations
         run: uv run alembic upgrade head --sql > /tmp/aster-migrations.sql
@@ -129,6 +138,11 @@ jobs:
           curl --fail --silent --show-error \
             "http://localhost:8000/api/conversations/${conversation_id}" \
             | grep --quiet '"title":"CI chat"'
+
+      - name: Check chat generation controls
+        run: |
+          curl --fail --silent --show-error http://localhost:8000/openapi.json \
+            | python -c 'import json, sys; paths = json.load(sys.stdin)["paths"]; required = ["/api/conversations/{conversation_id}/messages/{message_id}/edit-and-resend", "/api/conversations/{conversation_id}/messages/{message_id}/regenerate", "/api/messages/{message_id}/stop"]; assert all(path in paths for path in required)'
 
       - name: Check chat page
         run: >-

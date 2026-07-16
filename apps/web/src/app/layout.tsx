@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 import "./persona.css";
 import "./chat.css";
+import "./chat-controls.css";
 
 export const metadata: Metadata = {
   title: "Aster",
