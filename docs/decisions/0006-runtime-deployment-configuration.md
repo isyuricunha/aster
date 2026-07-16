@@ -17,7 +17,9 @@ The browser build also needs a public API URL that is different from the interna
 
 Aster supports two database modes through the same Compose file.
 
-The bundled PostgreSQL service belongs to the `local-db` profile. `.env.example` enables that profile so the default installation remains one command. External database deployments disable the profile and set `DATABASE_URL` to a PostgreSQL URL reachable from the API container.
+The bundled PostgreSQL service belongs to the `local-db` profile. `.env.example` enables that profile so the default installation remains one command. When `DATABASE_URL` is empty, the API derives its connection URL from `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`.
+
+External database deployments disable the profile and set `DATABASE_URL` to a PostgreSQL URL reachable from the API container. An explicit `DATABASE_URL` always takes precedence over the local PostgreSQL settings.
 
 The bundled PostgreSQL service does not publish port 5432 to the host. It remains reachable by other services on the Compose network.
 
@@ -34,9 +36,9 @@ Large model caches remain complete in the API and database. The web interface fi
 
 A new local installation still starts with `docker compose up --build` after copying `.env.example`.
 
-An external database installation must keep `COMPOSE_PROFILES` empty and provide `DATABASE_URL`.
+Existing local installations keep using their current `POSTGRES_*` values without duplicating credentials inside `DATABASE_URL`.
 
-Changing local PostgreSQL credentials also requires updating the local `DATABASE_URL` value.
+An external database installation must keep `COMPOSE_PROFILES` empty and provide `DATABASE_URL`.
 
 The application can handle slow but valid model-list endpoints without forcing every deployment to use the same timeout.
 
