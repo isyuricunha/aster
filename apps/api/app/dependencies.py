@@ -11,4 +11,7 @@ def get_secret_cipher() -> SecretCipher:
 
 
 def get_openai_client() -> OpenAICompatibleClient:
-    return OpenAICompatibleClient()
+    return OpenAICompatibleClient(
+        timeout_seconds=settings.aster_endpoint_timeout_seconds,
+        stream_timeout_seconds=settings.aster_stream_timeout_seconds,
+    )
