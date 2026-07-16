@@ -65,3 +65,43 @@ jobs:
 
       - name: Test
         run: uv run pytest
+
+  compose:
+    name: Docker Compose
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Prepare environment
+        run: cp .env.example .env
+
+      - name: Validate configuration
+        run: docker compose config --quiet
+
+      - name: Start application stack
+        run: docker compose up --build --detach
+
+      - name: Check API readiness
+        run: >-
+          curl --fail --silent --show-error
+          --retry 30 --retry-all-errors --retry-delay 2
+          http://localhost:8000/ready
+
+      - name: Check web application
+        run: >-
+          curl --fail --silent --show-error
+          --retry 30 --retry-all-errors --retry-delay 2
+          http://localhost:3000
+
+      - name: Show service state
+        if: always()
+        run: docker compose ps
+
+      - name: Show service logs
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Stop application stack
+        if: always()
+        run: docker compose down --volumes --remove-orphans
