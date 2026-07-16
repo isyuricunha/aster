@@ -6,6 +6,14 @@ All notable changes to Aster are documented in this file.
 
 ### Added
 
+- Safe Markdown rendering for user and assistant messages.
+- GFM tables, task lists, autolinks, strikethrough, and authored line breaks.
+- Fenced-code syntax highlighting with per-block copy controls.
+- Message copy actions and stable rendering for incomplete streamed code fences.
+- Full-history search across conversation titles and message content.
+- Versioned JSON conversation export and authenticated import.
+- Human-readable Markdown conversation export.
+- Inline conversation renaming and keyboard access to history search.
 - Shared application frame for chat, model, persona, and account navigation.
 - Internal interface icon set and dedicated Aster brand mark.
 - Responsive workspace navigation for desktop and mobile layouts.
@@ -24,6 +32,8 @@ All notable changes to Aster are documented in this file.
 
 ### Changed
 
+- Chat content now renders as structured documents instead of plain text.
+- Conversation import validates format, version, roles, statuses, metadata, and total size.
 - Interface hierarchy now derives from a neutral base, restrained accent, and shared contrast system.
 - Sidebar and primary view chrome now form one continuous application frame.
 - Navigation, conversation rows, controls, labels, and icons use denser shared alignment rules.
@@ -38,6 +48,7 @@ All notable changes to Aster are documented in this file.
 
 ### Fixed
 
+- Incomplete fenced code remains readable while a response is still streaming.
 - Real endpoints that need more than ten seconds to return a large model list no longer fail prematurely.
 
 ## 0.1.0
