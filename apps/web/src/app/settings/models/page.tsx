@@ -1,7 +1,6 @@
-import Link from "next/link";
-
 import type { CachedModel, ModelEndpoint, ModelPreferences } from "../../../lib/api";
 import { requireServerAuth, serverApiFetch } from "../../../lib/server-api";
+import { AppFrame } from "../../ui/app-frame";
 import { ModelSettings } from "./model-settings";
 
 export const dynamic = "force-dynamic";
@@ -46,33 +45,18 @@ export default async function ModelsSettingsPage() {
   const initialData = await getInitialModelSettings();
 
   return (
-    <main className="settings-page">
-      <nav className="top-nav">
-        <Link className="brand" href="/">
-          Aster
-        </Link>
-        <div className="nav-links">
-          <span>Models</span>
-          <Link href="/settings/persona">Persona</Link>
-          <Link href="/settings/account">Account</Link>
-        </div>
-      </nav>
-
-      <header className="page-header">
-        <p className="eyebrow">Settings</p>
-        <h1>Models</h1>
-        <p className="lead">
-          Connect OpenAI-compatible APIs, keep a local model cache, and choose the default model for
-          each role.
-        </p>
-      </header>
-
+    <AppFrame
+      active="models"
+      kicker="Configuration"
+      title="Models"
+      description="Connect compatible APIs, maintain the local model catalog, and assign the defaults used across Aster."
+    >
       <ModelSettings
         initialEndpoints={initialData.endpoints}
         initialModels={initialData.models}
         initialPreferences={initialData.preferences}
         initialError={initialData.error}
       />
-    </main>
+    </AppFrame>
   );
 }
