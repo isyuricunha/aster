@@ -1,6 +1,6 @@
 # Aster Project Charter
 
-Status: Accepted for MVP 1
+Status: Accepted through Stage 7
 
 ## Product vision
 
@@ -32,7 +32,7 @@ The MVP must solve a small set of problems reliably. Future architecture should 
 
 ### Observable behavior
 
-Failures must be explicit. Endpoint errors, unavailable models, interrupted streams, and stale model caches must be visible to the user without exposing secrets.
+Failures must be explicit. Endpoint errors, unavailable models, interrupted streams, stale model caches, and authentication failures must be visible to the user without exposing secrets.
 
 ## MVP 1 capabilities
 
@@ -78,7 +78,17 @@ Multiple personas, persona versioning, and per-conversation personas are deferre
 - Allow manual model identifiers when model listing is unsupported or incomplete
 - Mark models missing from the latest refresh instead of deleting them silently
 
-## MVP 1 non-goals
+### Authentication
+
+- Create one owner through first-access setup
+- Close public sign-up permanently after the owner exists
+- Hash passwords with Argon2id
+- Store opaque sessions as token hashes
+- Require authentication for application data and settings
+- Change the owner password and revoke sessions
+- Recover access through an administrative container command
+
+## Current non-goals
 
 - Agents or autonomous execution
 - Tool calling and MCP
@@ -88,7 +98,8 @@ Multiple personas, persona versioning, and per-conversation personas are deferre
 - Scheduled or conditional tasks
 - Email and calendar integrations
 - Audio features
-- Multiple users and application-managed authentication
+- Multiple users, invitations, roles, and per-user data isolation
+- Email-based password recovery
 - Multiple, versioned, or conversation-scoped personas
 - Advanced user-defined model parameters
 - Intelligent model routing and fallback chains
@@ -105,15 +116,17 @@ Aster recognizes three configuration roles:
 
 Only the primary role is required to use the initial chat. The utility and image roles are configuration foundations and must not justify premature background or image features.
 
-## Initial operating mode
+## Operating mode
 
-MVP 1 is a single-user, self-hosted application. Deployment-level protection may be provided by a trusted reverse proxy, private network, or another external access-control layer.
+Aster is a single-owner, self-hosted application. The owner is created in the browser on first access. After that transaction succeeds, the setup route cannot create another account.
 
-Application-managed accounts, password recovery, invitations, and multi-user data isolation are deferred.
+Remote deployment must use HTTPS through a trusted reverse proxy or tunnel. Only the web service is published; it proxies API traffic internally so the host-only session cookie remains on one public origin.
+
+Multiple users, password recovery by email, invitations, and user-level data isolation remain deferred.
 
 ## Definition of stable
 
-The first MVP is stable only when:
+Aster is stable only when:
 
 - Container restarts preserve conversations and configuration
 - Endpoint changes do not require source-code edits
@@ -121,7 +134,10 @@ The first MVP is stable only when:
 - Streaming does not duplicate or silently truncate messages
 - Remote API failures produce clear user-facing errors
 - Cached models remain usable while an endpoint is temporarily unavailable
-- Credentials never appear in logs or API responses
+- Credentials and session tokens never appear in logs or API responses
+- First sign-up cannot create more than one owner
+- Private routes reject unauthenticated requests
+- Password changes revoke existing sessions
 - A clean Docker Compose installation is reproducible
 - Database migrations work against an empty database
 - Required lint, type checks, builds, and tests pass
@@ -129,9 +145,11 @@ The first MVP is stable only when:
 ## Milestone status
 
 - Foundation: implemented
-- Endpoint and model configuration: implemented in the current milestone
+- Endpoint and model configuration: implemented
 - Persona composition: implemented
-- Chat: pending
+- Persistent chat and generation controls: implemented
+- Production-ready deployment: implemented
+- Single-owner authentication: implemented in Stage 7
 
 ## Change control
 
