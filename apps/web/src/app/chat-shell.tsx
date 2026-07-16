@@ -8,7 +8,7 @@ import {
   useState,
   type ChangeEvent,
   type FormEvent,
-  type KeyboardEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 
 import {
@@ -109,13 +109,13 @@ export function ChatShell({
   const [searchResults, setSearchResults] = useState<ConversationSummary[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [searchRevision, setSearchRevision] = useState(0);
   const [error, setError] = useState<string | null>(initialError);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const renameRef = useRef<HTMLInputElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const copiedTimerRef = useRef<number | null>(null);
+  const searchTimerRef = useRef<number | null>(null);
   const searchRequestRef = useRef(0);
   const activeAssistantIdRef = useRef<string | null>(null);
 
@@ -127,39 +127,7 @@ export function ChatShell({
   const visibleConversations = searchResults ?? conversations;
 
   useEffect(() => {
-    const query = searchQuery.trim();
-    const requestId = ++searchRequestRef.current;
-    if (!query) {
-      setSearchResults(null);
-      setSearching(false);
-      setSearchError(null);
-      return;
-    }
-
-    setSearching(true);
-    setSearchError(null);
-    const timeout = window.setTimeout(() => {
-      void apiRequest<ConversationSummary[]>(
-        `/api/conversations?query=${encodeURIComponent(query)}`,
-      )
-        .then((results) => {
-          if (searchRequestRef.current === requestId) setSearchResults(results);
-        })
-        .catch((caught: unknown) => {
-          if (searchRequestRef.current !== requestId) return;
-          setSearchError(caught instanceof Error ? caught.message : "Could not search conversations.");
-          setSearchResults([]);
-        })
-        .finally(() => {
-          if (searchRequestRef.current === requestId) setSearching(false);
-        });
-    }, 220);
-
-    return () => window.clearTimeout(timeout);
-  }, [searchQuery, searchRevision]);
-
-  useEffect(() => {
-    function handleShortcut(event: globalThis.KeyboardEvent) {
+    function handleShortcut(event: KeyboardEvent) {
       const target = event.target;
       const isTyping =
         target instanceof HTMLElement &&
@@ -177,14 +145,53 @@ export function ChatShell({
   useEffect(
     () => () => {
       if (copiedTimerRef.current !== null) window.clearTimeout(copiedTimerRef.current);
+      if (searchTimerRef.current !== null) window.clearTimeout(searchTimerRef.current);
+      searchRequestRef.current += 1;
     },
     [],
   );
 
+  function scheduleConversationSearch(value: string) {
+    setSearchQuery(value);
+    const query = value.trim();
+    const requestId = ++searchRequestRef.current;
+
+    if (searchTimerRef.current !== null) {
+      window.clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = null;
+    }
+
+    if (!query) {
+      setSearchResults(null);
+      setSearching(false);
+      setSearchError(null);
+      return;
+    }
+
+    setSearching(true);
+    setSearchError(null);
+    searchTimerRef.current = window.setTimeout(() => {
+      void apiRequest<ConversationSummary[]>(
+        `/api/conversations?query=${encodeURIComponent(query)}`,
+      )
+        .then((results) => {
+          if (searchRequestRef.current === requestId) setSearchResults(results);
+        })
+        .catch((caught: unknown) => {
+          if (searchRequestRef.current !== requestId) return;
+          setSearchError(caught instanceof Error ? caught.message : "Could not search conversations.");
+          setSearchResults([]);
+        })
+        .finally(() => {
+          if (searchRequestRef.current === requestId) setSearching(false);
+        });
+    }, 220);
+  }
+
   async function refreshConversations() {
     const refreshed = await apiRequest<ConversationSummary[]>("/api/conversations");
     setConversations(refreshed);
-    setSearchRevision((current) => current + 1);
+    if (searchQuery.trim()) scheduleConversationSearch(searchQuery);
   }
 
   async function refreshConversation(id: string) {
@@ -265,7 +272,7 @@ export function ChatShell({
       await apiRequest(`/api/conversations/${conversation.id}`, { method: "DELETE" });
       const remaining = conversations.filter((item) => item.id !== conversation.id);
       setConversations(remaining);
-      setSearchRevision((current) => current + 1);
+      if (searchQuery.trim()) scheduleConversationSearch(searchQuery);
       if (remaining[0]) {
         await selectConversation(remaining[0].id);
       } else {
@@ -327,7 +334,7 @@ export function ChatShell({
         method: "POST",
         body: JSON.stringify(transfer),
       });
-      setSearchQuery("");
+      scheduleConversationSearch("");
       setConversation(imported);
       setEditingMessageId(null);
       setRenaming(false);
@@ -554,16 +561,16 @@ export function ChatShell({
     }
   }
 
-  function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+  function handleComposerKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       event.currentTarget.form?.requestSubmit();
     }
   }
 
-  function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+  function handleSearchKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
     if (event.key === "Escape") {
-      setSearchQuery("");
+      scheduleConversationSearch("");
       event.currentTarget.blur();
       return;
     }
@@ -601,14 +608,18 @@ export function ChatShell({
           <Icon name="search" size={14} />
           <input
             aria-label="Search conversations"
-            onChange={(event) => setSearchQuery(event.target.value)}
+            onChange={(event) => scheduleConversationSearch(event.target.value)}
             onKeyDown={handleSearchKeyDown}
             placeholder="Search conversations"
             ref={searchRef}
             value={searchQuery}
           />
           {searchQuery ? (
-            <button aria-label="Clear search" onClick={() => setSearchQuery("")} type="button">
+            <button
+              aria-label="Clear search"
+              onClick={() => scheduleConversationSearch("")}
+              type="button"
+            >
               <Icon name="close" size={13} />
             </button>
           ) : (
