@@ -1,8 +1,5 @@
 FROM node:22-alpine AS build
 
-ARG NEXT_PUBLIC_ASTER_API_URL=http://localhost:8000
-ENV NEXT_PUBLIC_ASTER_API_URL=$NEXT_PUBLIC_ASTER_API_URL
-
 WORKDIR /app
 RUN npm install --global pnpm@10
 
