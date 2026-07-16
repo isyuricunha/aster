@@ -90,25 +90,40 @@ export type Conversation = {
   updated_at: string;
 };
 
+export type AuthStatus = {
+  setup_required: boolean;
+  authenticated: boolean;
+  username: string | null;
+};
+
+export type AuthUser = {
+  username: string;
+  created_at: string;
+};
+
+export type SessionRevocation = {
+  revoked_sessions: number;
+};
+
 type ErrorPayload = {
   detail?: string | { message?: string };
 };
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_ASTER_API_URL ?? "http://localhost:8000";
-
 export function apiUrl(path: string): string {
-  return `${apiBaseUrl}${path}`;
+  return path;
 }
 
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
-  headers.set("Content-Type", "application/json");
+  if (init?.body !== undefined) {
+    headers.set("Content-Type", "application/json");
+  }
 
   const response = await fetch(apiUrl(path), {
     ...init,
+    credentials: "include",
     headers,
   });
-
   if (response.status === 204) {
     return undefined as T;
   }

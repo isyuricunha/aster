@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     aster_cors_origins: str = "http://localhost:3000"
     aster_endpoint_timeout_seconds: float = Field(default=30.0, gt=0)
     aster_stream_timeout_seconds: float = Field(default=120.0, gt=0)
+    aster_session_cookie_name: str = "aster_session"
+    aster_session_secure: bool = False
+    aster_session_absolute_days: int = Field(default=30, ge=1, le=365)
+    aster_session_idle_hours: int = Field(default=168, ge=1, le=8760)
+    aster_session_touch_seconds: int = Field(default=300, ge=30, le=3600)
+    aster_login_attempts: int = Field(default=5, ge=1, le=100)
+    aster_login_window_seconds: int = Field(default=300, ge=30, le=86400)
 
     @field_validator("aster_encryption_key")
     @classmethod
@@ -32,6 +39,14 @@ class Settings(BaseSettings):
         if len(value.get_secret_value()) < 32:
             raise ValueError("ASTER_ENCRYPTION_KEY must contain at least 32 characters")
         return value
+
+    @field_validator("aster_session_cookie_name")
+    @classmethod
+    def validate_cookie_name(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("ASTER_SESSION_COOKIE_NAME cannot be empty")
+        return normalized
 
     @model_validator(mode="after")
     def resolve_database_url(self) -> "Settings":
@@ -50,6 +65,10 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.aster_cors_origins.split(",") if origin.strip()]
+
+    @property
+    def production(self) -> bool:
+        return self.app_environment.casefold() == "production"
 
 
 @lru_cache
