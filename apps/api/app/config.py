@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://aster:aster@localhost:5432/aster"
     aster_encryption_key: SecretStr
     aster_cors_origins: str = "http://localhost:3000"
+    aster_endpoint_timeout_seconds: float = Field(default=30.0, gt=0)
+    aster_stream_timeout_seconds: float = Field(default=120.0, gt=0)
 
     @field_validator("aster_encryption_key")
     @classmethod
