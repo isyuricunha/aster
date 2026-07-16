@@ -88,12 +88,19 @@ openssl rand -hex 32
 
 Set the generated value as `ASTER_ENCRYPTION_KEY` in `.env`. Keep this value stable after storing endpoint credentials.
 
-The example environment enables the `local-db` Compose profile and uses:
+The example environment enables the `local-db` Compose profile:
 
 ```env
 COMPOSE_PROFILES=local-db
-DATABASE_URL=postgresql+asyncpg://aster:aster@postgres:5432/aster
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_DB=aster
+POSTGRES_USER=aster
+POSTGRES_PASSWORD=aster
+DATABASE_URL=
 ```
+
+When `DATABASE_URL` is empty, the API builds the local connection URL from the `POSTGRES_*` values. Existing installations can keep their current PostgreSQL password without copying it into a second setting.
 
 Start Aster:
 
@@ -105,14 +112,16 @@ The bundled database is stored in the `postgres-data` Docker volume. PostgreSQL 
 
 ## Use an external PostgreSQL database
 
-Edit `.env` and disable the bundled database profile:
+Edit `.env`, disable the bundled database profile, and provide the external URL:
 
 ```env
 COMPOSE_PROFILES=
 DATABASE_URL=postgresql+asyncpg://user:password@database-host:5432/aster
 ```
 
-The database host must be reachable from the API container. Then start the same stack:
+An explicit `DATABASE_URL` takes precedence over every `POSTGRES_*` value. The database host must be reachable from the API container.
+
+Start the same stack:
 
 ```bash
 docker compose up -d --build
@@ -191,7 +200,7 @@ Chat requests use the configured primary model and set `stream: true`. The API k
 Back up the bundled database:
 
 ```bash
-docker compose exec -T postgres pg_dump -U aster -d aster > aster-backup.sql
+docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > aster-backup.sql
 ```
 
 External database deployments should use the backup process provided by their PostgreSQL host.
