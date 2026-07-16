@@ -109,10 +109,8 @@ type ErrorPayload = {
   detail?: string | { message?: string };
 };
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_ASTER_API_URL ?? "http://localhost:8000";
-
 export function apiUrl(path: string): string {
-  return `${apiBaseUrl}${path}`;
+  return path;
 }
 
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
