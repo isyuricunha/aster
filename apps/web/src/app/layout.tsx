@@ -7,6 +7,7 @@ import "./persona.css";
 import "./chat.css";
 import "./chat-controls.css";
 import "./auth.css";
+import "./interface-refinement.css";
 
 export const metadata: Metadata = {
   title: "Aster",
