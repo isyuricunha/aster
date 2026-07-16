@@ -1,5 +1,5 @@
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -19,12 +19,33 @@ class FakeOpenAICompatibleClient:
         self.models = ["alpha-model", "beta-model"]
         self.error = None
         self.received_api_key: str | None = None
+        self.chat_chunks = ["Hello", " from Aster"]
+        self.chat_error = None
+        self.received_chat_api_key: str | None = None
+        self.received_chat_model: str | None = None
+        self.received_chat_messages: list[dict[str, str]] = []
 
     async def list_models(self, base_url: str, api_key: str | None) -> list[str]:
         self.received_api_key = api_key
         if self.error is not None:
             raise self.error
         return self.models
+
+    async def stream_chat_completion(
+        self,
+        *,
+        base_url: str,
+        api_key: str | None,
+        model_id: str,
+        messages: Sequence[dict[str, str]],
+    ) -> AsyncIterator[str]:
+        self.received_chat_api_key = api_key
+        self.received_chat_model = model_id
+        self.received_chat_messages = list(messages)
+        if self.chat_error is not None:
+            raise self.chat_error
+        for chunk in self.chat_chunks:
+            yield chunk
 
 
 @pytest_asyncio.fixture
