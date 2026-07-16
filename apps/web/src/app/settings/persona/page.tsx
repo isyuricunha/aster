@@ -1,7 +1,10 @@
 import Link from "next/link";
 
 import type { PersonaSettings } from "../../../lib/api";
+import { requireServerAuth, serverApiFetch } from "../../../lib/server-api";
 import { PersonaSettingsForm } from "./persona-settings";
+
+export const dynamic = "force-dynamic";
 
 const neutralPersona: PersonaSettings = {
   name: "",
@@ -13,10 +16,8 @@ const neutralPersona: PersonaSettings = {
 };
 
 async function getPersona(): Promise<{ persona: PersonaSettings; error: string | null }> {
-  const baseUrl = process.env.ASTER_API_INTERNAL_URL ?? "http://localhost:8000";
-
   try {
-    const response = await fetch(`${baseUrl}/api/persona`, { cache: "no-store" });
+    const response = await serverApiFetch("/api/persona");
     if (!response.ok) {
       throw new Error(`Persona API returned HTTP ${response.status}.`);
     }
@@ -30,6 +31,7 @@ async function getPersona(): Promise<{ persona: PersonaSettings; error: string |
 }
 
 export default async function PersonaSettingsPage() {
+  await requireServerAuth();
   const initialData = await getPersona();
 
   return (
@@ -41,6 +43,7 @@ export default async function PersonaSettingsPage() {
         <div className="nav-links">
           <Link href="/settings/models">Models</Link>
           <span>Persona</span>
+          <Link href="/settings/account">Account</Link>
         </div>
       </nav>
 

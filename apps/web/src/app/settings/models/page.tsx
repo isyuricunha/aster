@@ -1,7 +1,10 @@
 import Link from "next/link";
 
 import type { CachedModel, ModelEndpoint, ModelPreferences } from "../../../lib/api";
+import { requireServerAuth, serverApiFetch } from "../../../lib/server-api";
 import { ModelSettings } from "./model-settings";
+
+export const dynamic = "force-dynamic";
 
 type InitialModelSettings = {
   endpoints: ModelEndpoint[];
@@ -11,13 +14,11 @@ type InitialModelSettings = {
 };
 
 async function getInitialModelSettings(): Promise<InitialModelSettings> {
-  const baseUrl = process.env.ASTER_API_INTERNAL_URL ?? "http://localhost:8000";
-
   try {
     const [endpointResponse, modelResponse, preferenceResponse] = await Promise.all([
-      fetch(`${baseUrl}/api/model-endpoints`, { cache: "no-store" }),
-      fetch(`${baseUrl}/api/models`, { cache: "no-store" }),
-      fetch(`${baseUrl}/api/model-preferences`, { cache: "no-store" }),
+      serverApiFetch("/api/model-endpoints"),
+      serverApiFetch("/api/models"),
+      serverApiFetch("/api/model-preferences"),
     ]);
 
     if (!endpointResponse.ok || !modelResponse.ok || !preferenceResponse.ok) {
@@ -41,6 +42,7 @@ async function getInitialModelSettings(): Promise<InitialModelSettings> {
 }
 
 export default async function ModelsSettingsPage() {
+  await requireServerAuth();
   const initialData = await getInitialModelSettings();
 
   return (
@@ -52,6 +54,7 @@ export default async function ModelsSettingsPage() {
         <div className="nav-links">
           <span>Models</span>
           <Link href="/settings/persona">Persona</Link>
+          <Link href="/settings/account">Account</Link>
         </div>
       </nav>
 

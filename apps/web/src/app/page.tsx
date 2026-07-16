@@ -1,4 +1,5 @@
 import type { Conversation, ConversationSummary, ModelPreferences } from "../lib/api";
+import { requireServerAuth, serverApiFetch } from "../lib/server-api";
 import { ChatShell } from "./chat-shell";
 
 export const dynamic = "force-dynamic";
@@ -11,12 +12,10 @@ type InitialChatData = {
 };
 
 async function getInitialChatData(): Promise<InitialChatData> {
-  const baseUrl = process.env.ASTER_API_INTERNAL_URL ?? "http://localhost:8000";
-
   try {
     const [conversationResponse, preferenceResponse] = await Promise.all([
-      fetch(`${baseUrl}/api/conversations`, { cache: "no-store" }),
-      fetch(`${baseUrl}/api/model-preferences`, { cache: "no-store" }),
+      serverApiFetch("/api/conversations"),
+      serverApiFetch("/api/model-preferences"),
     ]);
     if (!conversationResponse.ok || !preferenceResponse.ok) {
       throw new Error("The chat API returned an error.");
@@ -27,9 +26,9 @@ async function getInitialChatData(): Promise<InitialChatData> {
     let activeConversation: Conversation | null = null;
 
     if (conversations[0]) {
-      const activeResponse = await fetch(`${baseUrl}/api/conversations/${conversations[0].id}`, {
-        cache: "no-store",
-      });
+      const activeResponse = await serverApiFetch(
+        `/api/conversations/${conversations[0].id}`,
+      );
       if (activeResponse.ok) {
         activeConversation = (await activeResponse.json()) as Conversation;
       }
@@ -47,6 +46,7 @@ async function getInitialChatData(): Promise<InitialChatData> {
 }
 
 export default async function Home() {
+  await requireServerAuth();
   const initialData = await getInitialChatData();
   return <ChatShell {...initialData} />;
 }
