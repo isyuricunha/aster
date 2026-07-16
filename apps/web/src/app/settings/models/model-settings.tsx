@@ -8,6 +8,7 @@ import {
   type ModelEndpoint,
   type ModelPreferences,
 } from "../../../lib/api";
+import { EndpointModelList, ModelSelect } from "./model-browser";
 
 type EndpointDraft = {
   id: string | null;
@@ -84,6 +85,19 @@ export function ModelSettings({
     const enabled = new Set(endpoints.filter((item) => item.enabled).map((item) => item.id));
     return models.filter((model) => enabled.has(model.endpoint_id));
   }, [endpoints, models]);
+
+  const modelsByEndpoint = useMemo(() => {
+    const grouped = new Map<string, CachedModel[]>();
+    for (const model of models) {
+      const cached = grouped.get(model.endpoint_id);
+      if (cached) {
+        cached.push(model);
+      } else {
+        grouped.set(model.endpoint_id, [model]);
+      }
+    }
+    return grouped;
+  }, [models]);
 
   async function run(name: string, operation: () => Promise<void>) {
     setBusy(name);
@@ -249,7 +263,7 @@ export function ModelSettings({
         ) : (
           <div className="endpoint-list">
             {endpoints.map((item) => {
-              const cached = models.filter((model) => model.endpoint_id === item.id);
+              const cached = modelsByEndpoint.get(item.id) ?? [];
               return (
                 <article className="endpoint-card" key={item.id}>
                   <div className="endpoint-header">
@@ -326,23 +340,7 @@ export function ModelSettings({
                       Add model
                     </ActionButton>
                   </div>
-                  {cached.length > 0 && (
-                    <div className="model-list">
-                      {cached.map((model) => (
-                        <div className="model-row" key={model.id}>
-                          <code>{model.model_id}</code>
-                          <div className="model-badges">
-                            {model.is_manual && <span className="pill">Manual</span>}
-                            <span
-                              className={`pill ${model.is_available ? "pill-success" : "pill-warning"}`}
-                            >
-                              {model.is_available ? "Available" : "Missing from latest sync"}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  {cached.length > 0 && <EndpointModelList models={cached} />}
                 </article>
               );
             })}
@@ -446,33 +444,5 @@ function ActionButton({
     >
       {children}
     </button>
-  );
-}
-
-function ModelSelect({
-  label,
-  emptyLabel,
-  models,
-  value,
-  onChange,
-}: {
-  label: string;
-  emptyLabel: string;
-  models: CachedModel[];
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <Field label={label}>
-      <select value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">{emptyLabel}</option>
-        {models.map((model) => (
-          <option key={model.id} value={model.id}>
-            {model.endpoint_name} / {model.model_id}
-            {model.is_available ? "" : " (cached)"}
-          </option>
-        ))}
-      </select>
-    </Field>
   );
 }

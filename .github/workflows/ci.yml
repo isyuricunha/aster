@@ -93,6 +93,12 @@ jobs:
       - name: Validate configuration
         run: docker compose config --quiet
 
+      - name: Validate external database mode
+        env:
+          COMPOSE_PROFILES: ""
+          DATABASE_URL: postgresql+asyncpg://aster:aster@database.invalid:5432/aster
+        run: docker compose config --quiet
+
       - name: Build API image
         run: docker compose build --progress=plain api
 
@@ -107,6 +113,11 @@ jobs:
           curl --fail --silent --show-error
           --retry 30 --retry-all-errors --retry-delay 2
           http://localhost:8000/ready
+
+      - name: Check runtime timeout configuration
+        run: >-
+          docker compose exec -T api python -c
+          'from app.config import settings; assert settings.aster_endpoint_timeout_seconds == 30; assert settings.aster_stream_timeout_seconds == 120'
 
       - name: Check model settings API
         run: >-

@@ -1,8 +1,8 @@
 # Aster
 
-Aster is a self-hosted AI chat application designed around user-defined personas and OpenAI-compatible model endpoints.
+Aster is a self-hosted AI chat application built around user-defined personas and OpenAI-compatible model endpoints.
 
-The first MVP is feature-complete: endpoint and model configuration, one global persona, persistent conversations, streamed responses, message replacement, regeneration, explicit stop controls, and interrupted-stream recovery.
+MVP 1 is feature-complete and has been validated against a real endpoint with a model cache containing more than one thousand entries.
 
 ## MVP scope
 
@@ -10,7 +10,7 @@ The first MVP is feature-complete: endpoint and model configuration, one global 
 - One global, user-defined persona
 - OpenAI-compatible endpoint and model configuration
 - Primary, utility, and image model roles
-- Model listing and local cache
+- Persistent model discovery and local cache
 
 Utility falls back to primary when it is not configured. Image generation remains disabled until an image model is explicitly selected.
 
@@ -22,7 +22,8 @@ Utility falls back to primary when it is not configured. Image generation remain
 - Preserve cached model entries when an endpoint is unavailable
 - Mark discovered models missing from a later sync without deleting them
 - Add model IDs manually
-- Select primary, utility, and image model roles
+- Search and browse large model caches without rendering the entire list at once
+- Select primary, utility, and image model roles through searchable selectors
 - Resolve utility to primary when utility is not configured
 - Configure one global persona with a developer or system instruction role
 - Preview canonical message roles without sending a model request
@@ -54,10 +55,10 @@ Utility falls back to primary when it is not configured. Image generation remain
 ```text
 apps/web  Next.js user interface
 apps/api  FastAPI application and database migrations
-postgres  Persistent application database
+postgres  Optional bundled PostgreSQL database
 ```
 
-Docker Compose is the initial deployment target. Redis is intentionally absent because the current milestone does not require a queue or distributed state.
+Docker Compose is the initial deployment target. Redis is intentionally absent because the current application does not require a queue or distributed state.
 
 ## Requirements
 
@@ -71,25 +72,68 @@ For local development outside containers:
 - uv
 - PostgreSQL 17+
 
-## Start with Docker Compose
+## Start with the bundled PostgreSQL database
+
+Create the local environment file:
 
 ```bash
 cp .env.example .env
 ```
 
-Replace the example encryption key before storing credentials:
+Generate an encryption key:
 
 ```bash
 openssl rand -hex 32
 ```
 
-Set the generated value as `ASTER_ENCRYPTION_KEY` in `.env`, then start Aster:
+Set the generated value as `ASTER_ENCRYPTION_KEY` in `.env`. Keep this value stable after storing endpoint credentials.
 
-```bash
-docker compose up --build
+The example environment enables the `local-db` Compose profile:
+
+```env
+COMPOSE_PROFILES=local-db
+POSTGRES_DB=aster
+POSTGRES_USER=aster
+POSTGRES_PASSWORD=aster
+DATABASE_URL=
 ```
 
-Open:
+When `DATABASE_URL` is empty, the API builds the local connection URL from the bundled PostgreSQL settings. Existing installations can keep their current database name, user, and password without copying credentials into a second setting.
+
+The bundled database always uses port 5432 inside the Compose network and does not publish a database port to the host. An old `POSTGRES_PORT` entry may remain in an existing `.env`; it is no longer used by the Compose deployment.
+
+Start Aster:
+
+```bash
+docker compose up -d --build
+```
+
+The bundled database is stored in the `postgres-data` Docker volume.
+
+## Use an external PostgreSQL database
+
+Edit `.env`, disable the bundled database profile, and provide the external URL:
+
+```env
+COMPOSE_PROFILES=
+DATABASE_URL=postgresql+asyncpg://user:password@database-host:5432/aster
+```
+
+An explicit `DATABASE_URL` takes precedence over every local PostgreSQL setting. The database host must be reachable from the API container.
+
+Start the same stack:
+
+```bash
+docker compose up -d --build
+```
+
+Only the API and web services start when `COMPOSE_PROFILES` is empty.
+
+The API runs Alembic migrations before starting, regardless of whether PostgreSQL is bundled or external.
+
+## Open Aster
+
+Default local addresses:
 
 - Chat: http://localhost:3000
 - Model settings: http://localhost:3000/settings/models
@@ -98,9 +142,40 @@ Open:
 - API readiness: http://localhost:8000/ready
 - API documentation: http://localhost:8000/docs
 
-The database is stored in the `postgres-data` Docker volume and survives container restarts.
+## Configure access from another machine
 
-`ASTER_ENCRYPTION_KEY` must remain stable after endpoints are created. Changing it without re-encrypting existing credentials makes those credentials unreadable.
+When the browser does not run on the Docker host, set public addresses in `.env`:
+
+```env
+ASTER_CORS_ORIGINS=http://192.168.1.20:3000
+NEXT_PUBLIC_ASTER_API_URL=http://192.168.1.20:8000
+ASTER_API_INTERNAL_URL=http://api:8000
+```
+
+`NEXT_PUBLIC_ASTER_API_URL` is compiled into the browser bundle. Rebuild the web image after changing it:
+
+```bash
+docker compose up -d --build web
+```
+
+`ASTER_API_INTERNAL_URL` is used by server-side web requests inside the Compose network and normally remains `http://api:8000`.
+
+Use HTTPS before exposing Aster outside a trusted network. Configure `ASTER_CORS_ORIGINS` with the final browser origin.
+
+## Runtime timeouts
+
+Model listing and initial endpoint connections use 30 seconds by default. Streaming reads use 120 seconds by default.
+
+```env
+ASTER_ENDPOINT_TIMEOUT_SECONDS=30
+ASTER_STREAM_TIMEOUT_SECONDS=120
+```
+
+Increase these values for a slow endpoint without rebuilding the API image. Recreate the API container after changing them:
+
+```bash
+docker compose up -d --force-recreate api
+```
 
 ## OpenAI-compatible endpoint format
 
@@ -119,6 +194,27 @@ Authorization: Bearer <api-key>
 ```
 
 Chat requests use the configured primary model and set `stream: true`. The API key is optional for local services that do not require authentication.
+
+## Backup and upgrade
+
+Back up the bundled database:
+
+```bash
+docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > aster-backup.sql
+```
+
+External database deployments should use the backup process provided by their PostgreSQL host.
+
+Upgrade a source checkout:
+
+```bash
+git pull --ff-only
+docker compose up -d --build
+```
+
+Do not delete the PostgreSQL volume during a normal upgrade. The API applies pending migrations automatically.
+
+Changing `ASTER_ENCRYPTION_KEY` without re-encrypting stored credentials makes those credentials unreadable.
 
 ## Local checks
 
@@ -144,12 +240,14 @@ uv run alembic upgrade head
 
 ## Project documentation
 
+- [Changelog](CHANGELOG.md)
 - [Project charter](docs/product/project-charter.md)
 - [ADR-0001: Initial architecture](docs/decisions/0001-initial-architecture.md)
 - [ADR-0002: Model endpoints and local model cache](docs/decisions/0002-model-endpoints-and-cache.md)
 - [ADR-0003: Global persona and canonical message composition](docs/decisions/0003-persona-and-message-composition.md)
 - [ADR-0004: Persistent chat and streamed completions](docs/decisions/0004-persistent-chat-and-streaming.md)
 - [ADR-0005: Linear chat replacement and generation lifecycle](docs/decisions/0005-chat-generation-lifecycle.md)
+- [ADR-0006: Runtime deployment configuration](docs/decisions/0006-runtime-deployment-configuration.md)
 
 ## Security baseline
 
@@ -157,8 +255,9 @@ uv run alembic upgrade head
 - API keys are encrypted before being stored and are never returned by endpoint APIs.
 - API keys must never be included in logs, error payloads, fixtures, or documentation.
 - Upstream response bodies are not forwarded to the user.
+- The bundled PostgreSQL service is not published to the host.
 - Model-provider behavior is implemented through generic API contracts rather than hard-coded provider names.
 
 ## Status
 
-MVP 1 is feature-complete and ready for real-endpoint release validation. The application keeps a linear conversation history: editing or regenerating an earlier message intentionally replaces every later message.
+MVP 1 has passed real-endpoint validation and is being prepared for the `v0.1.0` release. Aster keeps one linear conversation history: editing or regenerating an earlier message intentionally replaces every later message.
