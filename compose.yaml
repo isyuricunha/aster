@@ -27,7 +27,7 @@ services:
     restart: unless-stopped
     environment:
       APP_ENVIRONMENT: ${APP_ENVIRONMENT:-development}
-      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-aster}:${POSTGRES_PASSWORD:-aster}@postgres:5432/${POSTGRES_DB:-aster}}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://aster:aster@postgres:5432/aster}
       ASTER_ENCRYPTION_KEY: ${ASTER_ENCRYPTION_KEY}
       ASTER_CORS_ORIGINS: ${ASTER_CORS_ORIGINS:-http://localhost:3000}
       ASTER_ENDPOINT_TIMEOUT_SECONDS: ${ASTER_ENDPOINT_TIMEOUT_SECONDS:-30}
