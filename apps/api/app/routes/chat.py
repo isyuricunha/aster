@@ -2,9 +2,9 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.chat_generation import (
@@ -23,6 +23,7 @@ from app.models import ChatMessage, Conversation
 from app.openai_compatible import OpenAICompatibleClient
 from app.schemas import (
     ConversationCreate,
+    ConversationImportRequest,
     ConversationResponse,
     ConversationSummaryResponse,
     ConversationUpdate,
@@ -38,7 +39,10 @@ ClientDep = Annotated[OpenAICompatibleClient, Depends(get_openai_client)]
 
 
 @router.get("/conversations", response_model=list[ConversationSummaryResponse])
-async def list_conversations(session: SessionDep) -> list[ConversationSummaryResponse]:
+async def list_conversations(
+    session: SessionDep,
+    query: Annotated[str | None, Query(max_length=200)] = None,
+) -> list[ConversationSummaryResponse]:
     message_count = (
         select(
             ChatMessage.conversation_id,
@@ -47,11 +51,27 @@ async def list_conversations(session: SessionDep) -> list[ConversationSummaryRes
         .group_by(ChatMessage.conversation_id)
         .subquery()
     )
+    statement = select(Conversation, func.coalesce(message_count.c.message_count, 0)).outerjoin(
+        message_count,
+        message_count.c.conversation_id == Conversation.id,
+    )
+
+    normalized_query = query.strip() if query else ""
+    if normalized_query:
+        pattern = f"%{normalized_query}%"
+        matching_message = exists(
+            select(ChatMessage.id).where(
+                ChatMessage.conversation_id == Conversation.id,
+                ChatMessage.content.ilike(pattern),
+            )
+        )
+        statement = statement.where(
+            or_(Conversation.title.ilike(pattern), matching_message)
+        )
+
     rows = (
         await session.execute(
-            select(Conversation, func.coalesce(message_count.c.message_count, 0))
-            .outerjoin(message_count, message_count.c.conversation_id == Conversation.id)
-            .order_by(Conversation.updated_at.desc(), Conversation.created_at.desc())
+            statement.order_by(Conversation.updated_at.desc(), Conversation.created_at.desc())
         )
     ).all()
     return [
@@ -77,6 +97,41 @@ async def create_conversation(
 ) -> ConversationResponse:
     conversation = Conversation(title=payload.title or "New chat")
     session.add(conversation)
+    await session.commit()
+    await session.refresh(conversation)
+    return await conversation_response(session, conversation)
+
+
+@router.post(
+    "/conversations/import",
+    response_model=ConversationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def import_conversation(
+    payload: ConversationImportRequest,
+    session: SessionDep,
+) -> ConversationResponse:
+    conversation = Conversation(title=payload.title)
+    session.add(conversation)
+    await session.flush()
+
+    now = datetime.now(UTC)
+    session.add_all(
+        [
+            ChatMessage(
+                conversation_id=conversation.id,
+                role=message.role,
+                content=message.content,
+                status=message.status,
+                error_message=message.error_message,
+                model_id=message.model_id,
+                position=position,
+                created_at=now,
+                updated_at=now,
+            )
+            for position, message in enumerate(payload.messages)
+        ]
+    )
     await session.commit()
     await session.refresh(conversation)
     return await conversation_response(session, conversation)
