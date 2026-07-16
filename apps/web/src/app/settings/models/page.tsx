@@ -49,7 +49,10 @@ export default async function ModelsSettingsPage() {
         <Link className="brand" href="/">
           Aster
         </Link>
-        <span>Settings / Models</span>
+        <div className="nav-links">
+          <span>Models</span>
+          <Link href="/settings/persona">Persona</Link>
+        </div>
       </nav>
 
       <header className="page-header">

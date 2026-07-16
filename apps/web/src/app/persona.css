@@ -1,0 +1,105 @@
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+textarea {
+  width: 100%;
+  padding: 12px 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  outline: none;
+  resize: vertical;
+  background: #0d0d10;
+  color: var(--text);
+  font: inherit;
+  line-height: 1.55;
+}
+
+textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+}
+
+.form-help {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.persona-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.persona-editor,
+.preview-panel {
+  min-width: 0;
+}
+
+.persona-form {
+  margin-top: 20px;
+}
+
+.preview-input {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.preview-input > span {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.preview-empty {
+  margin-top: 18px;
+}
+
+.message-preview-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.message-preview {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.message-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 0.8rem;
+}
+
+.message-preview pre {
+  max-height: 360px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  color: var(--text);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 900px) {
+  .persona-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .nav-links {
+    gap: 12px;
+  }
+}

@@ -33,25 +33,39 @@ export default async function Home() {
     <main>
       <nav className="top-nav">
         <span className="brand">Aster</span>
-        <Link href="/settings/models">Model settings</Link>
+        <div className="nav-links">
+          <Link href="/settings/models">Models</Link>
+          <Link href="/settings/persona">Persona</Link>
+        </div>
       </nav>
 
       <header className="hero-header">
         <p className="eyebrow">Self-hosted AI</p>
         <h1>Aster</h1>
         <p className="lead">
-          The model layer is ready for configuration. Add an OpenAI-compatible endpoint, synchronize
-          its model list, and choose the defaults Aster will use next.
+          Model connections and user-defined identity are ready. Configure the endpoint layer, set
+          the global persona, and inspect how Aster keeps instructions separate from user messages.
         </p>
-        <Link className="button hero-action" href="/settings/models">
-          Configure models
-        </Link>
+        <div className="button-row hero-action">
+          <Link className="button" href="/settings/models">
+            Configure models
+          </Link>
+          <Link className="button button-secondary" href="/settings/persona">
+            Configure persona
+          </Link>
+        </div>
       </header>
 
       <section className="grid" aria-label="System status">
         <article className="card">
           <h2>Model configuration</h2>
           <p>Endpoints, encrypted credentials, model caching, and default roles are available.</p>
+          <span className="status status-ok">Ready</span>
+        </article>
+
+        <article className="card">
+          <h2>Persona composition</h2>
+          <p>Global persona settings and canonical role previews are available.</p>
           <span className="status status-ok">Ready</span>
         </article>
 

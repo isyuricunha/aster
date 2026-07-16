@@ -100,3 +100,24 @@ class ModelPreferences(TimestampMixin, Base):
     image_model_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("model_cache_entries.id", ondelete="SET NULL"), nullable=True
     )
+
+
+class PersonaSettings(TimestampMixin, Base):
+    __tablename__ = "persona_settings"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_persona_settings_singleton"),
+        CheckConstraint(
+            "instruction_role IN ('developer', 'system')",
+            name="ck_persona_instruction_role",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    name: Mapped[str] = mapped_column(String(120), default="", server_default="", nullable=False)
+    instructions: Mapped[str] = mapped_column(Text, default="", server_default="", nullable=False)
+    enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    instruction_role: Mapped[str] = mapped_column(
+        String(16), default="developer", server_default="developer", nullable=False
+    )

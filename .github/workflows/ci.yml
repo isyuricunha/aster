@@ -104,11 +104,30 @@ jobs:
           curl --fail --silent --show-error
           http://localhost:8000/api/model-endpoints
 
-      - name: Check web application
+      - name: Check persona API
+        run: >-
+          curl --fail --silent --show-error
+          http://localhost:8000/api/persona
+
+      - name: Check message composition preview
+        run: >-
+          curl --fail --silent --show-error
+          --header 'Content-Type: application/json'
+          --data '{"user_message":"Hello"}'
+          http://localhost:8000/api/message-composition/preview
+          | grep --quiet '"role":"user"'
+
+      - name: Check model settings page
         run: >-
           curl --fail --silent --show-error
           --retry 30 --retry-all-errors --retry-delay 2
           http://localhost:3000/settings/models
+
+      - name: Check persona settings page
+        run: >-
+          curl --fail --silent --show-error
+          --retry 30 --retry-all-errors --retry-delay 2
+          http://localhost:3000/settings/persona
 
       - name: Show service state
         if: always()

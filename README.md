@@ -2,7 +2,7 @@
 
 Aster is a self-hosted AI chat application designed around user-defined personas and OpenAI-compatible model endpoints.
 
-The repository is being built in small, stable milestones. The current implementation provides the application foundation plus endpoint and model configuration. Chat and persona composition are not implemented yet.
+The repository is being built in small, stable milestones. The current implementation provides the application foundation, endpoint and model configuration, and one global user-defined persona with canonical message previews. Chat is not implemented yet.
 
 ## MVP scope
 
@@ -24,6 +24,9 @@ Utility falls back to primary when it is not configured. Image generation remain
 - Add model IDs manually
 - Select primary, utility, and image model roles
 - Resolve utility to primary when utility is not configured
+- Configure one global persona with a developer or system instruction role
+- Preview canonical message roles without sending a model request
+- Preserve the real user message separately and unchanged
 
 ## Explicitly out of scope for MVP 1
 
@@ -81,6 +84,7 @@ Open:
 
 - Web: http://localhost:3000
 - Model settings: http://localhost:3000/settings/models
+- Persona settings: http://localhost:3000/settings/persona
 - API health: http://localhost:8000/health
 - API readiness: http://localhost:8000/ready
 - API documentation: http://localhost:8000/docs
@@ -133,6 +137,7 @@ uv run alembic upgrade head
 - [Project charter](docs/product/project-charter.md)
 - [ADR-0001: Initial architecture](docs/decisions/0001-initial-architecture.md)
 - [ADR-0002: Model endpoints and local model cache](docs/decisions/0002-model-endpoints-and-cache.md)
+- [ADR-0003: Global persona and canonical message composition](docs/decisions/0003-persona-and-message-composition.md)
 
 ## Security baseline
 
@@ -144,4 +149,4 @@ uv run alembic upgrade head
 
 ## Status
 
-Foundation and model configuration are implemented. Persona composition and chat are the next MVP milestones.
+Foundation, model configuration, and persona composition are implemented. Persistent chat and streaming are the next MVP milestone.
