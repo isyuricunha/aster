@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 from urllib.parse import urlsplit, urlunsplit
 from uuid import UUID
 
@@ -160,3 +160,45 @@ class ModelPreferencesResponse(BaseModel):
     utility: SelectedModelResponse | None
     image: SelectedModelResponse | None
     resolved_utility: SelectedModelResponse | None
+
+
+class PersonaUpdate(BaseModel):
+    name: Annotated[str, Field(default="", max_length=120)] = ""
+    instructions: Annotated[str, Field(default="", max_length=100_000)] = ""
+    enabled: bool = False
+    instruction_role: Literal["developer", "system"] = "developer"
+
+    @field_validator("name")
+    @classmethod
+    def normalize_persona_name(cls, value: str) -> str:
+        return value.strip()
+
+
+class PersonaResponse(BaseModel):
+    name: str
+    instructions: str
+    enabled: bool
+    instruction_role: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class CompositionPreviewRequest(BaseModel):
+    user_message: Annotated[str, Field(min_length=1, max_length=100_000)]
+
+    @field_validator("user_message")
+    @classmethod
+    def validate_user_message(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("User message cannot be empty")
+        return value
+
+
+class CanonicalMessageResponse(BaseModel):
+    role: Literal["system", "developer", "user", "assistant", "tool"]
+    source: Literal["platform", "persona", "conversation", "user", "assistant", "tool"]
+    content: str
+
+
+class CompositionPreviewResponse(BaseModel):
+    messages: list[CanonicalMessageResponse]

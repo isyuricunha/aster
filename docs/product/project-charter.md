@@ -130,7 +130,7 @@ The first MVP is stable only when:
 
 - Foundation: implemented
 - Endpoint and model configuration: implemented in the current milestone
-- Persona composition: pending
+- Persona composition: implemented
 - Chat: pending
 
 ## Change control

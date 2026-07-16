@@ -74,3 +74,22 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
 
   return payload as T;
 }
+
+export type PersonaSettings = {
+  name: string;
+  instructions: string;
+  enabled: boolean;
+  instruction_role: "developer" | "system";
+  created_at: string;
+  updated_at: string;
+};
+
+export type CanonicalMessage = {
+  role: "system" | "developer" | "user" | "assistant" | "tool";
+  source: "platform" | "persona" | "conversation" | "user" | "assistant" | "tool";
+  content: string;
+};
+
+export type CompositionPreview = {
+  messages: CanonicalMessage[];
+};
