@@ -1,7 +1,7 @@
 FROM node:22-alpine AS build
 
 WORKDIR /app
-RUN corepack enable
+RUN npm install --global pnpm@10
 
 COPY package.json pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/package.json
@@ -14,7 +14,7 @@ FROM node:22-alpine AS runner
 
 ENV NODE_ENV=production
 WORKDIR /app
-RUN corepack enable
+RUN npm install --global pnpm@10
 
 COPY --from=build --chown=node:node /app /app
 USER node
