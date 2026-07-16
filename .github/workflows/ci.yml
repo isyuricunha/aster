@@ -79,8 +79,14 @@ jobs:
       - name: Validate configuration
         run: docker compose config --quiet
 
+      - name: Build API image
+        run: docker compose build --progress=plain api
+
+      - name: Build web image
+        run: docker compose build --progress=plain web
+
       - name: Start application stack
-        run: docker compose up --build --detach
+        run: docker compose up --detach
 
       - name: Check API readiness
         run: >-
