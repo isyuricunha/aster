@@ -139,3 +139,103 @@ async def test_conversation_crud(api_client: tuple) -> None:
 
     assert (await client.delete(f"/api/conversations/{conversation_id}")).status_code == 204
     assert (await client.get(f"/api/conversations/{conversation_id}")).status_code == 404
+
+
+async def test_conversation_import_preserves_content_and_order(api_client: tuple) -> None:
+    client, _, _ = api_client
+    response = await client.post(
+        "/api/conversations/import",
+        json={
+            "format": "aster-conversation",
+            "version": 1,
+            "title": "  Imported   chat ",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Show me `code`.",
+                    "status": "completed",
+                    "error_message": None,
+                    "model_id": None,
+                },
+                {
+                    "role": "assistant",
+                    "content": "```python\nprint('hello')\n```",
+                    "status": "stopped",
+                    "error_message": None,
+                    "model_id": "chat-model",
+                },
+            ],
+        },
+    )
+
+    assert response.status_code == 201
+    detail = response.json()
+    assert detail["title"] == "Imported chat"
+    assert [message["position"] for message in detail["messages"]] == [0, 1]
+    assert detail["messages"][0]["content"] == "Show me `code`."
+    assert detail["messages"][1]["status"] == "stopped"
+    assert detail["messages"][1]["model_id"] == "chat-model"
+
+    invalid = await client.post(
+        "/api/conversations/import",
+        json={
+            "format": "aster-conversation",
+            "version": 1,
+            "title": "Invalid",
+            "messages": [
+                {
+                    "role": "assistant",
+                    "content": "Partial",
+                    "status": "streaming",
+                }
+            ],
+        },
+    )
+    assert invalid.status_code == 422
+
+
+async def test_conversation_search_matches_titles_and_message_content(api_client: tuple) -> None:
+    client, _, _ = api_client
+    title_match = await client.post(
+        "/api/conversations/import",
+        json={
+            "format": "aster-conversation",
+            "version": 1,
+            "title": "Alpha planning",
+            "messages": [],
+        },
+    )
+    content_match = await client.post(
+        "/api/conversations/import",
+        json={
+            "format": "aster-conversation",
+            "version": 1,
+            "title": "Other topic",
+            "messages": [
+                {
+                    "role": "assistant",
+                    "content": "The hidden needle is here.",
+                    "status": "completed",
+                    "model_id": "chat-model",
+                }
+            ],
+        },
+    )
+    await client.post(
+        "/api/conversations/import",
+        json={
+            "format": "aster-conversation",
+            "version": 1,
+            "title": "Unrelated",
+            "messages": [],
+        },
+    )
+
+    title_results = (await client.get("/api/conversations", params={"query": "ALPHA"})).json()
+    assert [item["id"] for item in title_results] == [title_match.json()["id"]]
+
+    content_results = (await client.get("/api/conversations", params={"query": "needle"})).json()
+    assert [item["id"] for item in content_results] == [content_match.json()["id"]]
+
+    all_results = (await client.get("/api/conversations", params={"query": "  "})).json()
+    assert len(all_results) == 3

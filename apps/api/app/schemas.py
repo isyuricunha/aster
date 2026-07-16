@@ -257,6 +257,59 @@ class ConversationResponse(BaseModel):
     updated_at: datetime
 
 
+class ConversationImportMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["user", "assistant"]
+    content: Annotated[str, Field(default="", max_length=100_000)] = ""
+    status: Literal["completed", "failed", "stopped"] = "completed"
+    error_message: Annotated[str | None, Field(default=None, max_length=500)] = None
+    model_id: Annotated[str | None, Field(default=None, max_length=512)] = None
+
+    @field_validator("error_message", "model_id")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+    @model_validator(mode="after")
+    def validate_role_metadata(self) -> "ConversationImportMessage":
+        if self.role == "user" and self.status != "completed":
+            raise ValueError("Imported user messages must be completed")
+        has_assistant_metadata = self.error_message is not None or self.model_id is not None
+        if self.role == "user" and has_assistant_metadata:
+            raise ValueError("Imported user messages cannot contain assistant metadata")
+        if self.status == "completed" and not self.content:
+            raise ValueError("Completed imported messages cannot be empty")
+        return self
+
+
+class ConversationImportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    format: Literal["aster-conversation"]
+    version: Literal[1]
+    title: Annotated[str, Field(min_length=1, max_length=200)]
+    messages: Annotated[list[ConversationImportMessage], Field(max_length=2_000)]
+
+    @field_validator("title")
+    @classmethod
+    def normalize_title(cls, value: str) -> str:
+        normalized = " ".join(value.split())
+        if not normalized:
+            raise ValueError("Conversation title cannot be empty")
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_total_content_size(self) -> "ConversationImportRequest":
+        total_characters = sum(len(message.content) for message in self.messages)
+        if total_characters > 5_000_000:
+            raise ValueError("Imported conversation content exceeds 5,000,000 characters")
+        return self
+
+
 class SendMessageRequest(BaseModel):
     content: Annotated[str, Field(min_length=1, max_length=100_000)]
 
