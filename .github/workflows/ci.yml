@@ -154,10 +154,20 @@ jobs:
           curl --fail --silent --show-error --cookie /tmp/aster.cookies \
             "http://localhost:3000/api/conversations/${conversation_id}" \
             | grep --quiet '"title":"CI chat"'
+          curl --fail --silent --show-error \
+            --cookie /tmp/aster.cookies \
+            --header 'Content-Type: application/json' \
+            --header 'Origin: http://localhost:3000' \
+            --data '{"format":"aster-conversation","version":1,"title":"Imported CI chat","messages":[{"role":"user","content":"Searchable import","status":"completed","error_message":null,"model_id":null}]}' \
+            http://localhost:3000/api/conversations/import \
+            | grep --quiet '"title":"Imported CI chat"'
+          curl --fail --silent --show-error --cookie /tmp/aster.cookies \
+            'http://localhost:3000/api/conversations?query=Searchable' \
+            | grep --quiet '"title":"Imported CI chat"'
       - name: Check chat and authentication contracts
         run: |
           curl --fail --silent --show-error http://localhost:8000/openapi.json \
-            | python -c 'import json, sys; paths = json.load(sys.stdin)["paths"]; required = ["/api/conversations/{conversation_id}/messages/{message_id}/edit-and-resend", "/api/conversations/{conversation_id}/messages/{message_id}/regenerate", "/api/messages/{message_id}/stop", "/api/auth/setup", "/api/auth/login", "/api/auth/password"]; assert all(path in paths for path in required)'
+            | python -c 'import json, sys; paths = json.load(sys.stdin)["paths"]; required = ["/api/conversations/import", "/api/conversations/{conversation_id}/messages/{message_id}/edit-and-resend", "/api/conversations/{conversation_id}/messages/{message_id}/regenerate", "/api/messages/{message_id}/stop", "/api/auth/setup", "/api/auth/login", "/api/auth/password"]; assert all(path in paths for path in required)'
       - name: Check authenticated pages
         run: |
           for path in / /settings/models /settings/persona /settings/account; do
