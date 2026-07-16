@@ -1,6 +1,6 @@
 # Aster Project Charter
 
-Status: Accepted through Stage 8
+Status: Accepted through Stage 9
 
 ## Product vision
 
@@ -40,6 +40,12 @@ Aster is a daily-use workspace, not a collection of disconnected forms. Navigati
 
 Visual design should clarify product state before adding decoration. New screens reuse the shared interface foundation unless a documented product requirement demands a different interaction model.
 
+### Content safety
+
+Conversation content is treated as untrusted input. Markdown rendering must not enable raw HTML, executable scripts, or unsafe URL handling.
+
+Conversation transfer formats are versioned, validated, bounded, and imported through authenticated application APIs.
+
 ## MVP 1 capabilities
 
 ### Chat
@@ -52,6 +58,11 @@ Visual design should clarify product state before adding decoration. New screens
 - Select an available chat model
 - Preserve canonical message roles
 - Present actionable endpoint and streaming errors
+- Render safe Markdown, GFM structures, and fenced code
+- Copy complete messages and individual code blocks
+- Search conversation titles and message content
+- Export conversations as Markdown or versioned Aster JSON
+- Import validated Aster JSON exports
 
 ### Persona
 
@@ -148,6 +159,9 @@ Aster is stable only when:
 - Endpoint changes do not require source-code edits
 - Persona instructions reach the model in the intended instruction role
 - Streaming does not duplicate or silently truncate messages
+- Incomplete streamed Markdown remains readable
+- Raw HTML is not executed from conversation content
+- Conversation imports reject unsupported formats and active stream states
 - Remote API failures produce clear user-facing errors
 - Cached models remain usable while an endpoint is temporarily unavailable
 - Credentials and session tokens never appear in logs or API responses
@@ -169,6 +183,7 @@ Aster is stable only when:
 - Production-ready deployment: implemented
 - Single-owner authentication: implemented in Stage 7
 - Interface and UX foundation: implemented in Stage 8
+- Chat quality and content rendering: implemented in Stage 9
 
 ## Change control
 
