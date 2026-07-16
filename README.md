@@ -2,7 +2,7 @@
 
 Aster is a self-hosted AI chat application designed around user-defined personas and OpenAI-compatible model endpoints.
 
-The repository is being built in small, stable milestones. The current implementation provides the application foundation, endpoint and model configuration, and one global user-defined persona with canonical message previews. Chat is not implemented yet.
+The repository is being built in small, stable milestones. The current implementation includes endpoint and model configuration, one global persona, persistent conversations, and streamed chat responses through the configured primary model.
 
 ## MVP scope
 
@@ -27,6 +27,10 @@ Utility falls back to primary when it is not configured. Image generation remain
 - Configure one global persona with a developer or system instruction role
 - Preview canonical message roles without sending a model request
 - Preserve the real user message separately and unchanged
+- Create, rename, open, and delete persistent conversations
+- Stream responses from the primary model through `POST /chat/completions`
+- Persist completed messages and sanitized streaming failures
+- Generate the first conversation title locally without spending a model request
 
 ## Explicitly out of scope for MVP 1
 
@@ -82,7 +86,7 @@ docker compose up --build
 
 Open:
 
-- Web: http://localhost:3000
+- Chat: http://localhost:3000
 - Model settings: http://localhost:3000/settings/models
 - Persona settings: http://localhost:3000/settings/persona
 - API health: http://localhost:8000/health
@@ -104,11 +108,12 @@ https://example.com/v1
 Aster uses:
 
 ```text
-GET {base_url}/models
+GET  {base_url}/models
+POST {base_url}/chat/completions
 Authorization: Bearer <api-key>
 ```
 
-The API key is optional for local services that do not require authentication.
+Chat requests use the configured primary model and set `stream: true`. The API key is optional for local services that do not require authentication.
 
 ## Local checks
 
@@ -138,15 +143,16 @@ uv run alembic upgrade head
 - [ADR-0001: Initial architecture](docs/decisions/0001-initial-architecture.md)
 - [ADR-0002: Model endpoints and local model cache](docs/decisions/0002-model-endpoints-and-cache.md)
 - [ADR-0003: Global persona and canonical message composition](docs/decisions/0003-persona-and-message-composition.md)
+- [ADR-0004: Persistent chat and streamed completions](docs/decisions/0004-persistent-chat-and-streaming.md)
 
 ## Security baseline
 
 - Secrets must be supplied through environment variables or the application credential store.
 - API keys are encrypted before being stored and are never returned by endpoint APIs.
 - API keys must never be included in logs, error payloads, fixtures, or documentation.
-- Upstream error bodies are not forwarded to the user.
+- Upstream response bodies are not forwarded to the user.
 - Model-provider behavior is implemented through generic API contracts rather than hard-coded provider names.
 
 ## Status
 
-Foundation, model configuration, and persona composition are implemented. Persistent chat and streaming are the next MVP milestone.
+Core persistent chat and streaming are implemented. Editing and resending user messages, regenerating assistant responses, and release hardening remain before MVP 1 is considered stable.

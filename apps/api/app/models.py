@@ -121,3 +121,34 @@ class PersonaSettings(TimestampMixin, Base):
     instruction_role: Mapped[str] = mapped_column(
         String(16), default="developer", server_default="developer", nullable=False
     )
+
+
+class Conversation(TimestampMixin, Base):
+    __tablename__ = "conversations"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    title: Mapped[str] = mapped_column(
+        String(200), default="New chat", server_default="New chat", nullable=False
+    )
+
+
+class ChatMessage(TimestampMixin, Base):
+    __tablename__ = "chat_messages"
+    __table_args__ = (
+        UniqueConstraint("conversation_id", "position", name="uq_chat_message_position"),
+        CheckConstraint("role IN ('user', 'assistant')", name="ck_chat_message_role"),
+        CheckConstraint(
+            "status IN ('completed', 'streaming', 'failed')", name="ck_chat_message_status"
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    conversation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    role: Mapped[str] = mapped_column(String(16), nullable=False)
+    content: Mapped[str] = mapped_column(Text, default="", server_default="", nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    error_message: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    model_id: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)

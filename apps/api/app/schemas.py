@@ -202,3 +202,67 @@ class CanonicalMessageResponse(BaseModel):
 
 class CompositionPreviewResponse(BaseModel):
     messages: list[CanonicalMessageResponse]
+
+
+class ConversationCreate(BaseModel):
+    title: Annotated[str | None, Field(default=None, max_length=200)] = None
+
+    @field_validator("title")
+    @classmethod
+    def normalize_title(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = " ".join(value.split())
+        return normalized or None
+
+
+class ConversationUpdate(BaseModel):
+    title: Annotated[str, Field(min_length=1, max_length=200)]
+
+    @field_validator("title")
+    @classmethod
+    def normalize_title(cls, value: str) -> str:
+        normalized = " ".join(value.split())
+        if not normalized:
+            raise ValueError("Conversation title cannot be empty")
+        return normalized
+
+
+class ChatMessageResponse(BaseModel):
+    id: UUID
+    conversation_id: UUID
+    role: Literal["user", "assistant"]
+    content: str
+    status: Literal["completed", "streaming", "failed"]
+    error_message: str | None
+    model_id: str | None
+    position: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class ConversationSummaryResponse(BaseModel):
+    id: UUID
+    title: str
+    message_count: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class ConversationResponse(BaseModel):
+    id: UUID
+    title: str
+    messages: list[ChatMessageResponse]
+    created_at: datetime
+    updated_at: datetime
+
+
+class SendMessageRequest(BaseModel):
+    content: Annotated[str, Field(min_length=1, max_length=100_000)]
+
+    @field_validator("content")
+    @classmethod
+    def validate_content(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Message cannot be empty")
+        return value

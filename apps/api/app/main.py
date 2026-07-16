@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.db import engine
+from app.routes.chat import router as chat_router
 from app.routes.health import router as health_router
 from app.routes.model_endpoints import router as model_endpoints_router
 from app.routes.persona import router as persona_router
@@ -19,7 +20,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.3.0",
+    version="0.4.0",
     lifespan=lifespan,
 )
 app.add_middleware(
@@ -32,3 +33,4 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(model_endpoints_router)
 app.include_router(persona_router)
+app.include_router(chat_router)

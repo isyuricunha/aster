@@ -42,17 +42,69 @@ export type ModelPreferences = {
   resolved_utility: SelectedModel | null;
 };
 
+export type PersonaSettings = {
+  name: string;
+  instructions: string;
+  enabled: boolean;
+  instruction_role: "developer" | "system";
+  created_at: string;
+  updated_at: string;
+};
+
+export type CanonicalMessage = {
+  role: "system" | "developer" | "user" | "assistant" | "tool";
+  source: "platform" | "persona" | "conversation" | "user" | "assistant" | "tool";
+  content: string;
+};
+
+export type CompositionPreview = {
+  messages: CanonicalMessage[];
+};
+
+export type ChatMessage = {
+  id: string;
+  conversation_id: string;
+  role: "user" | "assistant";
+  content: string;
+  status: "completed" | "streaming" | "failed";
+  error_message: string | null;
+  model_id: string | null;
+  position: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ConversationSummary = {
+  id: string;
+  title: string;
+  message_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Conversation = {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  created_at: string;
+  updated_at: string;
+};
+
 type ErrorPayload = {
   detail?: string | { message?: string };
 };
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_ASTER_API_URL ?? "http://localhost:8000";
 
+export function apiUrl(path: string): string {
+  return `${apiBaseUrl}${path}`;
+}
+
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   headers.set("Content-Type", "application/json");
 
-  const response = await fetch(`${apiBaseUrl}${path}`, {
+  const response = await fetch(apiUrl(path), {
     ...init,
     headers,
   });
@@ -74,22 +126,3 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
 
   return payload as T;
 }
-
-export type PersonaSettings = {
-  name: string;
-  instructions: string;
-  enabled: boolean;
-  instruction_role: "developer" | "system";
-  created_at: string;
-  updated_at: string;
-};
-
-export type CanonicalMessage = {
-  role: "system" | "developer" | "user" | "assistant" | "tool";
-  source: "platform" | "persona" | "conversation" | "user" | "assistant" | "tool";
-  content: string;
-};
-
-export type CompositionPreview = {
-  messages: CanonicalMessage[];
-};

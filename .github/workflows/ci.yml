@@ -117,6 +117,25 @@ jobs:
           http://localhost:8000/api/message-composition/preview
           | grep --quiet '"role":"user"'
 
+      - name: Check conversation API
+        run: |
+          conversation_id="$(
+            curl --fail --silent --show-error \
+              --header 'Content-Type: application/json' \
+              --data '{"title":"CI chat"}' \
+              http://localhost:8000/api/conversations \
+              | python -c 'import json, sys; print(json.load(sys.stdin)["id"])'
+          )"
+          curl --fail --silent --show-error \
+            "http://localhost:8000/api/conversations/${conversation_id}" \
+            | grep --quiet '"title":"CI chat"'
+
+      - name: Check chat page
+        run: >-
+          curl --fail --silent --show-error
+          --retry 30 --retry-all-errors --retry-delay 2
+          http://localhost:3000
+
       - name: Check model settings page
         run: >-
           curl --fail --silent --show-error

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import "./globals.css";
 import "./persona.css";
+import "./chat.css";
 
 export const metadata: Metadata = {
   title: "Aster",
