@@ -2,7 +2,7 @@
 
 Aster is a self-hosted AI chat application designed around user-defined personas and OpenAI-compatible model endpoints.
 
-The repository is being built in small, stable milestones. The current implementation includes endpoint and model configuration, one global persona, persistent conversations, and streamed chat responses through the configured primary model.
+The first MVP is feature-complete: endpoint and model configuration, one global persona, persistent conversations, streamed responses, message replacement, regeneration, explicit stop controls, and interrupted-stream recovery.
 
 ## MVP scope
 
@@ -31,6 +31,11 @@ Utility falls back to primary when it is not configured. Image generation remain
 - Stream responses from the primary model through `POST /chat/completions`
 - Persist completed messages and sanitized streaming failures
 - Generate the first conversation title locally without spending a model request
+- Edit a user message and replace the conversation tail with a new response
+- Regenerate any finished assistant response using the preceding user message
+- Stop an active response without treating it as an upstream failure
+- Save partial output during long streams and recover abandoned streams after restart
+- Reject concurrent generations within the same conversation
 
 ## Explicitly out of scope for MVP 1
 
@@ -144,6 +149,7 @@ uv run alembic upgrade head
 - [ADR-0002: Model endpoints and local model cache](docs/decisions/0002-model-endpoints-and-cache.md)
 - [ADR-0003: Global persona and canonical message composition](docs/decisions/0003-persona-and-message-composition.md)
 - [ADR-0004: Persistent chat and streamed completions](docs/decisions/0004-persistent-chat-and-streaming.md)
+- [ADR-0005: Linear chat replacement and generation lifecycle](docs/decisions/0005-chat-generation-lifecycle.md)
 
 ## Security baseline
 
@@ -155,4 +161,4 @@ uv run alembic upgrade head
 
 ## Status
 
-Core persistent chat and streaming are implemented. Editing and resending user messages, regenerating assistant responses, and release hardening remain before MVP 1 is considered stable.
+MVP 1 is feature-complete and ready for real-endpoint release validation. The application keeps a linear conversation history: editing or regenerating an earlier message intentionally replaces every later message.

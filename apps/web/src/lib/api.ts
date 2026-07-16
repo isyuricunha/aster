@@ -66,7 +66,7 @@ export type ChatMessage = {
   conversation_id: string;
   role: "user" | "assistant";
   content: string;
-  status: "completed" | "streaming" | "failed";
+  status: "completed" | "streaming" | "failed" | "stopped";
   error_message: string | null;
   model_id: string | null;
   position: number;

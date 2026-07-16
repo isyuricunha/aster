@@ -18,14 +18,16 @@ type StreamEvent = {
 };
 
 type MetaEvent = {
+  operation: "send" | "edit" | "regenerate";
   conversation_id: string;
   title: string;
-  user_message: ChatMessage;
-  assistant_message: ChatMessage;
+  replace_from_position: number | null;
+  messages: ChatMessage[];
+  assistant_message_id: string;
 };
 
 type DeltaEvent = { content: string };
-type DoneEvent = { message: ChatMessage };
+type TerminalEvent = { message: ChatMessage };
 type ErrorEvent = { code: string; message: string };
 
 async function readEventStream(
@@ -80,8 +82,13 @@ export function ChatShell({
   const [conversation, setConversation] = useState(initialConversation);
   const [draft, setDraft] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const [activeAssistantId, setActiveAssistantId] = useState<string | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingDraft, setEditingDraft] = useState("");
   const [error, setError] = useState<string | null>(initialError);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const activeAssistantIdRef = useRef<string | null>(null);
 
   const primaryLabel = useMemo(() => {
     if (!preferences?.primary) return null;
@@ -92,11 +99,18 @@ export function ChatShell({
     setConversations(await apiRequest<ConversationSummary[]>("/api/conversations"));
   }
 
+  async function refreshConversation(id: string) {
+    const refreshed = await apiRequest<Conversation>(`/api/conversations/${id}`);
+    setConversation(refreshed);
+    return refreshed;
+  }
+
   async function selectConversation(id: string) {
     if (streaming) return;
     setError(null);
+    setEditingMessageId(null);
     try {
-      setConversation(await apiRequest<Conversation>(`/api/conversations/${id}`));
+      await refreshConversation(id);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load the conversation.");
     }
@@ -106,6 +120,7 @@ export function ChatShell({
     if (streaming) return;
     setConversation(null);
     setDraft("");
+    setEditingMessageId(null);
     setError(null);
     requestAnimationFrame(() => composerRef.current?.focus());
   }
@@ -156,24 +171,35 @@ export function ChatShell({
   function applyStreamEvent(event: StreamEvent) {
     if (event.event === "meta") {
       const meta = event.data as MetaEvent;
-      setConversation((current) => ({
-        id: meta.conversation_id,
-        title: meta.title,
-        messages: [...(current?.messages ?? []), meta.user_message, meta.assistant_message],
-        created_at: current?.created_at ?? meta.user_message.created_at,
-        updated_at: meta.assistant_message.updated_at,
-      }));
+      activeAssistantIdRef.current = meta.assistant_message_id;
+      setActiveAssistantId(meta.assistant_message_id);
+      setConversation((current) => {
+        const retained =
+          meta.replace_from_position === null
+            ? (current?.messages ?? [])
+            : (current?.messages ?? []).filter(
+                (message) => message.position < meta.replace_from_position!,
+              );
+        return {
+          id: meta.conversation_id,
+          title: meta.title,
+          messages: [...retained, ...meta.messages],
+          created_at: current?.created_at ?? meta.messages[0]?.created_at ?? new Date().toISOString(),
+          updated_at: meta.messages.at(-1)?.updated_at ?? new Date().toISOString(),
+        };
+      });
       return;
     }
 
     if (event.event === "delta") {
       const delta = event.data as DeltaEvent;
+      const assistantId = activeAssistantIdRef.current;
       setConversation((current) => {
-        if (!current) return current;
+        if (!current || !assistantId) return current;
         return {
           ...current,
-          messages: current.messages.map((message, index) =>
-            index === current.messages.length - 1 && message.role === "assistant"
+          messages: current.messages.map((message) =>
+            message.id === assistantId
               ? { ...message, content: `${message.content}${delta.content}` }
               : message,
           ),
@@ -182,14 +208,14 @@ export function ChatShell({
       return;
     }
 
-    if (event.event === "done") {
-      const done = event.data as DoneEvent;
+    if (event.event === "done" || event.event === "stopped") {
+      const terminal = event.data as TerminalEvent;
       setConversation((current) => {
         if (!current) return current;
         return {
           ...current,
           messages: current.messages.map((message) =>
-            message.id === done.message.id ? done.message : message,
+            message.id === terminal.message.id ? terminal.message : message,
           ),
         };
       });
@@ -198,13 +224,14 @@ export function ChatShell({
 
     if (event.event === "error") {
       const failure = event.data as ErrorEvent;
+      const assistantId = activeAssistantIdRef.current;
       setError(failure.message);
       setConversation((current) => {
-        if (!current) return current;
+        if (!current || !assistantId) return current;
         return {
           ...current,
-          messages: current.messages.map((message, index) =>
-            index === current.messages.length - 1 && message.role === "assistant"
+          messages: current.messages.map((message) =>
+            message.id === assistantId
               ? { ...message, status: "failed", error_message: failure.message }
               : message,
           ),
@@ -213,24 +240,26 @@ export function ChatShell({
     }
   }
 
-  async function sendMessage(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const content = draft;
-    if (!content.trim() || streaming) return;
-    if (!primaryLabel) {
-      setError("Configure a primary model before starting a chat.");
-      return;
-    }
-
+  async function runStream({
+    conversationId,
+    path,
+    body,
+  }: {
+    conversationId: string;
+    path: string;
+    body?: Record<string, string>;
+  }) {
     setStreaming(true);
+    setStopping(false);
     setError(null);
-    setDraft("");
+    activeAssistantIdRef.current = null;
+    setActiveAssistantId(null);
+    let operationError: unknown = null;
     try {
-      const target = conversation ?? (await createConversation());
-      const response = await fetch(apiUrl(`/api/conversations/${target.id}/messages/stream`), {
+      const response = await fetch(apiUrl(path), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        ...(body ? { body: JSON.stringify(body) } : {}),
       });
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as {
@@ -244,15 +273,114 @@ export function ChatShell({
         );
       }
       await readEventStream(response, applyStreamEvent);
-      const refreshed = await apiRequest<Conversation>(`/api/conversations/${target.id}`);
-      setConversation(refreshed);
-      await refreshConversations();
+    } catch (caught) {
+      operationError = caught;
+      throw caught;
+    } finally {
+      try {
+        await refreshConversation(conversationId);
+        await refreshConversations();
+      } catch (refreshError) {
+        if (operationError === null) throw refreshError;
+      }
+      activeAssistantIdRef.current = null;
+      setActiveAssistantId(null);
+      setStreaming(false);
+      setStopping(false);
+      requestAnimationFrame(() => composerRef.current?.focus());
+    }
+  }
+
+  async function sendMessage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const content = draft;
+    if (!content.trim() || streaming) return;
+    if (!primaryLabel) {
+      setError("Configure a primary model before starting a chat.");
+      return;
+    }
+
+    setDraft("");
+    try {
+      const target = conversation ?? (await createConversation());
+      await runStream({
+        conversationId: target.id,
+        path: `/api/conversations/${target.id}/messages/stream`,
+        body: { content },
+      });
     } catch (caught) {
       setDraft(content);
       setError(caught instanceof Error ? caught.message : "Could not send the message.");
-    } finally {
-      setStreaming(false);
-      requestAnimationFrame(() => composerRef.current?.focus());
+    }
+  }
+
+  function startEditing(message: ChatMessage) {
+    if (streaming || message.role !== "user") return;
+    setEditingMessageId(message.id);
+    setEditingDraft(message.content);
+    setError(null);
+  }
+
+  async function editAndResend(event: FormEvent<HTMLFormElement>, message: ChatMessage) {
+    event.preventDefault();
+    if (!conversation || streaming || !editingDraft.trim()) return;
+    const removesLaterMessages = conversation.messages.some(
+      (candidate) => candidate.position > message.position + 1,
+    );
+    if (
+      removesLaterMessages &&
+      !window.confirm("Editing this message will replace every response and message after it. Continue?")
+    ) {
+      return;
+    }
+
+    const content = editingDraft;
+    setEditingMessageId(null);
+    try {
+      await runStream({
+        conversationId: conversation.id,
+        path: `/api/conversations/${conversation.id}/messages/${message.id}/edit-and-resend`,
+        body: { content },
+      });
+    } catch (caught) {
+      setEditingMessageId(message.id);
+      setEditingDraft(content);
+      setError(caught instanceof Error ? caught.message : "Could not edit and resend the message.");
+    }
+  }
+
+  async function regenerate(message: ChatMessage) {
+    if (!conversation || streaming || message.role !== "assistant") return;
+    const removesLaterMessages = conversation.messages.some(
+      (candidate) => candidate.position > message.position,
+    );
+    if (
+      removesLaterMessages &&
+      !window.confirm("Regenerating this response will remove every message after it. Continue?")
+    ) {
+      return;
+    }
+
+    try {
+      await runStream({
+        conversationId: conversation.id,
+        path: `/api/conversations/${conversation.id}/messages/${message.id}/regenerate`,
+      });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not regenerate the response.");
+    }
+  }
+
+  async function stopGeneration() {
+    const assistantId = activeAssistantIdRef.current;
+    if (!assistantId || stopping) return;
+    setStopping(true);
+    setError(null);
+    try {
+      await apiRequest(`/api/messages/${assistantId}/stop`, { method: "POST" });
+    } catch (caught) {
+      setStopping(false);
+      setError(caught instanceof Error ? caught.message : "Could not stop the response.");
     }
   }
 
@@ -338,11 +466,52 @@ export function ChatShell({
                     <span>{message.role === "user" ? "You" : "Assistant"}</span>
                     {message.status === "streaming" && <small>Streaming</small>}
                     {message.status === "failed" && <small>Failed</small>}
+                    {message.status === "stopped" && <small>Stopped</small>}
                   </div>
-                  <div className="message-content">
-                    {message.content || (message.status === "streaming" ? "…" : "")}
-                  </div>
-                  {message.error_message && <p className="message-error">{message.error_message}</p>}
+
+                  {editingMessageId === message.id ? (
+                    <form className="message-edit-form" onSubmit={(event) => void editAndResend(event, message)}>
+                      <textarea
+                        autoFocus
+                        onChange={(event) => setEditingDraft(event.target.value)}
+                        rows={4}
+                        value={editingDraft}
+                      />
+                      <div className="message-edit-actions">
+                        <button
+                          className="message-action"
+                          type="button"
+                          onClick={() => setEditingMessageId(null)}
+                        >
+                          Cancel
+                        </button>
+                        <button className="message-action primary" disabled={!editingDraft.trim()} type="submit">
+                          Save and resend
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      <div className="message-content">
+                        {message.content || (message.status === "streaming" ? "…" : "")}
+                      </div>
+                      {message.error_message && <p className="message-error">{message.error_message}</p>}
+                      {!streaming && (
+                        <div className="message-actions">
+                          {message.role === "user" && message.status === "completed" && (
+                            <button className="message-action" onClick={() => startEditing(message)}>
+                              Edit
+                            </button>
+                          )}
+                          {message.role === "assistant" && message.status !== "streaming" && (
+                            <button className="message-action" onClick={() => void regenerate(message)}>
+                              Regenerate
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </article>
               ))}
             </div>
@@ -362,9 +531,15 @@ export function ChatShell({
               rows={1}
               value={draft}
             />
-            <button disabled={streaming || !draft.trim() || !primaryLabel} type="submit">
-              {streaming ? "Sending" : "Send"}
-            </button>
+            {streaming ? (
+              <button className="stop-generation" disabled={!activeAssistantId || stopping} type="button" onClick={() => void stopGeneration()}>
+                {stopping ? "Stopping" : "Stop"}
+              </button>
+            ) : (
+              <button disabled={!draft.trim() || !primaryLabel} type="submit">
+                Send
+              </button>
+            )}
           </form>
           <p className="composer-hint">Enter to send · Shift+Enter for a new line</p>
         </footer>
