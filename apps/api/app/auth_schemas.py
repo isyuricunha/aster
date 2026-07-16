@@ -10,7 +10,8 @@ _USERNAME_PATTERN = re.compile(r"^[a-z0-9._-]+$")
 def normalize_username(value: str) -> str:
     normalized = value.strip().casefold()
     if not _USERNAME_PATTERN.fullmatch(normalized):
-        raise ValueError("Username may only contain letters, numbers, dots, underscores, and hyphens")
+        message = "Username may only contain letters, numbers, dots, underscores, and hyphens"
+        raise ValueError(message)
     return normalized
 
 
