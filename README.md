@@ -205,14 +205,25 @@ docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES
 
 External database deployments should use the backup process provided by their PostgreSQL host.
 
-Upgrade a source checkout:
+### Upgrade an existing bundled-database installation
+
+Installations created before the `local-db` profile was added must add these lines to `.env` before the first upgrade:
+
+```env
+COMPOSE_PROFILES=local-db
+DATABASE_URL=
+```
+
+Keep the existing `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` values unchanged. Do not remove the `postgres-data` volume. An existing `POSTGRES_PORT` line can remain, but it is ignored because PostgreSQL is no longer published to the host.
+
+Upgrade the source checkout:
 
 ```bash
 git pull --ff-only
 docker compose up -d --build
 ```
 
-Do not delete the PostgreSQL volume during a normal upgrade. The API applies pending migrations automatically.
+The API applies pending migrations automatically.
 
 Changing `ASTER_ENCRYPTION_KEY` without re-encrypting stored credentials makes those credentials unreadable.
 
