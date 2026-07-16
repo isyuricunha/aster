@@ -38,6 +38,11 @@ CipherDep = Annotated[SecretCipher, Depends(get_secret_cipher)]
 ClientDep = Annotated[OpenAICompatibleClient, Depends(get_openai_client)]
 
 
+def _contains_pattern(value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
 @router.get("/conversations", response_model=list[ConversationSummaryResponse])
 async def list_conversations(
     session: SessionDep,
@@ -58,15 +63,15 @@ async def list_conversations(
 
     normalized_query = query.strip() if query else ""
     if normalized_query:
-        pattern = f"%{normalized_query}%"
+        pattern = _contains_pattern(normalized_query)
         matching_message = exists(
             select(ChatMessage.id).where(
                 ChatMessage.conversation_id == Conversation.id,
-                ChatMessage.content.ilike(pattern),
+                ChatMessage.content.ilike(pattern, escape="\\"),
             )
         )
         statement = statement.where(
-            or_(Conversation.title.ilike(pattern), matching_message)
+            or_(Conversation.title.ilike(pattern, escape="\\"), matching_message)
         )
 
     rows = (
