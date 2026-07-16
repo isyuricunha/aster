@@ -1,75 +1,77 @@
 .message-actions {
   display: flex;
-  gap: 8px;
-  margin-top: 2px;
+  gap: 6px;
+  margin-top: 10px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.chat-message:hover .message-actions,
+.chat-message:focus-within .message-actions {
+  opacity: 1;
 }
 
 .message-action {
-  min-height: 30px;
-  padding: 0 10px;
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--muted);
+  color: var(--text-faint);
   cursor: pointer;
-  font: inherit;
-  font-size: 0.76rem;
-  font-weight: 700;
+  font-size: 0.67rem;
+  font-weight: 570;
 }
 
 .message-action:hover:not(:disabled) {
   border-color: var(--border-strong);
-  background: var(--surface-strong);
+  background: var(--surface-hover);
   color: var(--text);
 }
 
 .message-action.primary {
-  border-color: var(--accent);
+  border-color: rgba(242, 169, 59, 0.42);
   background: var(--accent);
-  color: #17110a;
+  color: #1b140a;
 }
 
 .message-action:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: 0.45;
 }
 
 .message-edit-form {
   display: grid;
-  gap: 10px;
+  gap: 9px;
 }
 
 .message-edit-form textarea {
   width: 100%;
-  min-height: 110px;
-  resize: vertical;
-  padding: 12px;
-  border: 1px solid var(--border-strong);
-  border-radius: 12px;
-  outline: 0;
-  background: #111115;
-  color: var(--text);
-  font: inherit;
-  line-height: 1.55;
-}
-
-.message-edit-form textarea:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+  min-height: 120px;
+  font-size: 0.8rem;
 }
 
 .message-edit-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 7px;
 }
 
 .chat-composer .stop-generation {
-  border-color: rgba(251, 113, 133, 0.55);
-  background: rgba(251, 113, 133, 0.12);
-  color: #fecdd3;
+  border-color: rgba(251, 113, 133, 0.34);
+  background: rgba(251, 113, 133, 0.1);
+  color: #fda4af;
 }
 
 .chat-composer .stop-generation:hover:not(:disabled) {
-  background: rgba(251, 113, 133, 0.2);
+  background: rgba(251, 113, 133, 0.18);
+}
+
+@media (hover: none) {
+  .message-actions {
+    opacity: 1;
+  }
 }
