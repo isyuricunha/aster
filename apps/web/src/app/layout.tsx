@@ -8,6 +8,7 @@ import "./chat.css";
 import "./chat-controls.css";
 import "./auth.css";
 import "./interface-refinement.css";
+import "./chat-content.css";
 
 export const metadata: Metadata = {
   title: "Aster",
