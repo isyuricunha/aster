@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import type { CachedModel } from "../../../lib/api";
+import styles from "./model-browser.module.css";
 
 const MODEL_PAGE_SIZE = 50;
 const MODEL_SELECT_LIMIT = 100;
@@ -38,8 +39,8 @@ export function EndpointModelList({ models }: { models: CachedModel[] }) {
   }
 
   return (
-    <div className="model-browser">
-      <div className="model-browser-controls">
+    <div className={styles.browser}>
+      <div className={styles.controls}>
         <input
           aria-label="Filter cached models"
           type="search"
@@ -47,7 +48,7 @@ export function EndpointModelList({ models }: { models: CachedModel[] }) {
           onChange={(event) => updateQuery(event.target.value)}
           placeholder="Filter model IDs"
         />
-        <label className="model-filter-toggle">
+        <label className={styles.toggle}>
           <input
             type="checkbox"
             checked={showUnavailable}
@@ -57,7 +58,7 @@ export function EndpointModelList({ models }: { models: CachedModel[] }) {
         </label>
       </div>
 
-      <div className="model-list-summary">
+      <div className={styles.summary}>
         <span>
           Showing {visibleModels.length} of {filteredModels.length} matching models
         </span>
@@ -65,9 +66,9 @@ export function EndpointModelList({ models }: { models: CachedModel[] }) {
       </div>
 
       {filteredModels.length === 0 ? (
-        <div className="model-list-empty">No cached models match these filters.</div>
+        <div className={styles.empty}>No cached models match these filters.</div>
       ) : (
-        <div className="model-list">
+        <div className={styles.list}>
           {visibleModels.map((model) => (
             <div className="model-row" key={model.id}>
               <code>{model.model_id}</code>
@@ -83,7 +84,7 @@ export function EndpointModelList({ models }: { models: CachedModel[] }) {
       )}
 
       {visibleModels.length < filteredModels.length && (
-        <div className="model-list-actions">
+        <div className={styles.actions}>
           <button
             className="button button-secondary"
             type="button"
@@ -128,7 +129,7 @@ export function ModelSelect({
   return (
     <label>
       <span>{label}</span>
-      <div className="model-select-stack">
+      <div className={styles.selectStack}>
         <input
           aria-label={`Filter ${label.toLocaleLowerCase()}`}
           type="search"
@@ -145,7 +146,7 @@ export function ModelSelect({
             </option>
           ))}
         </select>
-        <span className="field-hint">
+        <span className={styles.hint}>
           Showing {visibleModels.length} of {matchingModels.length} matching models. Type to narrow the
           list.
         </span>
