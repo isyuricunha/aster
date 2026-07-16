@@ -2,17 +2,28 @@
 
 Aster is a self-hosted AI chat application designed around user-defined personas and OpenAI-compatible model endpoints.
 
-The repository is currently in its foundation stage. The first stable MVP is intentionally small and focuses on a reliable chat experience rather than a broad agent platform.
+The repository is being built in small, stable milestones. The current implementation provides the application foundation plus endpoint and model configuration. Chat and persona composition are not implemented yet.
 
 ## MVP scope
 
 - Persistent chat with streamed responses
 - One global, user-defined persona
 - OpenAI-compatible endpoint and model configuration
-- Primary, utility, and image model slots
+- Primary, utility, and image model roles
 - Model listing and local cache
 
-The utility model falls back to the primary model when it is not configured. The image model may fall back to the primary model only when the configured endpoint exposes compatible image-generation capabilities.
+Utility falls back to primary when it is not configured. Image generation remains disabled until an image model is explicitly selected.
+
+## Current capabilities
+
+- Register, edit, disable, test, and delete OpenAI-compatible endpoints
+- Encrypt optional Bearer API keys before storing them in PostgreSQL
+- Synchronize model IDs from `GET /models`
+- Preserve cached model entries when an endpoint is unavailable
+- Mark discovered models missing from a later sync without deleting them
+- Add model IDs manually
+- Select primary, utility, and image model roles
+- Resolve utility to primary when utility is not configured
 
 ## Explicitly out of scope for MVP 1
 
@@ -34,7 +45,7 @@ apps/api  FastAPI application and database migrations
 postgres  Persistent application database
 ```
 
-The initial deployment target is Docker Compose. Redis is intentionally not part of the foundation because the MVP does not yet require a queue or distributed state.
+Docker Compose is the initial deployment target. Redis is intentionally absent because the current milestone does not require a queue or distributed state.
 
 ## Requirements
 
@@ -52,17 +63,48 @@ For local development outside containers:
 
 ```bash
 cp .env.example .env
+```
+
+Replace the example encryption key before storing credentials:
+
+```bash
+openssl rand -hex 32
+```
+
+Set the generated value as `ASTER_ENCRYPTION_KEY` in `.env`, then start Aster:
+
+```bash
 docker compose up --build
 ```
 
-Then open:
+Open:
 
 - Web: http://localhost:3000
+- Model settings: http://localhost:3000/settings/models
 - API health: http://localhost:8000/health
 - API readiness: http://localhost:8000/ready
 - API documentation: http://localhost:8000/docs
 
 The database is stored in the `postgres-data` Docker volume and survives container restarts.
+
+`ASTER_ENCRYPTION_KEY` must remain stable after endpoints are created. Changing it without re-encrypting existing credentials makes those credentials unreadable.
+
+## OpenAI-compatible endpoint format
+
+Enter the API root as the base URL. Include `/v1` when the service exposes its OpenAI-compatible routes there.
+
+```text
+https://example.com/v1
+```
+
+Aster uses:
+
+```text
+GET {base_url}/models
+Authorization: Bearer <api-key>
+```
+
+The API key is optional for local services that do not require authentication.
 
 ## Local checks
 
@@ -78,6 +120,7 @@ pnpm build
 ### API
 
 ```bash
+export ASTER_ENCRYPTION_KEY="development-key-with-at-least-32-characters"
 cd apps/api
 uv sync --group dev
 uv run ruff check .
@@ -89,17 +132,16 @@ uv run alembic upgrade head
 
 - [Project charter](docs/product/project-charter.md)
 - [ADR-0001: Initial architecture](docs/decisions/0001-initial-architecture.md)
+- [ADR-0002: Model endpoints and local model cache](docs/decisions/0002-model-endpoints-and-cache.md)
 
 ## Security baseline
 
-- Secrets must be supplied through environment variables or a future secret-storage layer.
+- Secrets must be supplied through environment variables or the application credential store.
+- API keys are encrypted before being stored and are never returned by endpoint APIs.
 - API keys must never be included in logs, error payloads, fixtures, or documentation.
-- Model-provider behavior must be implemented through generic capabilities and API adapters rather than hard-coded provider names.
-
-## License
-
-Aster is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+- Upstream error bodies are not forwarded to the user.
+- Model-provider behavior is implemented through generic API contracts rather than hard-coded provider names.
 
 ## Status
 
-Foundation work only. Chat, persona management, endpoint management, and model caching will be implemented in subsequent milestones.
+Foundation and model configuration are implemented. Persona composition and chat are the next MVP milestones.

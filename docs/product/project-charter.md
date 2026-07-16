@@ -60,17 +60,18 @@ Multiple personas, persona versioning, and per-conversation personas are deferre
 ### Endpoint and model configuration
 
 - Register multiple OpenAI-compatible endpoints
-- Store a display name, base URL, and API credential
+- Store a display name, base URL, and optional API credential
+- Encrypt credentials before storing them
 - Test endpoint connectivity
 - Select a primary model
 - Optionally select utility and image models
 - Fall back from utility to primary when utility is not configured
-- Use primary as the image fallback only when compatible image-generation capability is available
+- Keep image generation disabled when no image model is configured
 
 ### Model cache
 
 - Fetch the model catalog from a compatible models endpoint
-- Cache model metadata locally
+- Cache model identifiers locally
 - Refresh the cache manually
 - Display the last successful refresh time
 - Preserve cached entries when the remote endpoint is unavailable
@@ -124,6 +125,13 @@ The first MVP is stable only when:
 - A clean Docker Compose installation is reproducible
 - Database migrations work against an empty database
 - Required lint, type checks, builds, and tests pass
+
+## Milestone status
+
+- Foundation: implemented
+- Endpoint and model configuration: implemented in the current milestone
+- Persona composition: pending
+- Chat: pending
 
 ## Change control
 

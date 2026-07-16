@@ -42,6 +42,8 @@ jobs:
   api:
     name: API
     runs-on: ubuntu-latest
+    env:
+      ASTER_ENCRYPTION_KEY: tests-only-encryption-key-with-32-characters
     defaults:
       run:
         working-directory: apps/api
@@ -65,6 +67,9 @@ jobs:
 
       - name: Test
         run: uv run pytest
+
+      - name: Validate migrations
+        run: uv run alembic upgrade head --sql > /tmp/aster-migrations.sql
 
   compose:
     name: Docker Compose
@@ -94,11 +99,16 @@ jobs:
           --retry 30 --retry-all-errors --retry-delay 2
           http://localhost:8000/ready
 
+      - name: Check model settings API
+        run: >-
+          curl --fail --silent --show-error
+          http://localhost:8000/api/model-endpoints
+
       - name: Check web application
         run: >-
           curl --fail --silent --show-error
           --retry 30 --retry-all-errors --retry-delay 2
-          http://localhost:3000
+          http://localhost:3000/settings/models
 
       - name: Show service state
         if: always()

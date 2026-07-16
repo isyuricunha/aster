@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export const dynamic = "force-dynamic";
 
 type ApiState = {
@@ -29,28 +31,34 @@ export default async function Home() {
 
   return (
     <main>
-      <header>
-        <p className="eyebrow">Foundation</p>
+      <nav className="top-nav">
+        <span className="brand">Aster</span>
+        <Link href="/settings/models">Model settings</Link>
+      </nav>
+
+      <header className="hero-header">
+        <p className="eyebrow">Self-hosted AI</p>
         <h1>Aster</h1>
         <p className="lead">
-          The application foundation is running. Chat, persona, endpoint management, and model
-          caching will be built on this baseline.
+          The model layer is ready for configuration. Add an OpenAI-compatible endpoint, synchronize
+          its model list, and choose the defaults Aster will use next.
         </p>
+        <Link className="button hero-action" href="/settings/models">
+          Configure models
+        </Link>
       </header>
 
       <section className="grid" aria-label="System status">
         <article className="card">
-          <h2>Web application</h2>
-          <p>Next.js is serving the initial application shell.</p>
+          <h2>Model configuration</h2>
+          <p>Endpoints, encrypted credentials, model caching, and default roles are available.</p>
           <span className="status status-ok">Ready</span>
         </article>
 
         <article className="card">
           <h2>Application API</h2>
           <p>{apiState.message}.</p>
-          <span
-            className={`status ${apiState.available ? "status-ok" : "status-unavailable"}`}
-          >
+          <span className={`status ${apiState.available ? "status-ok" : "status-unavailable"}`}>
             {apiState.available ? "Ready" : "Unavailable"}
           </span>
         </article>
