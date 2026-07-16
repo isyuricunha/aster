@@ -1,0 +1,62 @@
+name: aster
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aster}
+      POSTGRES_USER: ${POSTGRES_USER:-aster}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aster}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  api:
+    build:
+      context: ./apps/api
+    restart: unless-stopped
+    environment:
+      APP_ENVIRONMENT: development
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-aster}:${POSTGRES_PASSWORD:-aster}@postgres:5432/${POSTGRES_DB:-aster}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8000/ready', timeout=3)
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    environment:
+      ASTER_API_INTERNAL_URL: ${ASTER_API_INTERNAL_URL:-http://api:8000}
+      NEXT_PUBLIC_ASTER_API_URL: ${NEXT_PUBLIC_ASTER_API_URL:-http://localhost:8000}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
