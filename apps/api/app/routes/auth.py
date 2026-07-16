@@ -1,16 +1,16 @@
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth_dependencies import (
-    get_login_rate_limiter,
-    get_optional_auth,
-    get_password_service,
-    get_session_service,
-    require_auth,
+    DatabaseSession,
+    LoginLimiter,
+    OptionalAuth,
+    PasswordManager,
+    RequiredAuth,
+    SessionManager,
 )
 from app.auth_schemas import (
     AuthStatusResponse,
@@ -20,16 +20,8 @@ from app.auth_schemas import (
     SessionRevocationResponse,
     SetupRequest,
 )
-from app.auth_service import (
-    AuthContext,
-    LoginRateLimiter,
-    PasswordService,
-    SessionService,
-    session_cookie_options,
-    utc_now,
-)
+from app.auth_service import session_cookie_options, utc_now
 from app.config import settings
-from app.db import get_session
 from app.models import AuthSession, User
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
@@ -55,8 +47,8 @@ def client_key(request: Request) -> str:
 
 @router.get("/status", response_model=AuthStatusResponse)
 async def auth_status(
-    database: AsyncSession = Depends(get_session),
-    context: AuthContext | None = Depends(get_optional_auth),
+    database: DatabaseSession,
+    context: OptionalAuth,
 ) -> AuthStatusResponse:
     user_count = await database.scalar(select(func.count()).select_from(User))
     setup_required = not bool(user_count)
@@ -71,9 +63,9 @@ async def auth_status(
 async def setup_owner(
     payload: SetupRequest,
     response: Response,
-    database: AsyncSession = Depends(get_session),
-    passwords: PasswordService = Depends(get_password_service),
-    sessions: SessionService = Depends(get_session_service),
+    database: DatabaseSession,
+    passwords: PasswordManager,
+    sessions: SessionManager,
 ) -> AuthUserResponse:
     if await database.scalar(select(User.id).limit(1)) is not None:
         raise HTTPException(
@@ -111,10 +103,10 @@ async def login(
     payload: LoginRequest,
     request: Request,
     response: Response,
-    database: AsyncSession = Depends(get_session),
-    passwords: PasswordService = Depends(get_password_service),
-    sessions: SessionService = Depends(get_session_service),
-    limiter: LoginRateLimiter = Depends(get_login_rate_limiter),
+    database: DatabaseSession,
+    passwords: PasswordManager,
+    sessions: SessionManager,
+    limiter: LoginLimiter,
 ) -> AuthUserResponse:
     key = client_key(request)
     retry_after = await limiter.retry_after(key)
@@ -157,8 +149,8 @@ async def login(
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
     response: Response,
-    database: AsyncSession = Depends(get_session),
-    context: AuthContext | None = Depends(get_optional_auth),
+    database: DatabaseSession,
+    context: OptionalAuth,
 ) -> Response:
     if context is not None:
         context.session.revoked_at = utc_now()
@@ -169,7 +161,7 @@ async def logout(
 
 
 @router.get("/me", response_model=AuthUserResponse)
-async def current_user(context: AuthContext = Depends(require_auth)) -> AuthUserResponse:
+async def current_user(context: RequiredAuth) -> AuthUserResponse:
     return AuthUserResponse(username=context.user.username, created_at=context.user.created_at)
 
 
@@ -177,10 +169,10 @@ async def current_user(context: AuthContext = Depends(require_auth)) -> AuthUser
 async def change_password(
     payload: PasswordChangeRequest,
     response: Response,
-    context: AuthContext = Depends(require_auth),
-    database: AsyncSession = Depends(get_session),
-    passwords: PasswordService = Depends(get_password_service),
-    sessions: SessionService = Depends(get_session_service),
+    context: RequiredAuth,
+    database: DatabaseSession,
+    passwords: PasswordManager,
+    sessions: SessionManager,
 ) -> AuthUserResponse:
     if not passwords.verify(context.user.password_hash, payload.current_password):
         raise HTTPException(
@@ -205,8 +197,8 @@ async def change_password(
 
 @router.delete("/sessions", response_model=SessionRevocationResponse)
 async def revoke_other_sessions(
-    context: AuthContext = Depends(require_auth),
-    database: AsyncSession = Depends(get_session),
+    context: RequiredAuth,
+    database: DatabaseSession,
 ) -> SessionRevocationResponse:
     result = await database.execute(
         update(AuthSession)
