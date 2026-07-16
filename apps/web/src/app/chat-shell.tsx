@@ -1,7 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 
 import {
   apiRequest,
@@ -11,6 +19,13 @@ import {
   type ConversationSummary,
   type ModelPreferences,
 } from "../lib/api";
+import {
+  createConversationMarkdown,
+  createConversationTransfer,
+  downloadConversationFile,
+  parseConversationTransfer,
+} from "./conversation-transfer";
+import { copyText, MarkdownMessage } from "./markdown-message";
 import { AsterMark, Icon } from "./ui/icons";
 
 type StreamEvent = {
@@ -87,8 +102,21 @@ export function ChatShell({
   const [activeAssistantId, setActiveAssistantId] = useState<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState("");
+  const [renaming, setRenaming] = useState(false);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<ConversationSummary[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchRevision, setSearchRevision] = useState(0);
   const [error, setError] = useState<string | null>(initialError);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const renameRef = useRef<HTMLInputElement>(null);
+  const importRef = useRef<HTMLInputElement>(null);
+  const copiedTimerRef = useRef<number | null>(null);
+  const searchRequestRef = useRef(0);
   const activeAssistantIdRef = useRef<string | null>(null);
 
   const primaryLabel = useMemo(() => {
@@ -96,8 +124,67 @@ export function ChatShell({
     return `${preferences.primary.endpoint_name} / ${preferences.primary.model_id}`;
   }, [preferences]);
 
+  const visibleConversations = searchResults ?? conversations;
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+    const requestId = ++searchRequestRef.current;
+    if (!query) {
+      setSearchResults(null);
+      setSearching(false);
+      setSearchError(null);
+      return;
+    }
+
+    setSearching(true);
+    setSearchError(null);
+    const timeout = window.setTimeout(() => {
+      void apiRequest<ConversationSummary[]>(
+        `/api/conversations?query=${encodeURIComponent(query)}`,
+      )
+        .then((results) => {
+          if (searchRequestRef.current === requestId) setSearchResults(results);
+        })
+        .catch((caught: unknown) => {
+          if (searchRequestRef.current !== requestId) return;
+          setSearchError(caught instanceof Error ? caught.message : "Could not search conversations.");
+          setSearchResults([]);
+        })
+        .finally(() => {
+          if (searchRequestRef.current === requestId) setSearching(false);
+        });
+    }, 220);
+
+    return () => window.clearTimeout(timeout);
+  }, [searchQuery, searchRevision]);
+
+  useEffect(() => {
+    function handleShortcut(event: globalThis.KeyboardEvent) {
+      const target = event.target;
+      const isTyping =
+        target instanceof HTMLElement &&
+        (target.matches("input, textarea, select") || target.isContentEditable);
+      if (event.key === "/" && !isTyping) {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    }
+
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (copiedTimerRef.current !== null) window.clearTimeout(copiedTimerRef.current);
+    },
+    [],
+  );
+
   async function refreshConversations() {
-    setConversations(await apiRequest<ConversationSummary[]>("/api/conversations"));
+    const refreshed = await apiRequest<ConversationSummary[]>("/api/conversations");
+    setConversations(refreshed);
+    setSearchRevision((current) => current + 1);
   }
 
   async function refreshConversation(id: string) {
@@ -110,6 +197,7 @@ export function ChatShell({
     if (streaming) return;
     setError(null);
     setEditingMessageId(null);
+    setRenaming(false);
     try {
       await refreshConversation(id);
     } catch (caught) {
@@ -122,6 +210,7 @@ export function ChatShell({
     setConversation(null);
     setDraft("");
     setEditingMessageId(null);
+    setRenaming(false);
     setError(null);
     requestAnimationFrame(() => composerRef.current?.focus());
   }
@@ -136,16 +225,33 @@ export function ChatShell({
     return created;
   }
 
-  async function renameConversation() {
+  function startRenaming() {
     if (!conversation || streaming) return;
-    const title = window.prompt("Conversation title", conversation.title)?.trim();
-    if (!title || title === conversation.title) return;
+    setRenameDraft(conversation.title);
+    setRenaming(true);
+    requestAnimationFrame(() => {
+      renameRef.current?.focus();
+      renameRef.current?.select();
+    });
+  }
+
+  async function renameConversation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!conversation || streaming) return;
+    const title = renameDraft.trim();
+    if (!title) return;
+    if (title === conversation.title) {
+      setRenaming(false);
+      return;
+    }
+
     try {
       const updated = await apiRequest<Conversation>(`/api/conversations/${conversation.id}`, {
         method: "PATCH",
         body: JSON.stringify({ title }),
       });
       setConversation(updated);
+      setRenaming(false);
       await refreshConversations();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not rename the conversation.");
@@ -159,6 +265,7 @@ export function ChatShell({
       await apiRequest(`/api/conversations/${conversation.id}`, { method: "DELETE" });
       const remaining = conversations.filter((item) => item.id !== conversation.id);
       setConversations(remaining);
+      setSearchRevision((current) => current + 1);
       if (remaining[0]) {
         await selectConversation(remaining[0].id);
       } else {
@@ -166,6 +273,68 @@ export function ChatShell({
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not delete the conversation.");
+    }
+  }
+
+  async function copyMessage(message: ChatMessage) {
+    try {
+      await copyText(message.content);
+      setCopiedMessageId(message.id);
+      if (copiedTimerRef.current !== null) window.clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = window.setTimeout(() => setCopiedMessageId(null), 1_500);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not copy the message.");
+    }
+  }
+
+  function exportConversation(format: "json" | "markdown") {
+    if (!conversation || streaming) return;
+    try {
+      if (format === "json") {
+        const transfer = createConversationTransfer(conversation);
+        downloadConversationFile(
+          `${JSON.stringify(transfer, null, 2)}\n`,
+          conversation.title,
+          "aster.json",
+          "application/json;charset=utf-8",
+        );
+        return;
+      }
+      downloadConversationFile(
+        createConversationMarkdown(conversation),
+        conversation.title,
+        "md",
+        "text/markdown;charset=utf-8",
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not export the conversation.");
+    }
+  }
+
+  async function importConversation(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file || streaming) return;
+    if (file.size > 10_000_000) {
+      setError("Conversation exports must be smaller than 10 MB.");
+      return;
+    }
+
+    try {
+      const transfer = parseConversationTransfer(await file.text());
+      const imported = await apiRequest<Conversation>("/api/conversations/import", {
+        method: "POST",
+        body: JSON.stringify(transfer),
+      });
+      setSearchQuery("");
+      setConversation(imported);
+      setEditingMessageId(null);
+      setRenaming(false);
+      setError(null);
+      await refreshConversations();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not import the conversation.");
     }
   }
 
@@ -392,6 +561,18 @@ export function ChatShell({
     }
   }
 
+  function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Escape") {
+      setSearchQuery("");
+      event.currentTarget.blur();
+      return;
+    }
+    if (event.key === "Enter" && visibleConversations[0] && !streaming) {
+      event.preventDefault();
+      void selectConversation(visibleConversations[0].id);
+    }
+  }
+
   return (
     <div className="chat-app">
       <aside className="chat-sidebar">
@@ -416,16 +597,59 @@ export function ChatShell({
           <span>Chat</span>
         </div>
 
+        <div className="conversation-search">
+          <Icon name="search" size={14} />
+          <input
+            aria-label="Search conversations"
+            onChange={(event) => setSearchQuery(event.target.value)}
+            onKeyDown={handleSearchKeyDown}
+            placeholder="Search conversations"
+            ref={searchRef}
+            value={searchQuery}
+          />
+          {searchQuery ? (
+            <button aria-label="Clear search" onClick={() => setSearchQuery("")} type="button">
+              <Icon name="close" size={13} />
+            </button>
+          ) : (
+            <kbd>/</kbd>
+          )}
+        </div>
+
         <div className="sidebar-section-heading">
-          <span>Conversations</span>
-          <small>{conversations.length}</small>
+          <span>{searchQuery.trim() ? "Search results" : "Conversations"}</span>
+          <div className="sidebar-section-actions">
+            <small>{searching ? "…" : visibleConversations.length}</small>
+            <button
+              aria-label="Import conversation"
+              disabled={streaming}
+              onClick={() => importRef.current?.click()}
+              title="Import Aster conversation"
+              type="button"
+            >
+              <Icon name="upload" size={13} />
+            </button>
+            <input
+              accept=".json,application/json"
+              className="conversation-import-input"
+              onChange={(event) => void importConversation(event)}
+              ref={importRef}
+              type="file"
+            />
+          </div>
         </div>
 
         <div className="conversation-list" aria-label="Conversations">
-          {conversations.length === 0 ? (
-            <p className="conversation-empty">Your conversations will appear here.</p>
+          {searchError ? (
+            <p className="conversation-empty conversation-search-error">{searchError}</p>
+          ) : visibleConversations.length === 0 ? (
+            <p className="conversation-empty">
+              {searchQuery.trim()
+                ? "No conversations match this search."
+                : "Your conversations will appear here."}
+            </p>
           ) : (
-            conversations.map((item) => (
+            visibleConversations.map((item) => (
               <button
                 className={`conversation-item ${conversation?.id === item.id ? "active" : ""}`}
                 disabled={streaming}
@@ -474,17 +698,54 @@ export function ChatShell({
           <div className="chat-header-context">
             <span className="chat-header-section">Chat</span>
             <Icon name="chevron-right" size={13} />
-            <div>
-              <p className="chat-title">{conversation?.title ?? "New conversation"}</p>
-              <p className="chat-model">{primaryLabel ?? "Primary model not configured"}</p>
-            </div>
+            {renaming && conversation ? (
+              <form className="chat-title-editor" onSubmit={(event) => void renameConversation(event)}>
+                <input
+                  aria-label="Conversation title"
+                  maxLength={200}
+                  onChange={(event) => setRenameDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") setRenaming(false);
+                  }}
+                  ref={renameRef}
+                  value={renameDraft}
+                />
+                <button aria-label="Save title" disabled={!renameDraft.trim()} type="submit">
+                  <Icon name="check" size={13} />
+                </button>
+                <button aria-label="Cancel rename" onClick={() => setRenaming(false)} type="button">
+                  <Icon name="close" size={13} />
+                </button>
+              </form>
+            ) : (
+              <div>
+                <p className="chat-title">{conversation?.title ?? "New conversation"}</p>
+                <p className="chat-model">{primaryLabel ?? "Primary model not configured"}</p>
+              </div>
+            )}
           </div>
           {conversation && (
             <div className="chat-actions">
               <button
+                aria-label="Export conversation as Markdown"
+                disabled={streaming}
+                onClick={() => exportConversation("markdown")}
+                title="Export as Markdown"
+              >
+                <Icon name="download" />
+              </button>
+              <button
+                aria-label="Export conversation as Aster JSON"
+                disabled={streaming}
+                onClick={() => exportConversation("json")}
+                title="Export for import"
+              >
+                <Icon name="copy" />
+              </button>
+              <button
                 aria-label="Rename conversation"
                 disabled={streaming}
-                onClick={() => void renameConversation()}
+                onClick={startRenaming}
                 title="Rename conversation"
               >
                 <Icon name="edit" />
@@ -564,14 +825,25 @@ export function ChatShell({
                       </form>
                     ) : (
                       <>
-                        <div className="message-content">
-                          {message.content || (message.status === "streaming" ? "…" : "")}
-                        </div>
+                        <MarkdownMessage
+                          content={message.content}
+                          streaming={message.status === "streaming"}
+                        />
                         {message.error_message && (
                           <p className="message-error">{message.error_message}</p>
                         )}
                         {!streaming && (
                           <div className="message-actions">
+                            <button
+                              className="message-action"
+                              onClick={() => void copyMessage(message)}
+                            >
+                              <Icon
+                                name={copiedMessageId === message.id ? "check" : "copy"}
+                                size={13}
+                              />
+                              {copiedMessageId === message.id ? "Copied" : "Copy"}
+                            </button>
                             {message.role === "user" && message.status === "completed" && (
                               <button className="message-action" onClick={() => startEditing(message)}>
                                 <Icon name="edit" size={13} />
@@ -638,7 +910,9 @@ export function ChatShell({
               )}
             </div>
           </form>
-          <p className="composer-hint">Enter to send · Shift+Enter for a new line</p>
+          <p className="composer-hint">
+            Enter to send · Shift+Enter for a new line · Press / to search history
+          </p>
         </footer>
       </section>
     </div>
