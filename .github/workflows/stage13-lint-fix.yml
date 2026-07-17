@@ -1,0 +1,93 @@
+name: Apply Stage 13 Lint Cleanup
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: >-
+      github.head_ref == 'memory-and-rag' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the Stage 13 branch
+        uses: actions/checkout@v4
+        with:
+          ref: memory-and-rag
+      - name: Apply deterministic cleanup
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              'apps/api/app/memory_service.py': [
+                  (
+                      '    if not endpoint.enabled or not model.is_available or not supports_chat or not supports_streaming:\n',
+                      '    unavailable = (\n'
+                      '        not endpoint.enabled\n'
+                      '        or not model.is_available\n'
+                      '        or not supports_chat\n'
+                      '        or not supports_streaming\n'
+                      '    )\n'
+                      '    if unavailable:\n',
+                  ),
+              ],
+              'apps/api/app/routes/knowledge.py': [
+                  (
+                      '        raise HTTPException(status_code=422, detail="Documents cannot be added to a disabled collection")\n',
+                      '        raise HTTPException(\n'
+                      '            status_code=422,\n'
+                      '            detail="Documents cannot be added to a disabled collection",\n'
+                      '        )\n',
+                  ),
+              ],
+              'apps/api/app/routes/memory.py': [
+                  (
+                      '            raise HTTPException(status_code=422, detail="The selected embedding model does not exist")\n',
+                      '            raise HTTPException(\n'
+                      '                status_code=422,\n'
+                      '                detail="The selected embedding model does not exist",\n'
+                      '            )\n',
+                  ),
+                  (
+                      '            raise HTTPException(status_code=422, detail="The selected embedding model is unavailable")\n',
+                      '            raise HTTPException(\n'
+                      '                status_code=422,\n'
+                      '                detail="The selected embedding model is unavailable",\n'
+                      '            )\n',
+                  ),
+                  (
+                      '    persona_id = payload.persona_id if "persona_id" in payload.model_fields_set else suggestion.persona_id\n',
+                      '    persona_id = (\n'
+                      '        payload.persona_id\n'
+                      '        if "persona_id" in payload.model_fields_set\n'
+                      '        else suggestion.persona_id\n'
+                      '    )\n',
+                  ),
+              ],
+          }
+          for filename, pairs in replacements.items():
+              path = Path(filename)
+              content = path.read_text()
+              for old, new in pairs:
+                  if old not in content:
+                      raise SystemExit(f'Expected text was not found in {filename}')
+                  content = content.replace(old, new)
+              path.write_text(content)
+          PY
+          python -m pip install --disable-pip-version-check uv
+          cd apps/api
+          uv run ruff check migrations/env.py --fix
+      - name: Commit the cleanup
+        run: |
+          git config user.name 'isyuricunha'
+          git config user.email '115634315+isyuricunha@users.noreply.github.com'
+          git add apps/api/app/memory_service.py apps/api/app/routes/knowledge.py \
+            apps/api/app/routes/memory.py apps/api/migrations/env.py
+          git commit -m 'fix(memory): clean the initial API pass'
+          git push origin HEAD:memory-and-rag
