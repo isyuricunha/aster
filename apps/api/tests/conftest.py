@@ -9,6 +9,7 @@ from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
+os.environ.setdefault("APP_ENVIRONMENT", "test")
 os.environ.setdefault("ASTER_ENCRYPTION_KEY", "tests-only-encryption-key-with-32-characters")
 os.environ.setdefault("ASTER_CORS_ORIGINS", "http://testserver")
 os.environ.setdefault("ASTER_SESSION_SECURE", "false")
