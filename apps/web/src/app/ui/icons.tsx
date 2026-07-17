@@ -19,6 +19,7 @@ export type IconName =
   | "search"
   | "settings"
   | "stop"
+  | "tools"
   | "trash"
   | "upload";
 
@@ -122,6 +123,12 @@ export function Icon({ name, size = 16, ...props }: IconProps) {
       </>
     ),
     stop: <rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none" />,
+    tools: (
+      <>
+        <path d="M14.5 5.5a4 4 0 0 0-5.2 5.2L4.5 15.5a2.1 2.1 0 0 0 3 3l4.8-4.8a4 4 0 0 0 5.2-5.2l-2.4 2.4-2-2 2.4-2.4Z" />
+        <path d="m6.7 16.3 1 1" />
+      </>
+    ),
     trash: (
       <>
         <path d="M5 7h14" />
