@@ -101,6 +101,8 @@ jobs:
         run: >-
           curl --fail --silent --show-error --retry 30 --retry-all-errors --retry-delay 2
           http://localhost:3000/setup
+      - name: Check Stage 11 legacy upgrade
+        run: sh scripts/ci/check-stage11-persona-migration.sh
       - name: Check runtime authentication configuration
         run: >-
           docker compose exec -T api python -c
@@ -137,15 +139,15 @@ jobs:
           curl --fail --silent --show-error --cookie /tmp/aster.cookies \
             http://localhost:3000/api/model-routing | grep --quiet '"fallbacks":\[\]'
           curl --fail --silent --show-error --cookie /tmp/aster.cookies \
-            http://localhost:3000/api/persona >/dev/null
+            http://localhost:3000/api/persona | grep --quiet '"name":"Migrated Assistant"'
           curl --fail --silent --show-error --cookie /tmp/aster.cookies \
-            http://localhost:3000/api/personas | grep --quiet '^\[\]$'
+            http://localhost:3000/api/personas | grep --quiet '"name":"Migrated Assistant"'
           curl --fail --silent --show-error --cookie /tmp/aster.cookies \
             --header 'Content-Type: application/json' \
             --header 'Origin: http://localhost:3000' \
             --data '{"user_message":"Hello"}' \
             http://localhost:3000/api/message-composition/preview \
-            | grep --quiet '"role":"user"'
+            | grep --quiet 'Preserve these legacy instructions.'
       - name: Check persona library and default snapshot
         run: |
           persona_id="$(curl --fail --silent --show-error \
@@ -157,6 +159,10 @@ jobs:
             | python -c 'import json, sys; print(json.load(sys.stdin)["id"])')"
           printf '%s' "${persona_id}" > /tmp/aster-persona-id
           curl --fail --silent --show-error --cookie /tmp/aster.cookies \
+            --header 'Content-Type: application/json' \
+            --header 'Origin: http://localhost:3000' \
+            --request PUT \
+            --data "{\"default_persona_id\":\"${persona_id}\"}" \
             http://localhost:3000/api/persona-preferences \
             | grep --quiet '"name":"CI Persona"'
           curl --fail --silent --show-error --cookie /tmp/aster.cookies \
