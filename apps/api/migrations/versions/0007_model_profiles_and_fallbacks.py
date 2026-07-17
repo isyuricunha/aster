@@ -1,6 +1,6 @@
 """Add model profiles and fallback routing.
 
-Revision ID: 0007_model_profiles_and_fallbacks
+Revision ID: 0007_model_profiles
 Revises: 0006_single_owner_auth
 Create Date: 2026-07-16
 """
@@ -10,7 +10,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0007_model_profiles_and_fallbacks"
+revision: str = "0007_model_profiles"
 down_revision: str | None = "0006_single_owner_auth"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
