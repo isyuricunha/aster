@@ -73,7 +73,7 @@ class FallbackModelResponse(BaseModel):
 class ModelRoutingUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    fallback_model_ids: Annotated[list[UUID], Field(max_length=20)] = []
+    fallback_model_ids: Annotated[list[UUID], Field(default_factory=list, max_length=20)]
 
     @field_validator("fallback_model_ids")
     @classmethod
