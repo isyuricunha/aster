@@ -1,0 +1,226 @@
+.stack {
+  display: grid;
+  gap: 16px;
+}
+
+.serverPanel {
+  display: grid;
+  gap: 18px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.2fr) minmax(180px, 0.8fr) minmax(130px, 0.45fr);
+  gap: 12px;
+}
+
+.transportFields {
+  display: grid;
+  gap: 12px;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  align-self: end;
+  min-height: 36px;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.checkboxLabel input,
+.policyToggle input,
+.scopeItem input {
+  accent-color: var(--accent);
+}
+
+.savedSecrets {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.serverList,
+.toolList {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--border);
+}
+
+.serverRow,
+.toolRow {
+  position: relative;
+  display: grid;
+  align-items: center;
+  gap: 14px;
+  background: var(--surface);
+}
+
+.serverRow {
+  grid-template-columns: minmax(240px, 1fr) auto auto;
+  padding: 11px 12px;
+}
+
+.serverIdentity {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.serverIdentity > span:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.serverIdentity strong,
+.toolIdentity strong,
+.scopeItem strong {
+  color: var(--text-strong);
+  font-size: 0.84rem;
+  font-weight: 620;
+}
+
+.serverIdentity small,
+.scopeItem small {
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.serverIcon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--icon-muted);
+}
+
+.serverStatus,
+.rowActions,
+.policyGrid {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.serverError {
+  grid-column: 1 / -1;
+  margin: 0 0 0 38px;
+  color: var(--danger);
+  font-size: 0.75rem;
+}
+
+.toolRow {
+  grid-template-columns: minmax(260px, 1fr) auto auto;
+  padding: 13px 14px;
+}
+
+.toolIdentity {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.toolIdentity > span {
+  color: var(--text-faint);
+  font-size: 0.7rem;
+}
+
+.toolIdentity p {
+  margin: 3px 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.toolIdentity code {
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: 0.67rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.policyToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.scopeList {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.scopeItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+
+.scopeItem > span {
+  display: grid;
+  gap: 1px;
+}
+
+.scopeList > button {
+  width: fit-content;
+  margin-top: 4px;
+}
+
+@media (max-width: 1050px) {
+  .formGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .serverRow,
+  .toolRow {
+    grid-template-columns: 1fr;
+  }
+
+  .serverStatus,
+  .rowActions,
+  .policyGrid {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .serverError {
+    margin-left: 0;
+  }
+}
