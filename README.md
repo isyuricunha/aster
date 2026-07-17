@@ -1,6 +1,6 @@
 # Aster
 
-Aster is a self-hosted AI workspace built around user-defined personas, OpenAI-compatible model endpoints, controlled MCP tools, approved personal memory, and private document retrieval.
+Aster is a self-hosted AI workspace built around user-defined personas, OpenAI-compatible model endpoints, controlled MCP tools, approved personal memory, private document retrieval, and private image generation and editing.
 
 ## Current capabilities
 
@@ -9,7 +9,7 @@ Aster is a self-hosted AI workspace built around user-defined personas, OpenAI-c
 - Login rate limiting, password changes, logout, and session revocation
 - OpenAI-compatible endpoint registration, testing, model discovery, and encrypted API credentials
 - Searchable primary, utility, image, and embedding model selection
-- Per-model output, sampling, reasoning, and compatibility profiles
+- Per-model chat profiles and explicit image capability profiles
 - Ordered chat fallback routing that never combines partial model output
 - Reusable personas with frozen conversation snapshots
 - Persistent streamed conversations with edit, resend, regenerate, stop, search, import, and export
@@ -22,16 +22,21 @@ Aster is a self-hosted AI workspace built around user-defined personas, OpenAI-c
 - Lexical retrieval with optional OpenAI-compatible embeddings
 - Per-conversation memory, RAG, and collection controls
 - Visible and persisted retrieval provenance for assistant responses
+- OpenAI-compatible image generation and editing from chat
+- PNG, JPEG, and WebP visual inputs with optional masks
+- Private image attachments, gallery, operation history, and conversation association
+- Provider-aware image defaults and bounded additional parameters
 
 ## Architecture
 
 ```text
 apps/web  Next.js user interface and same-origin API proxy
-apps/api  FastAPI application, model adapters, MCP client, retrieval, and migrations
+apps/api  FastAPI application, model adapters, MCP client, retrieval, private media, and migrations
 postgres  Optional bundled PostgreSQL database
+media     Private image files in the aster-media Docker volume
 ```
 
-Docker Compose is the initial deployment target. Redis, a background queue, pgvector, and public object storage are intentionally absent from the default stack.
+Docker Compose is the initial deployment target. Redis, a background queue, pgvector, ChromaDB, and public object storage are intentionally absent from the default stack.
 
 ## Requirements
 
@@ -77,7 +82,7 @@ Start Aster:
 docker compose up -d --build
 ```
 
-The bundled database is stored in the `postgres-data` Docker volume and is not published to the host.
+The bundled database is stored in the `postgres-data` Docker volume. Private uploaded and generated images are stored separately in the `aster-media` volume. Neither service is published as public storage.
 
 ## First sign-up
 
@@ -105,13 +110,14 @@ Start the same stack:
 docker compose up -d --build
 ```
 
-Only the API and web services start when `COMPOSE_PROFILES` is empty. The API applies pending Alembic migrations before starting.
+Only the API and web services start when `COMPOSE_PROFILES` is empty. The API applies pending Alembic migrations before starting. The `aster-media` volume remains part of the application stack unless a different `ASTER_MEDIA_ROOT` is mounted deliberately.
 
 ## Open Aster
 
 Default local routes:
 
 - Chat: `http://localhost:3000`
+- Images: `http://localhost:3000/images`
 - Models: `http://localhost:3000/settings/models`
 - Personas: `http://localhost:3000/settings/persona`
 - Tools: `http://localhost:3000/settings/tools`
@@ -165,19 +171,27 @@ Aster may use:
 GET  {base_url}/models
 POST {base_url}/chat/completions
 POST {base_url}/embeddings
+POST {base_url}/images/generations
+POST {base_url}/images/edits
 Authorization: Bearer <api-key>
 ```
 
 `/embeddings` is used only when an embedding model is selected. Chat and private document retrieval remain functional without it.
 
+Image generation uses JSON requests. Image editing uses multipart form data with one or more images and an optional mask. Aster accepts either base64 image results or provider URLs, downloads URL results immediately, validates them, and stores the durable result privately.
+
 ## Model roles
 
 - **Primary** — chat, reasoning, and model-requested tools
 - **Utility** — bounded support work such as memory-candidate extraction; falls back to Primary
-- **Image** — reserved for image operations in a later stage
+- **Image** — image generation and editing
 - **Embedding** — optional semantic indexing and retrieval
 
-Per-model profiles can configure temperature, top-p, output limits, reasoning effort, token-field compatibility, and declared chat or streaming support.
+The Image role may be left empty. In that case Aster uses the Primary model only when that exact cached model has an image profile declaring the required capability. Model names are never used to guess image support.
+
+Chat profiles configure temperature, top-p, output limits, reasoning effort, token-field compatibility, and declared chat or streaming support.
+
+Image profiles configure explicit generation, editing, multiple-input, and mask support; maximum inputs; output count; normalized defaults; and bounded provider parameters.
 
 ## Personas
 
@@ -230,6 +244,7 @@ Retrieval behavior:
 
 - lexical retrieval is always available;
 - an optional embedding model adds semantic scoring;
+- embeddings are stored as JSON vectors in PostgreSQL without pgvector;
 - embedding failures keep lexical indexing and retrieval available;
 - vectors created by a different model are ignored until reindexing;
 - memory and document context enter the model as untrusted developer data;
@@ -238,6 +253,32 @@ Retrieval behavior:
 
 Collections marked as defaults are copied only to new conversations. Existing conversations are never modified retroactively.
 
+## Images
+
+Open the image panel from the chat composer for an explicit image operation. Aster does not infer image intent from keywords in ordinary messages.
+
+Before the first operation:
+
+1. Select an Image model under **Settings → Models**, or leave Image empty to use a compatible Primary model.
+2. Open **Images**.
+3. Declare the model's actual generation and editing capabilities.
+4. Configure provider defaults only when the provider requires them.
+
+Stage 14 supports:
+
+- generation from a text prompt;
+- editing with one or more PNG, JPEG, or WebP inputs when the model allows it;
+- an optional image mask when the model allows it;
+- normalized size, quality, output format, background, count, and input-fidelity parameters;
+- bounded additional provider parameters that cannot replace Aster-controlled fields;
+- persistent input and output attachments in the conversation;
+- a private gallery with prompt, model, parameters, result metadata, failures, and conversation links;
+- restart recovery that marks interrupted operations as failed instead of leaving them running forever.
+
+Uploads and outputs are validated by file signature and dimensions. Private metadata is removed from supported formats before storage. SVG, generic multimodal chat, OCR, audio, video, public media sharing, background generation, and scheduled image jobs are outside Stage 14.
+
+Media bytes are never stored inside chat text or PostgreSQL. The database stores metadata and relationships; the `aster-media` volume stores the files. Media content is available only through authenticated API routes.
+
 ## Conversation transfer
 
 - Version 1: basic conversation messages
@@ -245,7 +286,9 @@ Collections marked as defaults are copied only to new conversations. Existing co
 - Version 3: portable tool-call history
 - Version 4: retrieval flags and local collection names
 
-Version 4 does not export approved memory, document text, chunks, vectors, or source snapshots. During import, collection names are matched only against collections that already exist locally.
+Version 4 does not export approved memory, document text, chunks, vectors, retrieval source snapshots, or private image bytes. Image turns include an explicit omission note so an imported transcript never pretends the missing binary was transferred.
+
+During import, collection names are matched only against collections that already exist locally.
 
 ## Runtime limits
 
@@ -269,6 +312,13 @@ ASTER_DOCUMENT_CHUNK_CHARACTERS=1600
 ASTER_DOCUMENT_CHUNK_OVERLAP=200
 ASTER_DOCUMENT_MAX_CHUNKS=2000
 ASTER_EMBEDDING_BATCH_SIZE=64
+ASTER_MEDIA_ROOT=/var/lib/aster/media
+ASTER_IMAGE_TIMEOUT_SECONDS=300
+ASTER_IMAGE_UPLOAD_MAX_BYTES=20000000
+ASTER_IMAGE_OUTPUT_MAX_BYTES=25000000
+ASTER_IMAGE_MAX_PIXELS=40000000
+ASTER_IMAGE_MAX_INPUTS=8
+ASTER_IMAGE_MAX_OUTPUTS=4
 ```
 
 Recreate the API container after changing runtime settings:
@@ -286,6 +336,17 @@ docker compose exec -T postgres sh -c \
   'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > aster-backup.sql
 ```
 
+Back up private image media separately:
+
+```bash
+docker run --rm \
+  -v aster_aster-media:/source:ro \
+  -v "$PWD":/backup \
+  alpine sh -c 'cd /source && tar -czf /backup/aster-media-backup.tar.gz .'
+```
+
+The exact Compose volume prefix may differ when the project name is overridden. Confirm it with `docker volume ls` before running the media backup command.
+
 External database deployments should use the backup process provided by their PostgreSQL host.
 
 Upgrade the source checkout:
@@ -297,7 +358,7 @@ docker compose up -d --build
 
 The API applies pending migrations automatically.
 
-Migration `0010_memory_and_rag` creates memory, knowledge, chunk, conversation scope, and retrieval provenance tables. Existing conversations receive memory and RAG enabled with no collection assignment. Existing conversations, messages, personas, endpoints, model caches, tools, and encrypted credentials remain intact.
+Migration `0010_memory_and_rag` creates memory, knowledge, chunk, conversation scope, and retrieval provenance tables. Migration `0011_images` creates image profiles, media metadata, operations, inputs, outputs, and message attachments. Existing conversations, messages, personas, endpoints, model caches, tools, retrieval data, and encrypted credentials remain intact.
 
 Changing `ASTER_ENCRYPTION_KEY` without re-encrypting stored credentials makes them unreadable.
 
@@ -346,12 +407,14 @@ docker compose up -d --build
 - Passwords are hashed with Argon2id and never stored in plain text.
 - Session tokens are random, delivered through `HttpOnly` cookies, and stored only as hashes.
 - Unsafe browser requests validate their origin.
-- API responses use `Cache-Control: no-store`.
+- API responses use `Cache-Control: no-store` unless an authenticated media response declares private caching explicitly.
 - Endpoint and MCP credentials are encrypted before storage and never returned by APIs.
 - Provider response bodies, credentials, passwords, and session tokens are excluded from user errors, logs, fixtures, and documentation.
 - Tool results, memory, and retrieved documents are treated as untrusted model context.
 - Generated memory suggestions never become approved memory automatically.
 - Original uploaded documents are not served through public file routes.
+- Image uploads and outputs are bounded, validated, privately stored, and served only through authenticated routes.
+- Temporary provider image URLs are never used as durable history.
 - The bundled PostgreSQL service is not published to the host.
 
 ## Project documentation
@@ -360,7 +423,8 @@ docker compose up -d --build
 - [Project charter](docs/product/project-charter.md)
 - [ADR-0012: Tools and MCP](docs/decisions/0012-tools-and-mcp.md)
 - [ADR-0013: Personal memory and bounded retrieval](docs/decisions/0013-memory-and-rag.md)
+- [ADR-0014: Private image operations and media history](docs/decisions/0014-images.md)
 
 ## Status
 
-Stages 1 through 12 have passed automated and real deployment validation. Stage 13 remains in draft until its branch passes the same release gate.
+Stages 1 through 13 have passed automated and real deployment validation. Stage 14 remains in draft until its branch passes automated validation and a real deployment test on the target self-hosted installation.
