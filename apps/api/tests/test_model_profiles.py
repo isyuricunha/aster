@@ -184,3 +184,31 @@ async def test_chat_does_not_fallback_for_authentication_failure(api_client: tup
     assert "event: fallback" not in response.text
     assert "event: error" in response.text
     assert fake_client.chat_calls == ["primary-model"]
+
+
+async def test_chat_does_not_fallback_after_partial_output(api_client: tuple) -> None:
+    client, fake_client, session_factory = api_client
+    _, fallback = await create_models(session_factory)
+    async with session_factory() as session:
+        session.add(ModelFallbackEntry(model_id=fallback.id, position=0))
+        await session.commit()
+
+    fake_client.chat_chunks_by_model["primary-model"] = ["Partial answer"]
+    fake_client.chat_errors_after_chunks_by_model["primary-model"] = ModelEndpointError(
+        "connection_error",
+        "Primary endpoint disconnected.",
+    )
+
+    conversation_id = (await client.post("/api/conversations", json={})).json()["id"]
+    response = await client.post(
+        f"/api/conversations/{conversation_id}/messages/stream",
+        json={"content": "Keep one model per response"},
+    )
+
+    assert "event: fallback" not in response.text
+    assert "event: error" in response.text
+    assert fake_client.chat_calls == ["primary-model"]
+    detail = (await client.get(f"/api/conversations/{conversation_id}")).json()
+    assert detail["messages"][-1]["content"] == "Partial answer"
+    assert detail["messages"][-1]["status"] == "failed"
+    assert detail["messages"][-1]["model_id"] == "primary-model"
