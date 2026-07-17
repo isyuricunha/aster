@@ -72,7 +72,6 @@ def _target(
     )
     if unavailable:
         return None
-
     return ModelTarget(
         model_id=model.id,
         provider_model_id=model.model_id,
@@ -100,7 +99,6 @@ async def resolve_chat_targets(
             status_code=409,
             detail="Configure a primary model before starting a chat.",
         )
-
     fallback_ids = list(
         await session.scalars(
             select(ModelFallbackEntry.model_id).order_by(ModelFallbackEntry.position.asc())
@@ -116,7 +114,6 @@ async def resolve_chat_targets(
         )
     ).all()
     by_id = {model.id: (model, endpoint, profile) for model, endpoint, profile in rows}
-
     targets = [
         target
         for model_id in ordered_ids
@@ -125,8 +122,30 @@ async def resolve_chat_targets(
     ]
     if targets:
         return targets
-
     raise HTTPException(
         status_code=409,
         detail="No configured chat model is currently available.",
     )
+
+
+async def resolve_automation_targets(
+    session: AsyncSession,
+    cipher: SecretCipher,
+    requested_model_id: UUID | None,
+) -> list[ModelTarget]:
+    if requested_model_id is None:
+        return await resolve_chat_targets(session, cipher)
+    row = (
+        await session.execute(
+            select(ModelCacheEntry, ModelEndpoint, ModelProfile)
+            .join(ModelEndpoint, ModelEndpoint.id == ModelCacheEntry.endpoint_id)
+            .outerjoin(ModelProfile, ModelProfile.model_id == ModelCacheEntry.id)
+            .where(ModelCacheEntry.id == requested_model_id)
+        )
+    ).one_or_none()
+    if row is None:
+        raise HTTPException(status_code=409, detail="The automation model no longer exists.")
+    target = _target(*row, cipher)
+    if target is None:
+        raise HTTPException(status_code=409, detail="The automation model is unavailable.")
+    return [target]
