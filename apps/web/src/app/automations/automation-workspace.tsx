@@ -442,11 +442,19 @@ export function AutomationWorkspace({
               </div>
               {draft.triggerType === "webhook" && selected?.webhook_configured ? (
                 <div className={styles.secretBox}>
-                  <div><strong>Inbound webhook configured</strong><span>The token is shown only when created or rotated.</span></div>
+                  <div><strong>Inbound webhook configured</strong><span>The secret token is shown only when created or rotated.</span></div>
                   <button disabled={working} onClick={() => void rotateToken()} type="button">Rotate token</button>
                 </div>
               ) : null}
-              {webhookToken ? <div className={styles.tokenBox}><strong>Copy this webhook URL now</strong><code>{`${window.location.origin}/api/webhooks/${webhookToken}`}</code></div> : null}
+              {webhookToken && selectedId ? (
+                <div className={styles.tokenBox}>
+                  <strong>Copy these webhook credentials now</strong>
+                  <span>Endpoint</span>
+                  <code>{`${window.location.origin}/api/webhooks/${selectedId}`}</code>
+                  <span>Request header</span>
+                  <code>{`X-Aster-Webhook-Token: ${webhookToken}`}</code>
+                </div>
+              ) : null}
             </section>
 
             <section className={styles.formSection}>
