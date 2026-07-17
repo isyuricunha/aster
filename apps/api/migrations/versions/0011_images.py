@@ -46,7 +46,12 @@ def upgrade() -> None:
         sa.Column("max_input_images", sa.Integer(), server_default="1", nullable=False),
         sa.Column("default_size", sa.String(length=32), nullable=True),
         sa.Column("default_quality", sa.String(length=32), nullable=True),
-        sa.Column("default_output_format", sa.String(length=16), server_default="png", nullable=False),
+        sa.Column(
+            "default_output_format",
+            sa.String(length=16),
+            server_default="png",
+            nullable=False,
+        ),
         sa.Column("default_background", sa.String(length=32), nullable=True),
         sa.Column("default_count", sa.Integer(), server_default="1", nullable=False),
         sa.Column("default_input_fidelity", sa.String(length=32), nullable=True),
