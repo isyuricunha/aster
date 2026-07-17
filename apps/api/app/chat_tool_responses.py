@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +27,13 @@ def message_response(message: ChatMessage) -> ToolAwareChatMessageResponse:
     )
 
 
+def _loaded_execution_updated_at(execution: ToolExecution) -> datetime:
+    value = execution.__dict__.get("updated_at")
+    if isinstance(value, datetime):
+        return value
+    return execution.finished_at or execution.created_at
+
+
 def execution_response(execution: ToolExecution) -> ToolExecutionResponse:
     return ToolExecutionResponse(
         id=execution.id,
@@ -41,7 +50,7 @@ def execution_response(execution: ToolExecution) -> ToolExecutionResponse:
         started_at=execution.started_at,
         finished_at=execution.finished_at,
         created_at=execution.created_at,
-        updated_at=execution.updated_at,
+        updated_at=_loaded_execution_updated_at(execution),
     )
 
 
