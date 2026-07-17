@@ -4,8 +4,11 @@ const internalApiBaseUrl = process.env.ASTER_API_INTERNAL_URL ?? "http://localho
 const forwardedRequestHeaders = [
   "content-type",
   "cookie",
+  "idempotency-key",
   "origin",
   "user-agent",
+  "x-aster-delivery",
+  "x-aster-webhook-token",
   "x-forwarded-for",
   "x-real-ip",
 ];
