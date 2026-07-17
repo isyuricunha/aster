@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -230,13 +231,7 @@ async def test_caldav_delivery_creates_a_stable_icalendar_event(
         uid=run_id,
         summary="Project brief",
         description="Everything is green.",
-        start=httpx.Timestamp if False else __import__("datetime").datetime.datetime(
-            2026,
-            7,
-            20,
-            11,
-            tzinfo=__import__("datetime").datetime.UTC,
-        ),
+        start=datetime(2026, 7, 20, 11, tzinfo=UTC),
         duration_minutes=30,
         timeout_seconds=30,
     )
