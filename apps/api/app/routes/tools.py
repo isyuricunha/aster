@@ -16,6 +16,7 @@ from app.models import ConversationTool, McpServer, McpTool, ToolExecution
 from app.openai_compatible import OpenAICompatibleClient
 from app.security import SecretCipher
 from app.tool_generation import continue_tool_execution
+from app.tool_guards import ensure_no_pending_tool_confirmation
 from app.tool_schemas import (
     ConversationToolSettingsResponse,
     ConversationToolSettingsUpdate,
@@ -132,6 +133,7 @@ async def update_mcp_server(
     if await _name_is_taken(session, name=payload.name, exclude_id=server.id):
         raise HTTPException(status_code=409, detail="An MCP server with this name already exists")
 
+    previous_transport = server.transport
     server.name = payload.name
     server.transport = payload.transport
     server.url = payload.url
@@ -139,12 +141,23 @@ async def update_mcp_server(
     server.arguments = payload.arguments
     server.enabled = payload.enabled
     server.timeout_seconds = payload.timeout_seconds
-    if payload.headers or not payload.preserve_secrets:
-        server.encrypted_headers = encrypt_secret_map(cipher, payload.headers)
-        server.header_names = sorted(payload.headers)
-    if payload.environment or not payload.preserve_secrets:
-        server.encrypted_environment = encrypt_secret_map(cipher, payload.environment)
-        server.environment_names = sorted(payload.environment)
+
+    transport_changed = previous_transport != payload.transport
+    if payload.transport == "streamable_http":
+        if payload.headers or not payload.preserve_secrets or transport_changed:
+            server.encrypted_headers = encrypt_secret_map(cipher, payload.headers)
+            server.header_names = sorted(payload.headers)
+        if transport_changed:
+            server.encrypted_environment = None
+            server.environment_names = []
+    else:
+        if payload.environment or not payload.preserve_secrets or transport_changed:
+            server.encrypted_environment = encrypt_secret_map(cipher, payload.environment)
+            server.environment_names = sorted(payload.environment)
+        if transport_changed:
+            server.encrypted_headers = None
+            server.header_names = []
+
     server.last_sync_status = None
     server.last_error = None
     await session.commit()
@@ -258,6 +271,7 @@ async def update_conversation_tools(
 ) -> ConversationToolSettingsResponse:
     conversation = await get_conversation(session, conversation_id, for_update=True)
     await ensure_no_active_generation(session, conversation.id)
+    await ensure_no_pending_tool_confirmation(session, conversation.id)
     try:
         tools = await replace_conversation_tools(
             session,
