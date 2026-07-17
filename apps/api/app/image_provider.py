@@ -44,7 +44,10 @@ class OpenAICompatibleImageClient:
         prompt: str,
         parameters: dict[str, object],
     ) -> list[ProviderImage]:
-        payload = {"model": model_id, "prompt": prompt, **parameters}
+        generation_parameters = {
+            key: value for key, value in parameters.items() if key != "input_fidelity"
+        }
+        payload = {"model": model_id, "prompt": prompt, **generation_parameters}
         try:
             async with httpx.AsyncClient(
                 timeout=self._timeout,
