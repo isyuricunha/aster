@@ -55,7 +55,12 @@ def validate_schedule(
         return {"run_at": instant.isoformat()}
     if trigger_type == "interval":
         seconds = schedule.get("interval_seconds")
-        if not isinstance(seconds, int) or isinstance(seconds, bool) or not 60 <= seconds <= 31_536_000:
+        valid_seconds = (
+            isinstance(seconds, int)
+            and not isinstance(seconds, bool)
+            and 60 <= seconds <= 31_536_000
+        )
+        if not valid_seconds:
             raise ScheduleValidationError(
                 "interval_seconds must be between 60 and 31536000"
             )
@@ -70,7 +75,12 @@ def validate_schedule(
     normalized: dict[str, object] = {"time": clock.strftime("%H:%M")}
     if trigger_type == "weekly":
         weekday = schedule.get("weekday")
-        if not isinstance(weekday, int) or isinstance(weekday, bool) or not 0 <= weekday <= 6:
+        valid_weekday = (
+            isinstance(weekday, int)
+            and not isinstance(weekday, bool)
+            and 0 <= weekday <= 6
+        )
+        if not valid_weekday:
             raise ScheduleValidationError("weekday must be an integer from 0 to 6")
         normalized["weekday"] = weekday
     return normalized
@@ -100,7 +110,6 @@ def next_run_at(
         elapsed = (reference - anchor).total_seconds()
         steps = floor(elapsed / seconds) + 1
         return anchor + timedelta(seconds=steps * seconds)
-
     clock = _parse_clock(schedule.get("time"))
     local_reference = reference.astimezone(zone)
     if trigger_type == "daily":
@@ -108,10 +117,13 @@ def next_run_at(
         if candidate <= local_reference:
             candidate += timedelta(days=1)
         return candidate.astimezone(UTC)
-
     weekday = int(schedule["weekday"])
     days = (weekday - local_reference.weekday()) % 7
-    candidate = datetime.combine(local_reference.date() + timedelta(days=days), clock, tzinfo=zone)
+    candidate = datetime.combine(
+        local_reference.date() + timedelta(days=days),
+        clock,
+        tzinfo=zone,
+    )
     if candidate <= local_reference:
         candidate += timedelta(days=7)
     return candidate.astimezone(UTC)

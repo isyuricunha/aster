@@ -91,7 +91,10 @@ def _smtp_connect(config: dict[str, object], credentials: dict[str, str]) -> smt
     security = str(config["security"])
     if security == "ssl":
         client: smtplib.SMTP = smtplib.SMTP_SSL(
-            host, port, timeout=timeout, context=ssl.create_default_context()
+            host,
+            port,
+            timeout=timeout,
+            context=ssl.create_default_context(),
         )
     else:
         client = smtplib.SMTP(host, port, timeout=timeout)
@@ -143,7 +146,12 @@ def _send_email(
 
 
 def _auth_headers(config: dict[str, object], credentials: dict[str, str]) -> dict[str, str]:
-    headers = {key: value for key, value in credentials.items() if key.lower().startswith("x-")}
+    reserved = {"username", "password", "token"}
+    headers = {
+        key: value
+        for key, value in credentials.items()
+        if key.casefold() not in reserved
+    }
     auth_type = str(config.get("auth_type", "none"))
     if auth_type == "bearer" and credentials.get("token"):
         headers["Authorization"] = f"Bearer {credentials['token']}"
@@ -211,14 +219,22 @@ async def test_integration(
         if integration.kind == "smtp":
             await asyncio.to_thread(_test_smtp, config, credentials)
             return "SMTP connection succeeded."
-        url = str(config["calendar_url"] if integration.kind == "caldav" else config["url"])
+        url = str(
+            config["calendar_url"] if integration.kind == "caldav" else config["url"]
+        )
         method = "OPTIONS" if integration.kind == "caldav" else "POST"
         kwargs: dict[str, object] = {}
         if integration.kind == "caldav":
             kwargs["auth"] = _basic_auth(config, credentials)
         else:
-            kwargs["json"] = {"type": "aster.integration_test", "sent_at": datetime.now(UTC).isoformat()}
-        async with httpx.AsyncClient(timeout=timeout_seconds, follow_redirects=True) as client:
+            kwargs["json"] = {
+                "type": "aster.integration_test",
+                "sent_at": datetime.now(UTC).isoformat(),
+            }
+        async with httpx.AsyncClient(
+            timeout=timeout_seconds,
+            follow_redirects=True,
+        ) as client:
             response = await client.request(
                 method,
                 url,
@@ -227,13 +243,16 @@ async def test_integration(
             )
         if response.status_code >= 400:
             raise IntegrationError(
-                "connection_failed", f"Integration returned HTTP {response.status_code}."
+                "connection_failed",
+                f"Integration returned HTTP {response.status_code}.",
             )
         return f"{integration.kind.upper()} connection succeeded."
     except IntegrationError:
         raise
     except (OSError, smtplib.SMTPException, httpx.HTTPError) as error:
-        raise IntegrationError("connection_failed", "The integration could not be reached.") from error
+        raise IntegrationError(
+            "connection_failed", "The integration could not be reached."
+        ) from error
 
 
 async def deliver_email(
@@ -273,7 +292,10 @@ async def deliver_webhook(
     credentials = decrypt_credentials(cipher, integration.encrypted_credentials)
     url = str(config["url"])
     try:
-        async with httpx.AsyncClient(timeout=timeout_seconds, follow_redirects=True) as client:
+        async with httpx.AsyncClient(
+            timeout=timeout_seconds,
+            follow_redirects=True,
+        ) as client:
             response = await client.post(
                 url,
                 json=payload,
@@ -315,9 +337,17 @@ async def deliver_calendar_event(
         duration_minutes=duration_minutes,
     )
     headers = _auth_headers(config, credentials)
-    headers.update({"Content-Type": "text/calendar; charset=utf-8", "If-None-Match": "*"})
+    headers.update(
+        {
+            "Content-Type": "text/calendar; charset=utf-8",
+            "If-None-Match": "*",
+        }
+    )
     try:
-        async with httpx.AsyncClient(timeout=timeout_seconds, follow_redirects=True) as client:
+        async with httpx.AsyncClient(
+            timeout=timeout_seconds,
+            follow_redirects=True,
+        ) as client:
             response = await client.put(
                 event_url,
                 content=body.encode("utf-8"),

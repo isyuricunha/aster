@@ -3,6 +3,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -67,6 +68,7 @@ async def _generate(
     last_error: ModelEndpointError | None = None
     for index, target in enumerate(targets):
         chunks: list[str] = []
+        output_characters = 0
         try:
             parameters = target.parameters
             async with asyncio.timeout(run.timeout_seconds):
@@ -82,7 +84,8 @@ async def _generate(
                     reasoning_effort=parameters.reasoning_effort,
                 ):
                     chunks.append(chunk)
-                    if sum(len(item) for item in chunks) > output_limit:
+                    output_characters += len(chunk)
+                    if output_characters > output_limit:
                         raise ModelEndpointError(
                             "output_too_large",
                             "The automation output exceeded the configured character limit.",
@@ -289,7 +292,8 @@ async def execute_run(
         except (ModelEndpointError, HTTPException) as error:
             now = datetime.now(UTC)
             code = getattr(error, "code", "configuration_error")
-            message = str(getattr(error, "message", getattr(error, "detail", error)))[:500]
+            detail = getattr(error, "detail", error)
+            message = str(getattr(error, "message", detail))[:500]
             history = list(run.attempt_history)
             history.append(
                 {
