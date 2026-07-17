@@ -6,12 +6,21 @@ api_url="${ASTER_CI_API_URL:-http://localhost:8000}"
 cookie_jar="${ASTER_CI_COOKIE_JAR:-/tmp/aster.cookies}"
 origin="${ASTER_CI_ORIGIN:-http://localhost:3000}"
 
-preferences_payload="$(curl --fail --silent --show-error \
+endpoint_id="$(curl --fail --silent --show-error \
   --cookie "${cookie_jar}" \
-  "${web_url}/api/model-preferences")"
+  --header 'Content-Type: application/json' \
+  --header "Origin: ${origin}" \
+  --data '{"name":"CI image provider","base_url":"http://127.0.0.1:9/v1","api_key":null,"enabled":true}' \
+  "${web_url}/api/model-endpoints" \
+  | python -c 'import json, sys; print(json.load(sys.stdin)["id"])')"
 
-model_id="$(printf '%s' "${preferences_payload}" | python -c \
-  'import json, sys; payload=json.load(sys.stdin); assert payload["primary"] is not None; print(payload["primary"]["id"])')"
+model_id="$(curl --fail --silent --show-error \
+  --cookie "${cookie_jar}" \
+  --header 'Content-Type: application/json' \
+  --header "Origin: ${origin}" \
+  --data '{"model_id":"ci-image-model"}' \
+  "${web_url}/api/model-endpoints/${endpoint_id}/models" \
+  | python -c 'import json, sys; print(json.load(sys.stdin)["id"])')"
 
 curl --fail --silent --show-error \
   --cookie "${cookie_jar}" \
