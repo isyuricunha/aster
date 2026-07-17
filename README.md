@@ -351,7 +351,7 @@ uv run alembic upgrade head
 - [ADR-0006: Runtime deployment configuration](docs/decisions/0006-runtime-deployment-configuration.md)
 - [ADR-0007: Single-owner authentication](docs/decisions/0007-single-owner-authentication.md)
 - [ADR-0008: Interface foundation](docs/decisions/0008-interface-foundation.md)
-- [ADR-0009: Chat content rendering and transfer](docs/decisions/0009-chat-content-rendering-and-transfer.md)
+- [ADR-0009: Chat content rendering and transfer](docs/decisions/0009-chat-content-and-transfer.md)
 - [ADR-0010: Model profiles and fallback routing](docs/decisions/0010-model-profiles-and-fallback-routing.md)
 - [ADR-0011: Persona library and conversation snapshots](docs/decisions/0011-persona-library-and-conversation-snapshots.md)
 
