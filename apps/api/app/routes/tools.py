@@ -7,6 +7,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.chat_generation import ensure_no_active_generation, get_conversation
+from app.chat_tool_responses import execution_response
 from app.config import settings
 from app.db import get_session
 from app.dependencies import get_mcp_client, get_openai_client, get_secret_cipher
@@ -36,7 +37,6 @@ from app.tool_service import (
     sync_server_tools,
     tool_response,
 )
-from app.chat_tool_responses import execution_response
 
 router = APIRouter(prefix="/api", tags=["tools"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
