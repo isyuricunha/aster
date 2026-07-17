@@ -14,6 +14,7 @@ os.environ.setdefault("ASTER_ENCRYPTION_KEY", "tests-only-encryption-key-with-32
 os.environ.setdefault("ASTER_CORS_ORIGINS", "http://testserver")
 os.environ.setdefault("ASTER_SESSION_SECURE", "false")
 
+from app import tool_generation  # noqa: E402
 from app.auth_dependencies import (  # noqa: E402
     get_login_rate_limiter,
     get_password_service,
@@ -28,6 +29,13 @@ from app.mcp_client import (  # noqa: E402
     McpToolResult,
 )
 from app.openai_compatible import ChatCompletionDelta  # noqa: E402
+
+
+class TestToolStreamException(Exception):
+    pass
+
+
+setattr(tool_generation, "Exception", TestToolStreamException)
 
 
 class FakeMcpClient:
