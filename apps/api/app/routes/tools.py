@@ -2,16 +2,19 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.chat_generation import ensure_no_active_generation, get_conversation
 from app.config import settings
 from app.db import get_session
-from app.dependencies import get_mcp_client, get_secret_cipher
+from app.dependencies import get_mcp_client, get_openai_client, get_secret_cipher
 from app.mcp_client import McpClient, McpClientError
-from app.models import ConversationTool, McpServer, McpTool
+from app.models import ConversationTool, McpServer, McpTool, ToolExecution
+from app.openai_compatible import OpenAICompatibleClient
 from app.security import SecretCipher
+from app.tool_generation import continue_tool_execution
 from app.tool_schemas import (
     ConversationToolSettingsResponse,
     ConversationToolSettingsUpdate,
@@ -22,6 +25,7 @@ from app.tool_schemas import (
     McpSyncResponse,
     McpToolResponse,
     McpToolUpdate,
+    ToolExecutionResponse,
 )
 from app.tool_service import (
     connection_config,
@@ -32,11 +36,13 @@ from app.tool_service import (
     sync_server_tools,
     tool_response,
 )
+from app.chat_tool_responses import execution_response
 
 router = APIRouter(prefix="/api", tags=["tools"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 CipherDep = Annotated[SecretCipher, Depends(get_secret_cipher)]
 McpClientDep = Annotated[McpClient, Depends(get_mcp_client)]
+OpenAIClientDep = Annotated[OpenAICompatibleClient, Depends(get_openai_client)]
 
 
 async def _get_server(session: AsyncSession, server_id: UUID) -> McpServer:
@@ -261,3 +267,58 @@ async def update_conversation_tools(
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     return ConversationToolSettingsResponse(conversation_id=conversation.id, tools=tools)
+
+
+@router.get(
+    "/conversations/{conversation_id}/tool-executions",
+    response_model=list[ToolExecutionResponse],
+)
+async def list_tool_executions(
+    conversation_id: UUID,
+    session: SessionDep,
+) -> list[ToolExecutionResponse]:
+    await get_conversation(session, conversation_id)
+    executions = list(
+        await session.scalars(
+            select(ToolExecution)
+            .where(ToolExecution.conversation_id == conversation_id)
+            .order_by(ToolExecution.created_at.asc())
+        )
+    )
+    return [execution_response(execution) for execution in executions]
+
+
+@router.post("/tool-executions/{execution_id}/approve")
+async def approve_tool_execution(
+    execution_id: UUID,
+    session: SessionDep,
+    cipher: CipherDep,
+    openai_client: OpenAIClientDep,
+    mcp_client: McpClientDep,
+) -> StreamingResponse:
+    return await continue_tool_execution(
+        execution_id=execution_id,
+        approved=True,
+        session=session,
+        cipher=cipher,
+        client=openai_client,
+        mcp_client=mcp_client,
+    )
+
+
+@router.post("/tool-executions/{execution_id}/deny")
+async def deny_tool_execution(
+    execution_id: UUID,
+    session: SessionDep,
+    cipher: CipherDep,
+    openai_client: OpenAIClientDep,
+    mcp_client: McpClientDep,
+) -> StreamingResponse:
+    return await continue_tool_execution(
+        execution_id=execution_id,
+        approved=False,
+        session=session,
+        cipher=cipher,
+        client=openai_client,
+        mcp_client=mcp_client,
+    )
