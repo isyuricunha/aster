@@ -5,6 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.retrieval_schemas import RetrievalSourceResponse
 from app.schemas import ConversationPersonaImport, ConversationPersonaResponse
 from app.tool_schemas import ToolExecutionResponse
 
@@ -35,15 +36,24 @@ class ToolAwareChatMessageResponse(BaseModel):
     tool_calls: list[ToolCall] | None
     tool_call_id: str | None
     tool_name: str | None
+    retrieval_sources: list[RetrievalSourceResponse] = []
     position: int
     created_at: datetime
     updated_at: datetime
+
+
+class ConversationRetrievalResponse(BaseModel):
+    memory_enabled: bool
+    rag_enabled: bool
+    collection_ids: list[UUID]
+    collection_names: list[str]
 
 
 class ToolAwareConversationResponse(BaseModel):
     id: UUID
     title: str
     persona: ConversationPersonaResponse | None
+    retrieval: ConversationRetrievalResponse
     messages: list[ToolAwareChatMessageResponse]
     tool_executions: list[ToolExecutionResponse]
     created_at: datetime
@@ -103,13 +113,32 @@ class ToolAwareConversationImportMessage(BaseModel):
         return self
 
 
+class ConversationRetrievalImport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    memory_enabled: bool = True
+    rag_enabled: bool = True
+    collection_names: Annotated[list[str], Field(default_factory=list, max_length=128)]
+
+    @field_validator("collection_names")
+    @classmethod
+    def normalize_collection_names(cls, value: list[str]) -> list[str]:
+        normalized = [" ".join(name.split()) for name in value]
+        if any(not name or len(name) > 120 for name in normalized):
+            raise ValueError("Conversation collection names must contain 1 to 120 characters")
+        if len({name.casefold() for name in normalized}) != len(normalized):
+            raise ValueError("Conversation collection names must be unique")
+        return normalized
+
+
 class ToolAwareConversationImportRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     format: Literal["aster-conversation"]
-    version: Literal[1, 2, 3]
+    version: Literal[1, 2, 3, 4]
     title: Annotated[str, Field(min_length=1, max_length=200)]
     persona: ConversationPersonaImport | None = None
+    retrieval: ConversationRetrievalImport | None = None
     messages: Annotated[list[ToolAwareConversationImportMessage], Field(max_length=2_000)]
 
     @field_validator("title")
@@ -131,6 +160,8 @@ class ToolAwareConversationImportRequest(BaseModel):
                     for value in (message.tool_calls, message.tool_call_id, message.tool_name)
                 ):
                     raise ValueError("Tool history requires conversation export version 3")
+        if self.version < 4 and self.retrieval is not None:
+            raise ValueError("Retrieval settings require conversation export version 4")
         total_characters = sum(len(message.content) for message in self.messages)
         total_characters += sum(
             len(json.dumps(call.model_dump(mode="json"), ensure_ascii=False))
