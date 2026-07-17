@@ -30,6 +30,10 @@ from app.openai_compatible import (
     ModelEndpointError,
     OpenAICompatibleClient,
 )
+from app.retrieval_service import (
+    context_for_message,
+    copy_retrieval_usages,
+)
 from app.security import SecretCipher
 from app.tool_service import (
     ToolRuntime,
@@ -120,6 +124,7 @@ def _include_in_provider_history(message: ChatMessage) -> bool:
 def _provider_history(
     conversation: Conversation,
     messages: Sequence[ChatMessage],
+    retrieval_context: str = "",
 ) -> list[dict[str, object]]:
     result = [
         {"role": item.role.value, "content": item.content}
@@ -135,6 +140,8 @@ def _provider_history(
             ),
         }
     )
+    if retrieval_context:
+        result.append({"role": "developer", "content": retrieval_context})
     result.extend(
         _provider_message(message) for message in messages if _include_in_provider_history(message)
     )
@@ -534,6 +541,11 @@ async def _stream_model_round(
         position=state.assistant_message.position + len(tool_messages) + 1,
         target=state.model_targets[0],
     )
+    await copy_retrieval_usages(
+        session,
+        source_message_id=state.assistant_message.id,
+        target_message_id=next_assistant.id,
+    )
     await _move_registration(state, next_assistant)
     yield _sse(
         "assistant_started",
@@ -564,7 +576,9 @@ async def stream_response_with_tools(
     state = ToolLoopState(
         conversation=prepared.conversation,
         assistant_message=prepared.assistant_message,
-        provider_messages=_provider_history(prepared.conversation, initial_messages),
+        provider_messages=_provider_history(
+            prepared.conversation, initial_messages, prepared.retrieval_context
+        ),
         model_targets=prepared.model_targets,
         runtimes=runtimes,
         openai_client=client,
@@ -593,6 +607,7 @@ async def stream_response_with_tools(
                 "assistant_message_id": str(prepared.assistant_message.id),
                 "model": _target_payload(prepared.model_targets[0]),
                 "tools_enabled": len(runtimes),
+                "retrieval_sources": prepared.retrieval_sources,
             },
         )
         try:
@@ -746,6 +761,11 @@ async def continue_tool_execution(
             position=assistant_message.position + len(tool_messages) + 1,
             target=targets[0],
         )
+        await copy_retrieval_usages(
+            session,
+            source_message_id=assistant_message.id,
+            target_message_id=next_assistant.id,
+        )
         stop_event = await generation_registry.register(next_assistant.id)
         runtimes = await resolve_conversation_tool_runtimes(
             session,
@@ -763,10 +783,15 @@ async def continue_tool_execution(
                 .order_by(ChatMessage.position.asc())
             )
         )
+        retrieval_context = await context_for_message(
+            session, assistant_message.id
+        )
         state = ToolLoopState(
             conversation=conversation,
             assistant_message=next_assistant,
-            provider_messages=_provider_history(conversation, history),
+            provider_messages=_provider_history(
+                conversation, history, retrieval_context
+            ),
             model_targets=targets,
             runtimes=runtimes,
             openai_client=client,
