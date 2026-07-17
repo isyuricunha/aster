@@ -1,0 +1,125 @@
+name: Stage 14 chat patch
+
+on:
+  push:
+    branches:
+      - images
+    paths:
+      - .github/workflows/stage14-chat-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: images
+      - name: Apply chat image integration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("apps/web/src/app/chat-shell.tsx")
+          text = path.read_text()
+
+          replacements = [
+              (
+                  'import { RetrievalSourceList } from "./chat-retrieval-sources";\n',
+                  'import { ChatImageComposer, MessageAttachments } from "./chat-image-tools";\n'
+                  'import { RetrievalSourceList } from "./chat-retrieval-sources";\n',
+              ),
+              (
+                  'import type { RetrievalSource } from "../lib/retrieval-api";\n',
+                  'import type { MediaAsset, MessageAttachment } from "../lib/image-api";\n'
+                  'import type { RetrievalSource } from "../lib/retrieval-api";\n',
+              ),
+              (
+                  '  const [error, setError] = useState<string | null>(initialError);\n',
+                  '  const [error, setError] = useState<string | null>(initialError);\n'
+                  '  const [imageEditAsset, setImageEditAsset] = useState<MediaAsset | null>(null);\n',
+              ),
+              (
+                  '    setEditingMessageId(null);\n    setRenaming(false);\n    try {\n',
+                  '    setEditingMessageId(null);\n    setImageEditAsset(null);\n'
+                  '    setRenaming(false);\n    try {\n',
+              ),
+              (
+                  '    setDraft("");\n    setEditingMessageId(null);\n',
+                  '    setDraft("");\n    setEditingMessageId(null);\n    setImageEditAsset(null);\n',
+              ),
+              (
+                  '        <div className="chat-navigation-item active">\n'
+                  '          <Icon name="chat" />\n'
+                  '          <span>Chat</span>\n'
+                  '        </div>\n',
+                  '        <div className="chat-navigation-item active">\n'
+                  '          <Icon name="chat" />\n'
+                  '          <span>Chat</span>\n'
+                  '        </div>\n'
+                  '        <Link className="chat-navigation-item" href="/images">\n'
+                  '          <Icon name="images" />\n'
+                  '          <span>Images</span>\n'
+                  '        </Link>\n',
+              ),
+              (
+                  '                           <RetrievalSourceList sources={message.retrieval_sources ?? []} />\n',
+                  '                           <MessageAttachments\n'
+                  '                             attachments={\n'
+                  '                               ((message as ChatMessage & { attachments?: MessageAttachment[] })\n'
+                  '                                 .attachments ?? [])\n'
+                  '                             }\n'
+                  '                             disabled={streaming}\n'
+                  '                             onEdit={(asset) => setImageEditAsset(asset)}\n'
+                  '                           />\n'
+                  '                           <RetrievalSourceList sources={message.retrieval_sources ?? []} />\n',
+              ),
+              (
+                  '                              {message.role === "user" && message.status === "completed" && (\n',
+                  '                              {message.role === "user" &&\n'
+                  '                                message.status === "completed" &&\n'
+                  '                                !((message as ChatMessage & { attachments?: MessageAttachment[] })\n'
+                  '                                  .attachments?.length) && (\n',
+              ),
+              (
+                  '                              {message.role === "assistant" && message.status !== "streaming" && (\n',
+                  '                              {message.role === "assistant" &&\n'
+                  '                                message.status !== "streaming" &&\n'
+                  '                                !((message as ChatMessage & { attachments?: MessageAttachment[] })\n'
+                  '                                  .attachments?.length) && (\n',
+              ),
+              (
+                  '          <form className="chat-composer" onSubmit={sendMessage}>\n',
+                  '          <ChatImageComposer\n'
+                  '            conversation={conversation}\n'
+                  '            disabled={streaming || pendingConfirmation}\n'
+                  '            editAsset={imageEditAsset}\n'
+                  '            ensureConversation={createConversation}\n'
+                  '            onClearEdit={() => setImageEditAsset(null)}\n'
+                  '            onCompleted={async (conversationId) => {\n'
+                  '              await refreshConversation(conversationId);\n'
+                  '              await refreshConversations();\n'
+                  '            }}\n'
+                  '            onError={(message) => setError(message || null)}\n'
+                  '            preferences={preferences}\n'
+                  '          />\n'
+                  '          <form className="chat-composer" onSubmit={sendMessage}>\n',
+              ),
+          ]
+
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f"Missing expected chat-shell snippet: {old[:80]!r}")
+              text = text.replace(old, new, 1)
+
+          path.write_text(text)
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "isyuricunha"
+          git config user.email "115634315+isyuricunha@users.noreply.github.com"
+          git add apps/web/src/app/chat-shell.tsx
+          git commit -m "Integrate image operations with chat"
+          git push origin images
