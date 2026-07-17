@@ -142,7 +142,9 @@ async def test_integration_credentials_are_never_returned(api_client: tuple) -> 
     assert "private-signature" not in listed.text
 
 
-async def test_webhook_trigger_is_public_bounded_and_idempotent(api_client: tuple) -> None:
+async def test_webhook_trigger_uses_header_secret_and_is_idempotent(
+    api_client: tuple,
+) -> None:
     client, _, _ = api_client
     created = await client.post(
         "/api/automations",
@@ -157,24 +159,38 @@ async def test_webhook_trigger_is_public_bounded_and_idempotent(api_client: tupl
     automation = created.json()
     token = automation["webhook_token"]
     assert isinstance(token, str) and token
+    assert token not in automation["webhook_path"]
 
-    headers = {"X-Aster-Delivery": "delivery-123"}
+    path = f"/api/webhooks/{automation['id']}"
+    delivery_headers = {
+        "X-Aster-Webhook-Token": token,
+        "X-Aster-Delivery": "delivery-123",
+    }
     first = await client.post(
-        f"/api/webhooks/{token}",
+        path,
         json={"event": "deployment", "status": "failed"},
-        headers=headers,
+        headers=delivery_headers,
     )
     assert first.status_code == 200, first.text
     assert first.json()["status"] == "accepted"
     assert first.json()["run_id"] is not None
 
     duplicate = await client.post(
-        f"/api/webhooks/{token}",
+        path,
         json={"event": "deployment", "status": "failed"},
-        headers=headers,
+        headers=delivery_headers,
     )
     assert duplicate.status_code == 200
     assert duplicate.json() == {"status": "duplicate", "run_id": None}
+
+    missing_secret = await client.post(path, json={"event": "deployment"})
+    assert missing_secret.status_code == 422
+    wrong_secret = await client.post(
+        path,
+        json={"event": "deployment"},
+        headers={"X-Aster-Webhook-Token": "wrong-secret-value-with-enough-length"},
+    )
+    assert wrong_secret.status_code == 404
 
     runs = (await client.get("/api/automation-runs")).json()
     webhook_runs = [item for item in runs if item["automation_id"] == automation["id"]]

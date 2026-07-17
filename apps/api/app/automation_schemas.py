@@ -146,6 +146,13 @@ class AutomationResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    @model_validator(mode="after")
+    def normalize_webhook_path(self) -> "AutomationResponse":
+        self.webhook_path = (
+            f"/api/webhooks/{self.id}" if self.webhook_configured else None
+        )
+        return self
+
 
 class AutomationDeliveryAttemptResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)

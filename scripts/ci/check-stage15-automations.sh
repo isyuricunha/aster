@@ -36,26 +36,35 @@ automation_payload="$(curl --fail --silent --show-error \
   "${web_url}/api/automations")"
 
 automation_values="$(printf '%s' "${automation_payload}" | python -c \
-  'import json, sys; payload=json.load(sys.stdin); assert payload["trigger_type"] == "webhook"; assert payload["webhook_configured"] is True; assert payload["webhook_token"]; print(payload["id"] + "|" + payload["webhook_token"])')"
+  'import json, sys; payload=json.load(sys.stdin); assert payload["trigger_type"] == "webhook"; assert payload["webhook_configured"] is True; assert payload["webhook_token"]; assert payload["webhook_token"] not in payload["webhook_path"]; print(payload["id"] + "|" + payload["webhook_token"])')"
 automation_id="${automation_values%%|*}"
 webhook_token="${automation_values#*|}"
+webhook_url="${web_url}/api/webhooks/${automation_id}"
 
 first_delivery="$(curl --fail --silent --show-error \
   --header 'Content-Type: application/json' \
+  --header "X-Aster-Webhook-Token: ${webhook_token}" \
   --header 'X-Aster-Delivery: ci-delivery-001' \
   --data '{"event":"deployment","state":"green"}' \
-  "${web_url}/api/webhooks/${webhook_token}")"
+  "${webhook_url}")"
 
 run_id="$(printf '%s' "${first_delivery}" | python -c \
   'import json, sys; payload=json.load(sys.stdin); assert payload["status"] == "accepted"; assert payload["run_id"]; print(payload["run_id"])')"
 
 duplicate_delivery="$(curl --fail --silent --show-error \
   --header 'Content-Type: application/json' \
+  --header "X-Aster-Webhook-Token: ${webhook_token}" \
   --header 'X-Aster-Delivery: ci-delivery-001' \
   --data '{"event":"deployment","state":"green"}' \
-  "${web_url}/api/webhooks/${webhook_token}")"
+  "${webhook_url}")"
 printf '%s' "${duplicate_delivery}" | python -c \
   'import json, sys; payload=json.load(sys.stdin); assert payload == {"status":"duplicate","run_id":None}'
+
+test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+  --header 'Content-Type: application/json' \
+  --header 'X-Aster-Webhook-Token: wrong-secret-value-with-enough-length' \
+  --data '{}' \
+  "${webhook_url}")" = "404"
 
 curl --fail --silent --show-error --cookie "${cookie_jar}" \
   "${web_url}/api/automation-runs/${run_id}" \
@@ -73,4 +82,4 @@ curl --fail --silent --show-error --cookie "${cookie_jar}" \
   "${web_url}/automations" >/dev/null
 
 curl --fail --silent --show-error "${api_url}/openapi.json" \
-  | python -c 'import json, sys; paths=json.load(sys.stdin)["paths"]; required=["/api/integrations", "/api/integrations/{integration_id}/test", "/api/automations", "/api/automations/{automation_id}/run", "/api/automation-runs", "/api/automation-runs/{run_id}/cancel", "/api/automation-runs/{run_id}/retry", "/api/notifications", "/api/webhooks/{token}"]; assert all(path in paths for path in required)'
+  | python -c 'import json, sys; paths=json.load(sys.stdin)["paths"]; required=["/api/integrations", "/api/integrations/{integration_id}/test", "/api/automations", "/api/automations/{automation_id}/run", "/api/automation-runs", "/api/automation-runs/{run_id}/cancel", "/api/automation-runs/{run_id}/retry", "/api/notifications", "/api/webhooks/{automation_id}"]; assert all(path in paths for path in required); assert "/api/webhooks/{token}" not in paths'
