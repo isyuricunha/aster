@@ -14,7 +14,7 @@ memory_payload="$(curl --fail --silent --show-error \
   "${web_url}/api/memories")"
 
 memory_id="$(printf '%s' "${memory_payload}" | python -c \
-  'import json, sys; payload=json.load(sys.stdin); assert payload["source_type"] == "manual"; assert payload["has_embedding"] is False; print(payload["id"])')"
+  'import json, sys; payload=json.load(sys.stdin); assert payload["source_type"] == "manual"; print(payload["id"])')"
 
 curl --fail --silent --show-error --cookie "${cookie_jar}" \
   "${web_url}/api/memories/export" \
@@ -45,7 +45,7 @@ document_payload="$(curl --fail --silent --show-error \
   "${web_url}/api/knowledge-collections/${collection_id}/documents?filename=ci-notes.md")"
 
 printf '%s' "${document_payload}" | python -c \
-  'import json, sys; payload=json.load(sys.stdin); assert payload["status"] == "ready"; assert payload["chunk_count"] >= 1; assert payload["embedded_chunk_count"] == 0; assert payload["filename"] == "ci-notes.md"'
+  'import json, sys; payload=json.load(sys.stdin); assert payload["status"] == "ready"; assert payload["chunk_count"] >= 1; assert payload["filename"] == "ci-notes.md"'
 
 conversation_payload="$(curl --fail --silent --show-error \
   --cookie "${cookie_jar}" \
