@@ -78,6 +78,22 @@ export type ModelRouting = {
   fallbacks: FallbackModel[];
 };
 
+export type Persona = {
+  id: string;
+  name: string;
+  description: string;
+  instructions: string;
+  enabled: boolean;
+  instruction_role: "developer" | "system";
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PersonaPreferences = {
+  default_persona: Persona | null;
+};
+
 export type PersonaSettings = {
   name: string;
   instructions: string;
@@ -85,6 +101,16 @@ export type PersonaSettings = {
   instruction_role: "developer" | "system";
   created_at: string;
   updated_at: string;
+};
+
+export type PersonaTransfer = {
+  format: "aster-persona";
+  version: 1;
+  name: string;
+  description: string;
+  instructions: string;
+  enabled: boolean;
+  instruction_role: "developer" | "system";
 };
 
 export type CanonicalMessage = {
@@ -110,10 +136,19 @@ export type ChatMessage = {
   updated_at: string;
 };
 
+export type ConversationPersona = {
+  source_persona_id: string | null;
+  name: string;
+  description: string;
+  instructions: string;
+  instruction_role: "developer" | "system";
+};
+
 export type ConversationSummary = {
   id: string;
   title: string;
   message_count: number;
+  persona_name: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -121,6 +156,7 @@ export type ConversationSummary = {
 export type Conversation = {
   id: string;
   title: string;
+  persona?: ConversationPersona | null;
   messages: ChatMessage[];
   created_at: string;
   updated_at: string;
@@ -136,8 +172,9 @@ export type ConversationTransferMessage = {
 
 export type ConversationTransfer = {
   format: "aster-conversation";
-  version: 1;
+  version: 1 | 2;
   title: string;
+  persona?: ConversationPersona | null;
   messages: ConversationTransferMessage[];
 };
 

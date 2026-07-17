@@ -6,6 +6,11 @@ All notable changes to Aster are documented in this file.
 
 ### Added
 
+- Reusable persona library with create, edit, duplicate, delete, import, and export workflows.
+- Optional default persona for new conversations.
+- Frozen persona snapshots for individual conversations.
+- Explicit conversation reassignment and a no-persona option for future responses.
+- Persona-aware version 2 conversation exports with backward-compatible version 1 imports.
 - Per-model generation profiles for context metadata, output limits, sampling, reasoning effort, and declared chat capabilities.
 - Ordered global fallback routing for chat models and endpoints.
 - Profile and fallback controls in Models settings.
@@ -35,6 +40,9 @@ All notable changes to Aster are documented in this file.
 
 ### Changed
 
+- The original global persona is migrated into the persona library without discarding its instructions.
+- Chat generation now reads persona context from the conversation snapshot instead of mutable global configuration.
+- Editing or deleting a library persona no longer changes existing conversations.
 - Unset model-profile values now preserve provider defaults and are omitted from chat requests.
 - Eligible model failures may advance to the next fallback only before response content begins.
 - Chat content now renders as structured documents instead of plain text.
@@ -53,6 +61,7 @@ All notable changes to Aster are documented in this file.
 
 ### Fixed
 
+- Persona library changes cannot retroactively rewrite the instruction context of old conversations.
 - Fallback routing never combines partial output from different models.
 - Authentication and request-validation failures remain visible instead of triggering fallback.
 - Incomplete fenced code remains readable while a response is still streaming.

@@ -1,6 +1,7 @@
 import type {
   ChatMessage,
   Conversation,
+  ConversationPersona,
   ConversationTransfer,
   ConversationTransferMessage,
 } from "../lib/api";
@@ -8,8 +9,9 @@ import type {
 export function createConversationTransfer(conversation: Conversation): ConversationTransfer {
   return {
     format: "aster-conversation",
-    version: 1,
+    version: 2,
     title: conversation.title,
+    persona: conversation.persona,
     messages: conversation.messages.map(toTransferMessage),
   };
 }
@@ -21,6 +23,16 @@ export function createConversationMarkdown(conversation: Conversation): string {
     `> Exported from Aster on ${new Date().toISOString()}`,
     "",
   ];
+
+  if (conversation.persona) {
+    lines.push(
+      `> Persona: ${conversation.persona.name}`,
+      `> Instruction role: ${conversation.persona.instruction_role}`,
+      "",
+    );
+  } else {
+    lines.push("> Persona: none", "");
+  }
 
   for (const message of conversation.messages) {
     lines.push(`## ${message.role === "user" ? "You" : "Aster"}`, "");
@@ -36,7 +48,10 @@ export function createConversationMarkdown(conversation: Conversation): string {
 export function parseConversationTransfer(raw: string): ConversationTransfer {
   const value = JSON.parse(raw) as unknown;
   if (!isRecord(value)) throw new Error("The selected file does not contain a JSON object.");
-  if (value.format !== "aster-conversation" || value.version !== 1) {
+  if (
+    value.format !== "aster-conversation" ||
+    (value.version !== 1 && value.version !== 2)
+  ) {
     throw new Error("This is not a supported Aster conversation export.");
   }
   if (typeof value.title !== "string" || !value.title.trim()) {
@@ -44,6 +59,12 @@ export function parseConversationTransfer(raw: string): ConversationTransfer {
   }
   if (!Array.isArray(value.messages)) {
     throw new Error("The exported conversation does not contain a message list.");
+  }
+  if (value.version === 2 && value.persona !== null && !isConversationPersona(value.persona)) {
+    throw new Error("The exported conversation contains an invalid persona snapshot.");
+  }
+  if (value.version === 1 && "persona" in value) {
+    throw new Error("Version 1 conversation exports cannot contain a persona snapshot.");
   }
 
   for (const message of value.messages) {
@@ -101,6 +122,21 @@ function safeFileName(value: string): string {
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
   return normalized || "aster-conversation";
+}
+
+function isConversationPersona(value: unknown): value is ConversationPersona {
+  if (!isRecord(value)) return false;
+  const validSource =
+    value.source_persona_id === null || typeof value.source_persona_id === "string";
+  const validRole = value.instruction_role === "developer" || value.instruction_role === "system";
+  return (
+    validSource &&
+    validRole &&
+    typeof value.name === "string" &&
+    value.name.trim().length > 0 &&
+    typeof value.description === "string" &&
+    typeof value.instructions === "string"
+  );
 }
 
 function isTransferMessage(value: unknown): value is ConversationTransferMessage {
