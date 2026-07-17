@@ -9,8 +9,8 @@ WORKDIR /app
 
 RUN python -m pip install --no-cache-dir --disable-pip-version-check uv
 
-COPY pyproject.toml ./
-RUN uv sync --no-dev
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev
 
 RUN useradd --create-home --shell /usr/sbin/nologin appuser
 COPY --chown=appuser:appuser . .
