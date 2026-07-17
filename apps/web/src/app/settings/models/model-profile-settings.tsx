@@ -12,6 +12,8 @@ import {
 import { ModelSelect } from "./model-browser";
 import styles from "./model-profile-settings.module.css";
 
+type ReasoningEffortDraft = "" | "minimal" | "low" | "medium" | "high" | "xhigh";
+
 type ProfileDraft = {
   displayName: string;
   contextWindow: string;
@@ -19,7 +21,7 @@ type ProfileDraft = {
   tokenParameter: ModelProfile["token_parameter"];
   temperature: string;
   topP: string;
-  reasoningEffort: ModelProfile["reasoning_effort"] | "";
+  reasoningEffort: ReasoningEffortDraft;
   supportsChat: boolean;
   supportsStreaming: boolean;
 };
@@ -258,7 +260,7 @@ export function ModelProfileSettings({
                 onChange={(event) =>
                   setProfile({
                     ...profile,
-                    reasoningEffort: event.target.value as ProfileDraft["reasoningEffort"],
+                    reasoningEffort: event.target.value as ReasoningEffortDraft,
                   })
                 }
               >
