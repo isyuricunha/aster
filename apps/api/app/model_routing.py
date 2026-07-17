@@ -19,6 +19,7 @@ FALLBACK_ERROR_CODES = {
     "chat_not_supported",
     "connection_error",
     "invalid_response",
+    "rate_limited",
     "timeout",
     "upstream_error",
 }
