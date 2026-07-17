@@ -150,6 +150,24 @@ export type ToolExecution = {
   updated_at: string;
 };
 
+export type RetrievalSource = {
+  id: string;
+  kind: "memory" | "document";
+  rank: number;
+  score: number | null;
+  label: string;
+  content: string;
+  memory_id: string | null;
+  chunk_id: string | null;
+};
+
+export type ConversationRetrieval = {
+  memory_enabled: boolean;
+  rag_enabled: boolean;
+  collection_ids: string[];
+  collection_names: string[];
+};
+
 export type ChatMessage = {
   id: string;
   conversation_id: string;
@@ -161,6 +179,7 @@ export type ChatMessage = {
   tool_calls?: ToolCall[] | null;
   tool_call_id?: string | null;
   tool_name?: string | null;
+  retrieval_sources?: RetrievalSource[];
   position: number;
   created_at: string;
   updated_at: string;
@@ -187,6 +206,7 @@ export type Conversation = {
   id: string;
   title: string;
   persona?: ConversationPersona | null;
+  retrieval?: ConversationRetrieval;
   messages: ChatMessage[];
   tool_executions?: ToolExecution[];
   created_at: string;
@@ -206,9 +226,14 @@ export type ConversationTransferMessage = {
 
 export type ConversationTransfer = {
   format: "aster-conversation";
-  version: 1 | 2 | 3;
+  version: 1 | 2 | 3 | 4;
   title: string;
   persona?: ConversationPersona | null;
+  retrieval?: {
+    memory_enabled: boolean;
+    rag_enabled: boolean;
+    collection_names: string[];
+  } | null;
   messages: ConversationTransferMessage[];
 };
 
