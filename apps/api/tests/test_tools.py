@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.mcp_client import McpClientError
@@ -26,7 +28,7 @@ async def configure_primary(session_factory: async_sessionmaker[AsyncSession]) -
         await session.commit()
 
 
-async def create_and_sync_server(client, *, secret: str = "test-secret") -> tuple[str, dict]:
+async def create_and_sync_server(client, *, secret: str = "test-secret") -> tuple[UUID, dict]:
     response = await client.post(
         "/api/mcp-servers",
         json={
@@ -44,7 +46,7 @@ async def create_and_sync_server(client, *, secret: str = "test-secret") -> tupl
     assert sync.status_code == 200
     tools = (await client.get("/api/mcp-tools")).json()
     assert len(tools) == 1
-    return server["id"], tools[0]
+    return UUID(server["id"]), tools[0]
 
 
 async def enable_tool(
