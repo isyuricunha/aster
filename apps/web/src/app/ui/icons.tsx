@@ -11,6 +11,7 @@ export type IconName =
   | "download"
   | "edit"
   | "lock"
+  | "memory"
   | "models"
   | "more"
   | "new-chat"
@@ -73,6 +74,13 @@ export function Icon({ name, size = 16, ...props }: IconProps) {
       <>
         <rect x="5" y="10" width="14" height="10" rx="2" />
         <path d="M8.5 10V7.5a3.5 3.5 0 0 1 7 0V10" />
+      </>
+    ),
+    memory: (
+      <>
+        <path d="M9 5.5A3.5 3.5 0 0 0 5.5 9v1.2A3 3 0 0 0 4 12.8a3 3 0 0 0 2.2 2.9V17A3 3 0 0 0 9 20" />
+        <path d="M15 5.5A3.5 3.5 0 0 1 18.5 9v1.2a3 3 0 0 1 1.5 2.6 3 3 0 0 1-2.2 2.9V17A3 3 0 0 1 15 20" />
+        <path d="M9 4v16M15 4v16M9 8h3M12 12h3M9 16h3" />
       </>
     ),
     models: (
