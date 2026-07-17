@@ -1,6 +1,6 @@
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,7 +25,7 @@ from app.routes.tools import router as tools_router
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    Path(settings.aster_media_root).mkdir(parents=True, exist_ok=True)
+    os.makedirs(settings.aster_media_root, exist_ok=True)
     async with AsyncSessionFactory() as session:
         await recover_interrupted_image_operations(session)
     yield
