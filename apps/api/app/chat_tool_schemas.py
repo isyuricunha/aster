@@ -5,6 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.image_schemas import MessageAttachmentResponse
 from app.retrieval_schemas import RetrievalSourceResponse
 from app.schemas import ConversationPersonaImport, ConversationPersonaResponse
 from app.tool_schemas import ToolExecutionResponse
@@ -37,6 +38,7 @@ class ToolAwareChatMessageResponse(BaseModel):
     tool_call_id: str | None
     tool_name: str | None
     retrieval_sources: list[RetrievalSourceResponse] = Field(default_factory=list)
+    attachments: list[MessageAttachmentResponse] = Field(default_factory=list)
     position: int
     created_at: datetime
     updated_at: datetime

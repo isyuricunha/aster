@@ -8,6 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.chat_generation import recover_interrupted_streams
 from app.db import AsyncSessionFactory, engine
+from app.image_service import recover_interrupted_image_operations
 from app.tool_recovery import recover_interrupted_tool_executions
 
 router = APIRouter(tags=["system"])
@@ -29,6 +30,7 @@ async def _recover_interrupted_work_once() -> None:
         async with AsyncSessionFactory() as session:
             await recover_interrupted_streams(session)
             await recover_interrupted_tool_executions(session)
+            await recover_interrupted_image_operations(session)
         _recovery_complete = True
 
 

@@ -27,11 +27,27 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
       - name: Lint
-        run: pnpm lint
+        run: |
+          set -o pipefail
+          pnpm lint 2>&1 | tee /tmp/web-lint.log
       - name: Type check
-        run: pnpm typecheck
+        run: |
+          set -o pipefail
+          pnpm typecheck 2>&1 | tee /tmp/web-typecheck.log
       - name: Build
-        run: pnpm build
+        run: |
+          set -o pipefail
+          pnpm build 2>&1 | tee /tmp/web-build.log
+      - name: Upload web check logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-check-logs
+          path: |
+            /tmp/web-lint.log
+            /tmp/web-typecheck.log
+            /tmp/web-build.log
+          if-no-files-found: ignore
 
   api:
     name: API
@@ -99,7 +115,7 @@ jobs:
         run: >-
           curl --fail --silent --show-error --retry 30 --retry-all-errors --retry-delay 2
           http://localhost:3000/setup
-      - name: Check legacy upgrade through Stage 13
+      - name: Check legacy upgrade through Stage 14
         run: sh scripts/ci/check-stage11-persona-migration.sh
       - name: Check runtime configuration
         run: >-
@@ -121,11 +137,20 @@ jobs:
           assert settings.aster_document_max_bytes == 5000000;
           assert settings.aster_document_chunk_characters == 1600;
           assert settings.aster_document_chunk_overlap == 200;
-          assert settings.aster_embedding_batch_size == 64'
+          assert settings.aster_embedding_batch_size == 64;
+          assert settings.aster_media_root == "/var/lib/aster/media";
+          assert settings.aster_image_timeout_seconds == 300;
+          assert settings.aster_image_upload_max_bytes == 20000000;
+          assert settings.aster_image_output_max_bytes == 25000000;
+          assert settings.aster_image_max_pixels == 40000000;
+          assert settings.aster_image_max_inputs == 8;
+          assert settings.aster_image_max_outputs == 4'
       - name: Check core application contracts
         run: sh scripts/ci/check-stack-core.sh
       - name: Check Stage 13 memory and retrieval contracts
         run: sh scripts/ci/check-stage13-memory-rag.sh
+      - name: Check Stage 14 image contracts
+        run: sh scripts/ci/check-stage14-images.sh
       - name: Check Stage 12 tool contracts
         run: sh scripts/ci/check-stage12-tools.sh
       - name: Show service state

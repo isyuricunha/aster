@@ -1,5 +1,7 @@
+import base64
 import json
 import os
+import tempfile
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 
@@ -21,7 +23,14 @@ from app.auth_dependencies import (  # noqa: E402
 )
 from app.auth_service import PasswordService  # noqa: E402
 from app.db import Base, get_session  # noqa: E402
-from app.dependencies import get_mcp_client, get_openai_client  # noqa: E402
+from app.dependencies import (  # noqa: E402
+    get_image_client,
+    get_mcp_client,
+    get_media_store,
+    get_openai_client,
+)
+from app.image_provider import ProviderImage  # noqa: E402
+from app.image_storage import PrivateMediaStore  # noqa: E402
 from app.main import app  # noqa: E402
 from app.mcp_client import (  # noqa: E402
     McpConnectionConfig,
@@ -79,6 +88,64 @@ class FakeMcpClient:
         )
 
 
+class FakeImageClient:
+    def __init__(self) -> None:
+        self.output = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlK7YQAAAAASUVORK5CYII="
+        )
+        self.error: Exception | None = None
+        self.generate_calls: list[dict[str, object]] = []
+        self.edit_calls: list[dict[str, object]] = []
+
+    async def generate(
+        self,
+        *,
+        base_url: str,
+        api_key: str | None,
+        model_id: str,
+        prompt: str,
+        parameters: dict[str, object],
+    ) -> list[ProviderImage]:
+        self.generate_calls.append(
+            {
+                "base_url": base_url,
+                "api_key": api_key,
+                "model_id": model_id,
+                "prompt": prompt,
+                "parameters": parameters,
+            }
+        )
+        if self.error is not None:
+            raise self.error
+        return [ProviderImage(data=self.output, revised_prompt="A revised image prompt")]
+
+    async def edit(
+        self,
+        *,
+        base_url: str,
+        api_key: str | None,
+        model_id: str,
+        prompt: str,
+        images: list[tuple[str, bytes, str]],
+        mask: tuple[str, bytes, str] | None,
+        parameters: dict[str, object],
+    ) -> list[ProviderImage]:
+        self.edit_calls.append(
+            {
+                "base_url": base_url,
+                "api_key": api_key,
+                "model_id": model_id,
+                "prompt": prompt,
+                "images": images,
+                "mask": mask,
+                "parameters": parameters,
+            }
+        )
+        if self.error is not None:
+            raise self.error
+        return [ProviderImage(data=self.output)]
+
+
 class FakeOpenAICompatibleClient:
     def __init__(self) -> None:
         self.models = ["alpha-model", "beta-model"]
@@ -97,6 +164,7 @@ class FakeOpenAICompatibleClient:
         self.received_chat_tools: list[dict[str, object]] = []
         self.chat_calls: list[str] = []
         self.mcp_client = FakeMcpClient()
+        self.image_client = FakeImageClient()
 
     async def list_models(self, base_url: str, api_key: str | None) -> list[str]:
         self.received_api_key = api_key
@@ -240,8 +308,12 @@ async def build_test_client() -> AsyncIterator[TestClientBundle]:
             yield session
 
     fake_client = FakeOpenAICompatibleClient()
+    temporary_media = tempfile.TemporaryDirectory()
+    media_store = PrivateMediaStore(temporary_media.name)
     app.dependency_overrides[get_session] = override_session
     app.dependency_overrides[get_openai_client] = lambda: fake_client
+    app.dependency_overrides[get_image_client] = lambda: fake_client.image_client
+    app.dependency_overrides[get_media_store] = lambda: media_store
     app.dependency_overrides[get_mcp_client] = lambda: fake_client.mcp_client
     app.dependency_overrides[get_password_service] = lambda: PasswordService(
         memory_cost=1024,
@@ -259,6 +331,7 @@ async def build_test_client() -> AsyncIterator[TestClientBundle]:
             yield client, fake_client, session_factory
     finally:
         app.dependency_overrides.clear()
+        temporary_media.cleanup()
         await limiter.clear()
         await engine.dispose()
 
