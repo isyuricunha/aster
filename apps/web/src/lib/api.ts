@@ -156,7 +156,7 @@ export type ConversationSummary = {
 export type Conversation = {
   id: string;
   title: string;
-  persona: ConversationPersona | null;
+  persona?: ConversationPersona | null;
   messages: ChatMessage[];
   created_at: string;
   updated_at: string;
