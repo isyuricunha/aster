@@ -4,12 +4,25 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.chat_generation import conversation_persona_response
-from app.chat_tool_schemas import ToolAwareChatMessageResponse, ToolAwareConversationResponse
+from app.chat_tool_schemas import (
+    ConversationRetrievalResponse,
+    ToolAwareChatMessageResponse,
+    ToolAwareConversationResponse,
+)
 from app.models import ChatMessage, Conversation, ToolExecution
+from app.retrieval_models import ConversationCollection, KnowledgeCollection
+from app.retrieval_schemas import RetrievalSourceResponse
+from app.retrieval_service import (
+    get_or_create_conversation_settings,
+    retrieval_sources_for_messages,
+)
 from app.tool_schemas import ToolExecutionResponse
 
 
-def message_response(message: ChatMessage) -> ToolAwareChatMessageResponse:
+def message_response(
+    message: ChatMessage,
+    retrieval_sources: list[RetrievalSourceResponse] | None = None,
+) -> ToolAwareChatMessageResponse:
     return ToolAwareChatMessageResponse(
         id=message.id,
         conversation_id=message.conversation_id,
@@ -21,6 +34,7 @@ def message_response(message: ChatMessage) -> ToolAwareChatMessageResponse:
         tool_calls=message.tool_calls,
         tool_call_id=message.tool_call_id,
         tool_name=message.tool_name,
+        retrieval_sources=retrieval_sources or [],
         position=message.position,
         created_at=message.created_at,
         updated_at=message.updated_at,
@@ -72,11 +86,36 @@ async def conversation_response(
             .order_by(ToolExecution.created_at.asc())
         )
     )
+    retrieval_settings = await get_or_create_conversation_settings(session, conversation.id)
+    collection_rows = (
+        await session.execute(
+            select(KnowledgeCollection.id, KnowledgeCollection.name)
+            .join(
+                ConversationCollection,
+                ConversationCollection.collection_id == KnowledgeCollection.id,
+            )
+            .where(ConversationCollection.conversation_id == conversation.id)
+            .order_by(KnowledgeCollection.name.asc())
+        )
+    ).all()
+    sources_by_message = await retrieval_sources_for_messages(
+        session,
+        [message.id for message in messages if message.role == "assistant"],
+    )
+    await session.commit()
     return ToolAwareConversationResponse(
         id=conversation.id,
         title=conversation.title,
         persona=conversation_persona_response(conversation),
-        messages=[message_response(message) for message in messages],
+        retrieval=ConversationRetrievalResponse(
+            memory_enabled=retrieval_settings.memory_enabled,
+            rag_enabled=retrieval_settings.rag_enabled,
+            collection_ids=[collection_id for collection_id, _ in collection_rows],
+            collection_names=[name for _, name in collection_rows],
+        ),
+        messages=[
+            message_response(message, sources_by_message.get(message.id)) for message in messages
+        ],
         tool_executions=[execution_response(execution) for execution in executions],
         created_at=conversation.created_at,
         updated_at=conversation.updated_at,

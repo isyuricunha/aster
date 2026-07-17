@@ -10,9 +10,16 @@ import type {
 export function createConversationTransfer(conversation: Conversation): ConversationTransfer {
   return {
     format: "aster-conversation",
-    version: 3,
+    version: 4,
     title: conversation.title,
     persona: conversation.persona,
+    retrieval: conversation.retrieval
+      ? {
+          memory_enabled: conversation.retrieval.memory_enabled,
+          rag_enabled: conversation.retrieval.rag_enabled,
+          collection_names: conversation.retrieval.collection_names,
+        }
+      : null,
     messages: conversation.messages.map(toTransferMessage),
   };
 }
@@ -63,7 +70,10 @@ export function parseConversationTransfer(raw: string): ConversationTransfer {
   if (!isRecord(value)) throw new Error("The selected file does not contain a JSON object.");
   if (
     value.format !== "aster-conversation" ||
-    (value.version !== 1 && value.version !== 2 && value.version !== 3)
+    (value.version !== 1 &&
+      value.version !== 2 &&
+      value.version !== 3 &&
+      value.version !== 4)
   ) {
     throw new Error("This is not a supported Aster conversation export.");
   }
@@ -83,6 +93,13 @@ export function parseConversationTransfer(raw: string): ConversationTransfer {
   }
   if (value.version === 1 && "persona" in value) {
     throw new Error("Version 1 conversation exports cannot contain a persona snapshot.");
+  }
+  if (value.version >= 4) {
+    if (value.retrieval !== null && !isConversationRetrieval(value.retrieval)) {
+      throw new Error("The exported conversation contains invalid retrieval settings.");
+    }
+  } else if ("retrieval" in value) {
+    throw new Error("Retrieval settings require conversation export version 4.");
   }
 
   for (const message of value.messages) {
@@ -175,10 +192,23 @@ function isConversationPersona(value: unknown): value is ConversationPersona {
   );
 }
 
-function isTransferMessage(value: unknown, version: 1 | 2 | 3): value is ConversationTransferMessage {
+function isConversationRetrieval(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.memory_enabled === "boolean" &&
+    typeof value.rag_enabled === "boolean" &&
+    Array.isArray(value.collection_names) &&
+    value.collection_names.every((name) => typeof name === "string")
+  );
+}
+
+function isTransferMessage(
+  value: unknown,
+  version: 1 | 2 | 3 | 4,
+): value is ConversationTransferMessage {
   if (!isRecord(value)) return false;
   const validRole =
-    value.role === "user" || value.role === "assistant" || (version === 3 && value.role === "tool");
+    value.role === "user" || value.role === "assistant" || (version >= 3 && value.role === "tool");
   const validStatus =
     value.status === "completed" || value.status === "failed" || value.status === "stopped";
   const validError = value.error_message === null || typeof value.error_message === "string";

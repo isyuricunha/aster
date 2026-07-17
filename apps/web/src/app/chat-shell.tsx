@@ -20,6 +20,7 @@ import {
   type ModelPreferences,
   type ToolExecution,
 } from "../lib/api";
+import { RetrievalSourceList } from "./chat-retrieval-sources";
 import { ToolCallList, ToolExecutionCard } from "./chat-tool-cards";
 import {
   createConversationMarkdown,
@@ -28,6 +29,7 @@ import {
   parseConversationTransfer,
 } from "./conversation-transfer";
 import { copyText, MarkdownMessage } from "./markdown-message";
+import type { RetrievalSource } from "../lib/retrieval-api";
 import { AsterMark, Icon } from "./ui/icons";
 
 type StreamEvent = {
@@ -42,6 +44,7 @@ type MetaEvent = {
   replace_from_position: number | null;
   messages: ChatMessage[];
   assistant_message_id: string;
+  retrieval_sources?: RetrievalSource[];
 };
 
 type DeltaEvent = { content: string };
@@ -89,7 +92,15 @@ async function readEventStream(
 function upsertMessage(messages: ChatMessage[], nextMessage: ChatMessage): ChatMessage[] {
   const exists = messages.some((message) => message.id === nextMessage.id);
   if (!exists) return [...messages, nextMessage].sort((left, right) => left.position - right.position);
-  return messages.map((message) => (message.id === nextMessage.id ? nextMessage : message));
+  return messages.map((message) =>
+    message.id === nextMessage.id
+      ? {
+          ...nextMessage,
+          retrieval_sources:
+            nextMessage.retrieval_sources ?? message.retrieval_sources,
+        }
+      : message,
+  );
 }
 
 function upsertExecution(
@@ -384,11 +395,17 @@ export function ChatShell({
             : (current?.messages ?? []).filter(
                 (message) => message.position < meta.replace_from_position!,
               );
+        const incoming = meta.messages.map((message) =>
+          message.id === meta.assistant_message_id
+            ? { ...message, retrieval_sources: meta.retrieval_sources ?? [] }
+            : message,
+        );
         return {
           id: meta.conversation_id,
           title: meta.title,
           persona: current?.persona ?? null,
-          messages: [...retained, ...meta.messages],
+          retrieval: current?.retrieval,
+          messages: [...retained, ...incoming],
           tool_executions: current?.tool_executions ?? [],
           created_at: current?.created_at ?? meta.messages[0]?.created_at ?? new Date().toISOString(),
           updated_at: meta.messages.at(-1)?.updated_at ?? new Date().toISOString(),
@@ -759,6 +776,10 @@ export function ChatShell({
             <Icon name="tools" />
             <span>Tools</span>
           </Link>
+          <Link href="/settings/memory">
+            <Icon name="memory" />
+            <span>Memory & Knowledge</span>
+          </Link>
           <Link href="/settings/account">
             <Icon name="account" />
             <span>Account</span>
@@ -931,7 +952,8 @@ export function ChatShell({
                               streaming={message.status === "streaming"}
                             />
                           ) : null}
-                          {executions.map((execution) => (
+                          <RetrievalSourceList sources={message.retrieval_sources ?? []} />
+                           {executions.map((execution) => (
                             <ToolExecutionCard
                               disabled={streaming}
                               execution={execution}

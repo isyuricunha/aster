@@ -1,0 +1,73 @@
+.sources {
+  margin-top: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--surface-raised) 76%, transparent);
+}
+
+.sources summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  list-style: none;
+}
+
+.sources summary::-webkit-details-marker {
+  display: none;
+}
+
+.sources summary span {
+  font-weight: 600;
+}
+
+.sources summary small {
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+}
+
+.list {
+  display: grid;
+  gap: 7px;
+  border-top: 1px solid var(--border-subtle);
+  padding: 8px;
+}
+
+.source {
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  background: var(--surface-base);
+  padding: 9px;
+}
+
+.source header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.source header strong {
+  color: var(--accent);
+  font-family: var(--font-mono);
+}
+
+.source header small {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+}
+
+.source p {
+  margin: 7px 0 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

@@ -37,6 +37,19 @@ class Settings(BaseSettings):
     aster_tool_max_rounds: int = Field(default=8, ge=1, le=32)
     aster_tool_argument_max_characters: int = Field(default=100_000, ge=1_000, le=1_000_000)
     aster_tool_result_max_characters: int = Field(default=100_000, ge=1_000, le=1_000_000)
+    aster_memory_max_items: int = Field(default=12, ge=1, le=100)
+    aster_memory_suggestion_max_items: int = Field(default=8, ge=1, le=32)
+    aster_rag_max_sources: int = Field(default=8, ge=1, le=32)
+    aster_rag_context_max_characters: int = Field(default=24_000, ge=2_000, le=200_000)
+    aster_rag_candidate_limit: int = Field(default=2_000, ge=100, le=20_000)
+    aster_document_max_bytes: int = Field(default=5_000_000, ge=10_000, le=100_000_000)
+    aster_document_max_characters: int = Field(
+        default=2_000_000, ge=10_000, le=20_000_000
+    )
+    aster_document_chunk_characters: int = Field(default=1_600, ge=400, le=8_000)
+    aster_document_chunk_overlap: int = Field(default=200, ge=0, le=2_000)
+    aster_document_max_chunks: int = Field(default=2_000, ge=10, le=20_000)
+    aster_embedding_batch_size: int = Field(default=64, ge=1, le=256)
 
     @field_validator("aster_encryption_key")
     @classmethod
@@ -52,6 +65,15 @@ class Settings(BaseSettings):
         if not normalized:
             raise ValueError("ASTER_SESSION_COOKIE_NAME cannot be empty")
         return normalized
+
+    @model_validator(mode="after")
+    def validate_retrieval_limits(self) -> "Settings":
+        if self.aster_document_chunk_overlap >= self.aster_document_chunk_characters:
+            raise ValueError(
+                "ASTER_DOCUMENT_CHUNK_OVERLAP must be smaller than "
+                "ASTER_DOCUMENT_CHUNK_CHARACTERS"
+            )
+        return self
 
     @model_validator(mode="after")
     def resolve_database_url(self) -> "Settings":

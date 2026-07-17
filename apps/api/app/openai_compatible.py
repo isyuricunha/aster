@@ -1,4 +1,5 @@
 import json
+import math
 from collections.abc import AsyncIterator, Iterable, Sequence
 from dataclasses import dataclass
 
@@ -47,7 +48,7 @@ class OpenAICompatibleClient:
     def _headers(api_key: str | None) -> dict[str, str]:
         headers = {
             "Accept": "application/json",
-            "User-Agent": "Aster/0.5",
+            "User-Agent": "Aster/0.6",
         }
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
@@ -89,6 +90,91 @@ class OpenAICompatibleClient:
         if not model_ids:
             return []
         return sorted(set(model_ids), key=str.casefold)
+
+    async def create_embeddings(
+        self,
+        *,
+        base_url: str,
+        api_key: str | None,
+        model_id: str,
+        inputs: Sequence[str],
+    ) -> list[list[float]]:
+        if not inputs:
+            return []
+        payload: dict[str, object] = {
+            "model": model_id,
+            "input": list(inputs),
+        }
+        try:
+            async with httpx.AsyncClient(
+                timeout=self._stream_timeout,
+                follow_redirects=True,
+                transport=self._transport,
+            ) as client:
+                response = await client.post(
+                    f"{base_url}/embeddings",
+                    headers=self._headers(api_key),
+                    json=payload,
+                )
+        except httpx.TimeoutException as error:
+            raise ModelEndpointError(
+                "timeout", "The embedding endpoint did not respond before the timeout."
+            ) from error
+        except httpx.RequestError as error:
+            raise ModelEndpointError(
+                "connection_error", "The embedding endpoint could not be reached."
+            ) from error
+
+        self._raise_for_status(response, route_name="embeddings")
+        try:
+            body = response.json()
+        except ValueError as error:
+            raise ModelEndpointError(
+                "invalid_response", "The embedding endpoint returned invalid JSON."
+            ) from error
+
+        data = body.get("data") if isinstance(body, dict) else None
+        if not isinstance(data, list) or len(data) != len(inputs):
+            raise ModelEndpointError(
+                "invalid_response",
+                "The embedding endpoint returned an unexpected number of vectors.",
+            )
+        indexed: dict[int, list[float]] = {}
+        for fallback_index, item in enumerate(data):
+            if not isinstance(item, dict):
+                raise ModelEndpointError(
+                    "invalid_response", "The embedding endpoint returned an invalid vector."
+                )
+            index = item.get("index", fallback_index)
+            raw_embedding = item.get("embedding")
+            if not isinstance(index, int) or not isinstance(raw_embedding, list):
+                raise ModelEndpointError(
+                    "invalid_response", "The embedding endpoint returned an invalid vector."
+                )
+            vector: list[float] = []
+            for value in raw_embedding:
+                if not isinstance(value, int | float) or not math.isfinite(float(value)):
+                    raise ModelEndpointError(
+                        "invalid_response", "The embedding endpoint returned a non-finite vector."
+                    )
+                vector.append(float(value))
+            if not vector:
+                raise ModelEndpointError(
+                    "invalid_response", "The embedding endpoint returned an empty vector."
+                )
+            indexed[index] = vector
+        try:
+            vectors = [indexed[index] for index in range(len(inputs))]
+        except KeyError as error:
+            raise ModelEndpointError(
+                "invalid_response", "The embedding endpoint returned incomplete vector indexes."
+            ) from error
+        dimensions = {len(vector) for vector in vectors}
+        if len(dimensions) != 1:
+            raise ModelEndpointError(
+                "invalid_response", "The embedding endpoint returned inconsistent dimensions."
+            )
+        return vectors
 
     async def stream_chat_completion(
         self,
@@ -205,8 +291,12 @@ class OpenAICompatibleClient:
                 response.status_code,
             )
         if response.status_code == 404:
-            code = "models_not_supported" if route_name == "models" else "chat_not_supported"
-            route = "/models" if route_name == "models" else "/chat/completions"
+            routes = {
+                "models": ("models_not_supported", "/models"),
+                "chat": ("chat_not_supported", "/chat/completions"),
+                "embeddings": ("embeddings_not_supported", "/embeddings"),
+            }
+            code, route = routes.get(route_name, ("route_not_supported", route_name))
             raise ModelEndpointError(
                 code,
                 f"The endpoint does not expose a compatible {route} route.",

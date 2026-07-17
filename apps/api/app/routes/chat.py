@@ -8,6 +8,7 @@ from sqlalchemy import exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.chat_generation import (
+    PreparedGeneration,
     ensure_no_active_generation,
     get_conversation,
     prepare_edit_and_resend,
@@ -20,11 +21,18 @@ from app.chat_tool_schemas import (
     ToolAwareConversationImportRequest,
     ToolAwareConversationResponse,
 )
+from app.config import settings
 from app.db import get_session
 from app.dependencies import get_mcp_client, get_openai_client, get_secret_cipher
 from app.mcp_client import McpClient
 from app.models import ChatMessage, Conversation, Persona, PersonaPreferences
 from app.openai_compatible import OpenAICompatibleClient
+from app.retrieval_models import KnowledgeCollection
+from app.retrieval_service import (
+    get_or_create_conversation_settings,
+    prepare_retrieval,
+    replace_conversation_retrieval_settings,
+)
 from app.schemas import (
     ConversationCreate,
     ConversationSummaryResponse,
@@ -42,6 +50,28 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 CipherDep = Annotated[SecretCipher, Depends(get_secret_cipher)]
 ClientDep = Annotated[OpenAICompatibleClient, Depends(get_openai_client)]
 McpClientDep = Annotated[McpClient, Depends(get_mcp_client)]
+
+
+async def _attach_retrieval(
+    prepared: PreparedGeneration,
+    *,
+    session: AsyncSession,
+    client: OpenAICompatibleClient,
+    cipher: SecretCipher,
+) -> None:
+    retrieval = await prepare_retrieval(
+        session,
+        conversation=prepared.conversation,
+        assistant_message=prepared.assistant_message,
+        query=prepared.current_user_message.content,
+        client=client,
+        cipher=cipher,
+        settings=settings,
+    )
+    prepared.retrieval_context = retrieval.context
+    prepared.retrieval_sources = [
+        source.model_dump(mode="json") for source in retrieval.sources
+    ]
 
 
 def _contains_pattern(value: str) -> str:
@@ -159,6 +189,7 @@ async def create_conversation(
     session.add(conversation)
     await session.flush()
     await copy_default_tools_to_conversation(session, conversation_id=conversation.id)
+    await get_or_create_conversation_settings(session, conversation.id)
     await session.commit()
     await session.refresh(conversation)
     return await conversation_response(session, conversation)
@@ -187,6 +218,26 @@ async def import_conversation(
         conversation.persona_instruction_role = payload.persona.instruction_role
     session.add(conversation)
     await session.flush()
+
+    if payload.retrieval is None:
+        await get_or_create_conversation_settings(session, conversation.id)
+    else:
+        normalized_names = {name.casefold() for name in payload.retrieval.collection_names}
+        collection_ids = list(
+            await session.scalars(
+                select(KnowledgeCollection.id).where(
+                    KnowledgeCollection.enabled.is_(True),
+                    func.lower(KnowledgeCollection.name).in_(normalized_names),
+                )
+            )
+        ) if normalized_names else []
+        await replace_conversation_retrieval_settings(
+            session,
+            conversation_id=conversation.id,
+            memory_enabled=payload.retrieval.memory_enabled,
+            rag_enabled=payload.retrieval.rag_enabled,
+            collection_ids=collection_ids,
+        )
 
     now = datetime.now(UTC)
     session.add_all(
@@ -284,6 +335,9 @@ async def stream_message(
         conversation_id=conversation_id,
         content=payload.content,
     )
+    await _attach_retrieval(
+        prepared, session=session, client=client, cipher=cipher
+    )
     return await stream_response_with_tools(
         prepared=prepared,
         session=session,
@@ -311,6 +365,9 @@ async def edit_and_resend_message(
         message_id=message_id,
         content=payload.content,
     )
+    await _attach_retrieval(
+        prepared, session=session, client=client, cipher=cipher
+    )
     return await stream_response_with_tools(
         prepared=prepared,
         session=session,
@@ -335,6 +392,9 @@ async def regenerate_message(
         cipher=cipher,
         conversation_id=conversation_id,
         message_id=message_id,
+    )
+    await _attach_retrieval(
+        prepared, session=session, client=client, cipher=cipher
     )
     return await stream_response_with_tools(
         prepared=prepared,

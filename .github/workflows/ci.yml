@@ -99,7 +99,7 @@ jobs:
         run: >-
           curl --fail --silent --show-error --retry 30 --retry-all-errors --retry-delay 2
           http://localhost:3000/setup
-      - name: Check Stage 11 upgrade through Stage 12
+      - name: Check legacy upgrade through Stage 13
         run: sh scripts/ci/check-stage11-persona-migration.sh
       - name: Check runtime configuration
         run: >-
@@ -113,9 +113,19 @@ jobs:
           assert settings.aster_mcp_timeout_seconds == 30;
           assert settings.aster_tool_max_rounds == 8;
           assert settings.aster_tool_argument_max_characters == 100000;
-          assert settings.aster_tool_result_max_characters == 100000'
+          assert settings.aster_tool_result_max_characters == 100000;
+          assert settings.aster_memory_max_items == 12;
+          assert settings.aster_memory_suggestion_max_items == 8;
+          assert settings.aster_rag_max_sources == 8;
+          assert settings.aster_rag_context_max_characters == 24000;
+          assert settings.aster_document_max_bytes == 5000000;
+          assert settings.aster_document_chunk_characters == 1600;
+          assert settings.aster_document_chunk_overlap == 200;
+          assert settings.aster_embedding_batch_size == 64'
       - name: Check core application contracts
         run: sh scripts/ci/check-stack-core.sh
+      - name: Check Stage 13 memory and retrieval contracts
+        run: sh scripts/ci/check-stage13-memory-rag.sh
       - name: Check Stage 12 tool contracts
         run: sh scripts/ci/check-stage12-tools.sh
       - name: Show service state

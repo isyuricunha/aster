@@ -2,7 +2,7 @@ import asyncio
 import json
 from collections.abc import AsyncIterator, Sequence
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Literal
 from uuid import UUID
@@ -43,6 +43,8 @@ class PreparedGeneration:
     replace_from_position: int | None
     model_targets: list[ModelTarget]
     stop_event: asyncio.Event
+    retrieval_context: str = ""
+    retrieval_sources: list[dict[str, object]] = field(default_factory=list)
 
 
 def message_response(message: ChatMessage) -> ChatMessageResponse:
@@ -477,6 +479,7 @@ def stream_response(
                 ],
                 "assistant_message_id": str(prepared.assistant_message.id),
                 "model": _target_payload(prepared.model_targets[0]),
+                "retrieval_sources": prepared.retrieval_sources,
             },
         )
         chunks: list[str] = []
@@ -490,6 +493,11 @@ def stream_response(
                 current_user_message=prepared.current_user_message.content,
             )
             provider_messages = _provider_messages(canonical_messages)
+            if prepared.retrieval_context:
+                provider_messages.insert(
+                    max(0, len(provider_messages) - 1),
+                    {"role": "developer", "content": prepared.retrieval_context},
+                )
 
             for target_index, target in enumerate(prepared.model_targets):
                 if target_index > 0:

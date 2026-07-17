@@ -1,0 +1,318 @@
+.stack {
+  display: grid;
+  gap: 14px;
+  padding-bottom: 40px;
+}
+
+.banner {
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.error {
+  background: color-mix(in oklab, var(--danger) 10%, var(--surface-raised));
+  color: var(--danger);
+}
+
+.notice {
+  background: color-mix(in oklab, var(--accent) 9%, var(--surface-raised));
+  color: var(--text-primary);
+}
+
+.panel {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 9px;
+  background: var(--surface-raised);
+  padding: 16px;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.panelHeader p {
+  margin: 0 0 4px;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.panelHeader h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 620;
+}
+
+.panelHeader span,
+.row small,
+.collectionCard small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.editorGrid,
+.scopeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.wideField {
+  grid-column: span 2;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.field > span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 560;
+}
+
+.field input,
+.field select,
+.field textarea,
+.inlineControl select,
+.uploadBar select {
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  background: var(--surface-base);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  padding: 8px 10px;
+}
+
+.field textarea {
+  min-height: 82px;
+  resize: vertical;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus,
+.inlineControl select:focus,
+.uploadBar select:focus {
+  border-color: color-mix(in oklab, var(--accent) 50%, var(--border-subtle));
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 12%, transparent);
+}
+
+.checkboxField {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.checkboxField input {
+  accent-color: var(--accent);
+}
+
+.actions,
+.inlineControl,
+.uploadBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inlineControl,
+.uploadBar {
+  min-width: min(100%, 420px);
+}
+
+.inlineControl select,
+.uploadBar select {
+  flex: 1;
+}
+
+.primaryButton,
+.secondaryButton,
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 32px;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 570;
+  cursor: pointer;
+}
+
+.primaryButton {
+  border: 1px solid color-mix(in oklab, var(--accent) 60%, var(--border-subtle));
+  background: var(--accent);
+  color: var(--accent-foreground);
+  padding: 7px 11px;
+}
+
+.secondaryButton,
+.iconButton {
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-base);
+  color: var(--text-secondary);
+}
+
+.secondaryButton {
+  padding: 7px 10px;
+}
+
+.iconButton {
+  width: 32px;
+  padding: 0;
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.iconButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.list {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  padding: 11px 12px;
+}
+
+.row + .row {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.rowMain {
+  min-width: 0;
+}
+
+.rowMain p {
+  margin: 5px 0 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.rowMain small {
+  display: block;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.badges span {
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-base);
+  color: var(--text-muted);
+  font-size: 10px;
+  padding: 2px 6px;
+  text-transform: capitalize;
+}
+
+.empty {
+  padding: 18px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.collectionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.collectionCard {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-base);
+  padding: 12px;
+}
+
+.collectionCard h3 {
+  margin: 7px 0 0;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.collectionCard p {
+  margin: 4px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.scopeCollections {
+  display: grid;
+  grid-column: span 2;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  .panelHeader,
+  .row,
+  .collectionCard {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .editorGrid,
+  .scopeGrid,
+  .collectionGrid,
+  .scopeCollections {
+    grid-template-columns: 1fr;
+  }
+
+  .wideField,
+  .scopeCollections {
+    grid-column: span 1;
+  }
+
+  .inlineControl,
+  .uploadBar,
+  .actions {
+    flex-wrap: wrap;
+  }
+}
