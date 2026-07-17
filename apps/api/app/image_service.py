@@ -29,13 +29,7 @@ from app.image_storage import (
     PrivateMediaStore,
     validate_and_sanitize_image,
 )
-from app.models import (
-    ChatMessage,
-    Conversation,
-    ModelCacheEntry,
-    ModelEndpoint,
-    ModelPreferences,
-)
+from app.models import ChatMessage, ModelCacheEntry, ModelEndpoint, ModelPreferences
 from app.openai_compatible import ModelEndpointError
 from app.security import SecretCipher
 from app.tool_guards import ensure_no_pending_tool_confirmation
@@ -55,6 +49,7 @@ async def image_profile_response(
     endpoint: ModelEndpoint,
     profile: ImageModelProfile | None,
 ) -> ImageModelProfileResponse:
+    del session
     values = profile or ImageModelProfile(model_id=model.id)
     return ImageModelProfileResponse(
         model_id=model.id,
@@ -206,6 +201,7 @@ async def create_upload_asset(
     try:
         await session.commit()
     except Exception:
+        await session.rollback()
         store.delete(storage_key)
         raise
     await session.refresh(asset)
@@ -230,7 +226,9 @@ async def resolve_image_target(
     if target_id is None:
         preferences = await session.get(ModelPreferences, 1)
         if preferences is None:
-            raise ImageValidationError("Configure an image-capable model before generating images.")
+            raise ImageValidationError(
+                "Configure an image-capable model before generating images."
+            )
         target_id = preferences.image_model_id or preferences.primary_model_id
     if target_id is None:
         raise ImageValidationError("Configure an image-capable model before generating images.")
@@ -291,6 +289,31 @@ def _asset_filename(asset: MediaAsset) -> str:
         asset.media_type, "bin"
     )
     return asset.original_filename or f"{asset.id}.{extension}"
+
+
+async def _mark_operation_failed(
+    session: AsyncSession,
+    *,
+    operation_id: UUID,
+    assistant_message_id: UUID,
+    conversation_id: UUID,
+    error_code: str,
+    error_message: str,
+) -> None:
+    operation = await session.get(ImageOperation, operation_id)
+    assistant_message = await session.get(ChatMessage, assistant_message_id)
+    conversation = await get_conversation(session, conversation_id, for_update=True)
+    now = datetime.now(UTC)
+    if operation is not None:
+        operation.status = "failed"
+        operation.error_code = error_code
+        operation.error_message = error_message[:500]
+        operation.finished_at = now
+    if assistant_message is not None:
+        assistant_message.status = "failed"
+        assistant_message.error_message = error_message[:500]
+    conversation.updated_at = now
+    await session.commit()
 
 
 async def execute_image_operation(
@@ -397,19 +420,20 @@ async def execute_image_operation(
             ]
         )
     if mask_asset is not None:
-        mask_position = len(input_assets)
         session.add(
             ImageOperationInput(
                 operation_id=operation.id,
                 asset_id=mask_asset.id,
                 input_type="mask",
-                position=mask_position,
+                position=len(input_assets),
             )
         )
     conversation.updated_at = datetime.now(UTC)
     await session.commit()
-    await session.refresh(operation)
 
+    operation_id = operation.id
+    assistant_message_id = assistant_message.id
+    persisted_conversation_id = conversation.id
     created_storage_keys: list[str] = []
     try:
         if editing:
@@ -488,31 +512,33 @@ async def execute_image_operation(
         operation.finished_at = datetime.now(UTC)
         conversation.updated_at = datetime.now(UTC)
         await session.commit()
-        await session.refresh(operation)
         return operation
     except (ImageValidationError, ModelEndpointError) as error:
+        await session.rollback()
         for storage_key in created_storage_keys:
             store.delete(storage_key)
-        operation.status = "failed"
-        operation.error_code = getattr(error, "code", "image_validation_failed")
-        operation.error_message = str(getattr(error, "message", error))[:500]
-        operation.finished_at = datetime.now(UTC)
-        assistant_message.status = "failed"
-        assistant_message.error_message = operation.error_message
-        conversation.updated_at = datetime.now(UTC)
-        await session.commit()
+        message = str(getattr(error, "message", error))[:500]
+        await _mark_operation_failed(
+            session,
+            operation_id=operation_id,
+            assistant_message_id=assistant_message_id,
+            conversation_id=persisted_conversation_id,
+            error_code=getattr(error, "code", "image_validation_failed"),
+            error_message=message,
+        )
         raise
     except Exception as error:
+        await session.rollback()
         for storage_key in created_storage_keys:
             store.delete(storage_key)
-        operation.status = "failed"
-        operation.error_code = "image_operation_failed"
-        operation.error_message = str(error)[:500]
-        operation.finished_at = datetime.now(UTC)
-        assistant_message.status = "failed"
-        assistant_message.error_message = operation.error_message
-        conversation.updated_at = datetime.now(UTC)
-        await session.commit()
+        await _mark_operation_failed(
+            session,
+            operation_id=operation_id,
+            assistant_message_id=assistant_message_id,
+            conversation_id=persisted_conversation_id,
+            error_code="image_operation_failed",
+            error_message=str(error)[:500],
+        )
         raise
 
 
