@@ -95,7 +95,9 @@ class ToolAwareConversationImportMessage(BaseModel):
             if self.tool_call_id is None or self.tool_name is None:
                 raise ValueError("Imported tool messages require a call ID and tool name")
             if self.model_id is not None or self.tool_calls is not None:
-                raise ValueError("Imported tool messages cannot contain model or tool-call metadata")
+                raise ValueError(
+                    "Imported tool messages cannot contain model or tool-call metadata"
+                )
             if not self.content:
                 raise ValueError("Imported tool messages cannot be empty")
         return self
