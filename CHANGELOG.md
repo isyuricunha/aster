@@ -6,6 +6,17 @@ All notable changes to Aster are documented in this file.
 
 ### Added
 
+- Explicit image-model capability profiles for generation, editing, multiple inputs, masks, normalized defaults, and bounded provider parameters.
+- OpenAI-compatible image generation through `/images/generations` and multipart editing through `/images/edits`.
+- Explicit image mode in the chat composer with PNG, JPEG, and WebP inputs, optional masks, previews, and provider-aware parameters.
+- Private media assets with signature validation, dimension limits, SHA-256 hashes, metadata removal, and atomic local storage.
+- Persistent image operations with prompts, revised prompts, actual provider models, parameters, inputs, outputs, failures, and timestamps.
+- Image attachments associated with the relevant user and assistant messages.
+- Private Images workspace with gallery filtering, operation details, result metadata, and conversation links.
+- Authenticated media content routes with private caching and content-type hardening.
+- Restart recovery for interrupted image operations.
+- Migration `0011_images` and the persistent `aster-media` Docker volume.
+- Bounded runtime configuration for image timeouts, upload bytes, output bytes, pixels, inputs, and outputs.
 - Approved personal memory with global or persona scope, editing, disabling, deletion, import, export, and reindexing.
 - Utility-model memory suggestions that remain pending until the owner accepts or rejects them.
 - Optional OpenAI-compatible embedding-model selection for memory and document retrieval.
@@ -45,7 +56,7 @@ All notable changes to Aster are documented in this file.
 - Versioned JSON conversation export and authenticated import.
 - Human-readable Markdown conversation export.
 - Inline conversation renaming and keyboard access to history search.
-- Shared application frame for chat, model, persona, and account navigation.
+- Shared application frame for chat, image, model, persona, and account navigation.
 - Internal interface icon set and dedicated Aster brand mark.
 - Responsive workspace navigation for desktop and mobile layouts.
 - Single-owner authentication with first-access setup.
@@ -59,10 +70,16 @@ All notable changes to Aster are documented in this file.
 - Optional bundled PostgreSQL through the `local-db` Compose profile.
 - Runtime configuration for endpoint and stream timeouts.
 - Search, availability filtering, and bounded rendering for large model caches.
-- Searchable primary, utility, and image model selectors.
+- Searchable primary, utility, image, and embedding model selectors.
 
 ### Changed
 
+- The Image role is active and falls back to Primary only when that exact model explicitly declares the required image capability.
+- Provider image URLs are downloaded immediately and never stored as durable history.
+- Image media is stored outside PostgreSQL in a private persistent volume instead of inside chat text or database binary columns.
+- Image turns cannot use the text edit or regeneration flows; a new image operation preserves clear lineage and parameters.
+- Portable conversation exports omit private image bytes and add an explicit omission note to affected turns.
+- Deleting a conversation removes its generated output files instead of leaving private media behind.
 - Memory and retrieved document text enter model context as explicitly untrusted developer data instead of system authority.
 - Lexical retrieval remains available when no embedding model is configured or the embedding endpoint fails.
 - Knowledge collections marked as defaults apply only to new conversations and are never assigned retroactively.
@@ -85,13 +102,18 @@ All notable changes to Aster are documented in this file.
 - Chat now uses a compact workspace layout with clearer conversation selection, message hierarchy, contextual actions, and a focused composer.
 - Model, persona, account, setup, and sign-in screens now share one dense interface system.
 - Forms, endpoint metadata, model browsing, empty states, notices, and responsive behavior use consistent tokens and interaction states.
-- Every chat, model, persona, and account route now requires an authenticated owner session.
+- Every chat, image, model, persona, and account route requires an authenticated owner session.
 - The bundled PostgreSQL service no longer publishes port 5432 to the host.
 - Endpoint discovery now allows 30 seconds by default.
 - The API, web package, and release documentation use version `0.1.0` consistently.
 
 ### Fixed
 
+- Provider failures remain visible as failed image operations and failed assistant messages without persisting partial outputs.
+- Invalid base64, empty responses, oversized downloads, false media types, excessive dimensions, and unsupported image formats are rejected explicitly.
+- Partially stored output files are removed when image persistence fails.
+- Interrupted image operations are marked failed after restart.
+- Gallery conversation links open the associated conversation instead of the most recent one.
 - Memory suggestions work when the selected Utility or Primary model has no explicit profile.
 - Persona-scoped memory cannot leak into conversations using another persona.
 - Embeddings created by a different model are ignored until content is reindexed.
