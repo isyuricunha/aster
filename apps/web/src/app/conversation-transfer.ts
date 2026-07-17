@@ -7,6 +7,13 @@ import type {
   ToolCall,
 } from "../lib/api";
 
+type PortableAttachment = {
+  attachment_type: "input" | "output";
+  media_type: string;
+  width: number;
+  height: number;
+};
+
 export function createConversationTransfer(conversation: Conversation): ConversationTransfer {
   return {
     format: "aster-conversation",
@@ -59,6 +66,17 @@ export function createConversationMarkdown(conversation: Conversation): string {
       }
     }
     lines.push(message.content || "_(empty message)_", "");
+    const attachments = messageAttachments(message);
+    if (attachments.length) {
+      lines.push(
+        ...attachments.map(
+          (attachment) =>
+            `> Private ${attachment.attachment_type} image omitted from export: ` +
+            `${attachment.media_type}, ${attachment.width}×${attachment.height}.`,
+        ),
+        "",
+      );
+    }
     if (message.error_message) lines.push(`> Error: ${message.error_message}`, "");
   }
 
@@ -132,9 +150,13 @@ function toTransferMessage(message: ChatMessage): ConversationTransferMessage {
   if (message.status === "streaming") {
     throw new Error("A conversation cannot be exported while a response is streaming.");
   }
+  const attachments = messageAttachments(message);
+  const omission = attachments.length
+    ? `\n\n[${attachments.length} private image attachment${attachments.length === 1 ? "" : "s"} omitted from this portable export.]`
+    : "";
   return {
     role: message.role,
-    content: message.content,
+    content: `${message.content}${omission}`,
     status: message.status,
     error_message: message.error_message,
     model_id: message.model_id,
@@ -142,6 +164,22 @@ function toTransferMessage(message: ChatMessage): ConversationTransferMessage {
     tool_call_id: message.tool_call_id ?? null,
     tool_name: message.tool_name ?? null,
   };
+}
+
+function messageAttachments(message: ChatMessage): PortableAttachment[] {
+  const value = (message as ChatMessage & { attachments?: unknown }).attachments;
+  if (!Array.isArray(value)) return [];
+  return value.filter(isPortableAttachment);
+}
+
+function isPortableAttachment(value: unknown): value is PortableAttachment {
+  if (!isRecord(value)) return false;
+  return (
+    (value.attachment_type === "input" || value.attachment_type === "output") &&
+    typeof value.media_type === "string" &&
+    typeof value.width === "number" &&
+    typeof value.height === "number"
+  );
 }
 
 function messageHeading(message: ChatMessage): string {
