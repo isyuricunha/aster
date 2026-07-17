@@ -6,6 +6,17 @@ All notable changes to Aster are documented in this file.
 
 ### Added
 
+- Approved personal memory with global or persona scope, editing, disabling, deletion, import, export, and reindexing.
+- Utility-model memory suggestions that remain pending until the owner accepts or rejects them.
+- Optional OpenAI-compatible embedding-model selection for memory and document retrieval.
+- Private knowledge collections with bounded text, Markdown, JSON, CSV, XML, YAML, TOML, HTML, log, and PDF ingestion.
+- Deterministic document extraction, chunking, lexical indexing, optional embeddings, reindexing, and deletion.
+- Explicit memory, RAG, and collection controls for individual conversations.
+- Persisted retrieval provenance for every assistant response that used memory or document context.
+- Visible `[M#]` and `[D#]` source cards in chat.
+- Version 4 conversation transfer with portable retrieval flags and collection names.
+- Memory & Knowledge settings for approved memory, suggestions, embeddings, collections, documents, and conversation scope.
+- Bounded runtime configuration for memory candidates, sources, context, uploads, extraction, chunks, and embedding batches.
 - MCP server configuration for Streamable HTTP and opt-in stdio transports.
 - Encrypted MCP HTTP headers and process environment values.
 - MCP tool discovery, synchronization, availability tracking, and stable namespaced tool identifiers.
@@ -52,6 +63,10 @@ All notable changes to Aster are documented in this file.
 
 ### Changed
 
+- Memory and retrieved document text enter model context as explicitly untrusted developer data instead of system authority.
+- Lexical retrieval remains available when no embedding model is configured or the embedding endpoint fails.
+- Knowledge collections marked as defaults apply only to new conversations and are never assigned retroactively.
+- Conversation exports carry retrieval intent without embedding private memory, document text, chunks, or vectors.
 - Tool results are treated as untrusted data when returned to the model.
 - New MCP tools start disabled, are not assigned to new conversations, and require confirmation.
 - Conversation changes are blocked while a tool approval is pending.
@@ -77,6 +92,11 @@ All notable changes to Aster are documented in this file.
 
 ### Fixed
 
+- Memory suggestions work when the selected Utility or Primary model has no explicit profile.
+- Persona-scoped memory cannot leak into conversations using another persona.
+- Embeddings created by a different model are ignored until content is reindexed.
+- Prompt-like instructions inside retrieved documents remain inside the untrusted context boundary.
+- Existing conversations receive explicit retrieval settings during the Stage 13 migration without losing prior data.
 - Tool names from different MCP servers cannot collide in model requests.
 - A model cannot execute a tool that is disabled, unavailable, or outside the conversation scope.
 - Tool execution failures and denials remain visible instead of disappearing from the model loop.
