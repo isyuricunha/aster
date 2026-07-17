@@ -11,7 +11,7 @@ type InitialChatData = {
   error: string | null;
 };
 
-async function getInitialChatData(): Promise<InitialChatData> {
+async function getInitialChatData(preferredConversationId?: string): Promise<InitialChatData> {
   try {
     const [conversationResponse, preferenceResponse] = await Promise.all([
       serverApiFetch("/api/conversations"),
@@ -24,11 +24,11 @@ async function getInitialChatData(): Promise<InitialChatData> {
     const conversations = (await conversationResponse.json()) as ConversationSummary[];
     const preferences = (await preferenceResponse.json()) as ModelPreferences;
     let activeConversation: Conversation | null = null;
+    const preferred = conversations.find((item) => item.id === preferredConversationId);
+    const activeSummary = preferred ?? conversations[0];
 
-    if (conversations[0]) {
-      const activeResponse = await serverApiFetch(
-        `/api/conversations/${conversations[0].id}`,
-      );
+    if (activeSummary) {
+      const activeResponse = await serverApiFetch(`/api/conversations/${activeSummary.id}`);
       if (activeResponse.ok) {
         activeConversation = (await activeResponse.json()) as Conversation;
       }
@@ -45,8 +45,15 @@ async function getInitialChatData(): Promise<InitialChatData> {
   }
 }
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ conversation?: string | string[] }>;
+}) {
   await requireServerAuth();
-  const initialData = await getInitialChatData();
+  const params = await searchParams;
+  const preferredConversationId =
+    typeof params.conversation === "string" ? params.conversation : undefined;
+  const initialData = await getInitialChatData(preferredConversationId);
   return <ChatShell {...initialData} />;
 }
