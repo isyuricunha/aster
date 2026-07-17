@@ -197,7 +197,9 @@ class ConversationRetrievalSettingsUpdate(BaseModel):
 
     memory_enabled: bool = True
     rag_enabled: bool = True
-    collection_ids: Annotated[list[UUID], Field(max_length=128)] = []
+    collection_ids: Annotated[
+        list[UUID], Field(default_factory=list, max_length=128)
+    ]
 
     @field_validator("collection_ids")
     @classmethod
