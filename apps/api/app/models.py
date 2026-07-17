@@ -5,6 +5,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -98,6 +99,56 @@ class ModelCacheEntry(TimestampMixin, Base):
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class ModelProfile(TimestampMixin, Base):
+    __tablename__ = "model_profiles"
+    __table_args__ = (
+        CheckConstraint(
+            "context_window IS NULL OR context_window > 0",
+            name="ck_model_profiles_context_window",
+        ),
+        CheckConstraint(
+            "max_output_tokens IS NULL OR max_output_tokens > 0",
+            name="ck_model_profiles_max_output_tokens",
+        ),
+        CheckConstraint(
+            "temperature IS NULL OR (temperature >= 0 AND temperature <= 2)",
+            name="ck_model_profiles_temperature",
+        ),
+        CheckConstraint(
+            "top_p IS NULL OR (top_p > 0 AND top_p <= 1)",
+            name="ck_model_profiles_top_p",
+        ),
+        CheckConstraint(
+            "token_parameter IN ('none', 'max_tokens', 'max_completion_tokens')",
+            name="ck_model_profiles_token_parameter",
+        ),
+        CheckConstraint(
+            "reasoning_effort IS NULL OR reasoning_effort IN "
+            "('minimal', 'low', 'medium', 'high', 'xhigh')",
+            name="ck_model_profiles_reasoning_effort",
+        ),
+    )
+
+    model_id: Mapped[UUID] = mapped_column(
+        ForeignKey("model_cache_entries.id", ondelete="CASCADE"), primary_key=True
+    )
+    display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    context_window: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    max_output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    token_parameter: Mapped[str] = mapped_column(
+        String(32), default="max_tokens", server_default="max_tokens", nullable=False
+    )
+    temperature: Mapped[float | None] = mapped_column(Float, nullable=True)
+    top_p: Mapped[float | None] = mapped_column(Float, nullable=True)
+    reasoning_effort: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    supports_chat: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true", nullable=False
+    )
+    supports_streaming: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true", nullable=False
+    )
+
+
 class ModelSyncRun(Base):
     __tablename__ = "model_sync_runs"
     __table_args__ = (
@@ -139,6 +190,21 @@ class ModelPreferences(TimestampMixin, Base):
     image_model_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("model_cache_entries.id", ondelete="SET NULL"), nullable=True
     )
+
+
+class ModelFallbackEntry(TimestampMixin, Base):
+    __tablename__ = "model_fallback_entries"
+    __table_args__ = (
+        UniqueConstraint("model_id", name="uq_model_fallback_model"),
+        UniqueConstraint("position", name="uq_model_fallback_position"),
+        CheckConstraint("position >= 0", name="ck_model_fallback_position"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    model_id: Mapped[UUID] = mapped_column(
+        ForeignKey("model_cache_entries.id", ondelete="CASCADE"), nullable=False
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
 class PersonaSettings(TimestampMixin, Base):

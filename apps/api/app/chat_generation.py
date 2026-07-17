@@ -20,26 +20,13 @@ from app.message_composition import (
     PersonaConfiguration,
     compose_messages,
 )
-from app.models import (
-    ChatMessage,
-    Conversation,
-    ModelCacheEntry,
-    ModelEndpoint,
-    ModelPreferences,
-    PersonaSettings,
-)
+from app.model_routing import ModelTarget, can_fallback, resolve_chat_targets
+from app.models import ChatMessage, Conversation, PersonaSettings
 from app.openai_compatible import ModelEndpointError, OpenAICompatibleClient
 from app.schemas import ChatMessageResponse, ConversationResponse
 from app.security import SecretCipher
 
 GenerationOperation = Literal["send", "edit", "regenerate"]
-
-
-@dataclass(slots=True)
-class ModelTarget:
-    model: ModelCacheEntry
-    endpoint: ModelEndpoint
-    api_key: str | None
 
 
 @dataclass(slots=True)
@@ -50,7 +37,7 @@ class PreparedGeneration:
     current_user_message: ChatMessage
     assistant_message: ChatMessage
     replace_from_position: int | None
-    model_target: ModelTarget
+    model_targets: list[ModelTarget]
     stop_event: asyncio.Event
 
 
@@ -172,36 +159,6 @@ async def ensure_no_active_generation(session: AsyncSession, conversation_id: UU
         )
 
 
-async def _resolve_primary_model(
-    session: AsyncSession,
-    cipher: SecretCipher,
-) -> ModelTarget:
-    preferences = await session.get(ModelPreferences, 1)
-    if preferences is None or preferences.primary_model_id is None:
-        raise HTTPException(
-            status_code=409,
-            detail="Configure a primary model before starting a chat.",
-        )
-
-    target = (
-        await session.execute(
-            select(ModelCacheEntry, ModelEndpoint)
-            .join(ModelEndpoint, ModelEndpoint.id == ModelCacheEntry.endpoint_id)
-            .where(ModelCacheEntry.id == preferences.primary_model_id)
-        )
-    ).one_or_none()
-    if target is None:
-        raise HTTPException(status_code=409, detail="The primary model is no longer available.")
-    model, endpoint = target
-    if not endpoint.enabled:
-        raise HTTPException(status_code=409, detail="The primary model endpoint is disabled.")
-
-    api_key = None
-    if endpoint.encrypted_api_key is not None:
-        api_key = cipher.decrypt(endpoint.encrypted_api_key)
-    return ModelTarget(model=model, endpoint=endpoint, api_key=api_key)
-
-
 async def _messages_before(
     session: AsyncSession,
     conversation_id: UUID,
@@ -224,14 +181,14 @@ async def _create_assistant_message(
     *,
     conversation: Conversation,
     position: int,
-    model_id: str,
+    target: ModelTarget,
 ) -> ChatMessage:
     message = ChatMessage(
         conversation_id=conversation.id,
         role="assistant",
         content="",
         status="streaming",
-        model_id=model_id,
+        model_id=target.provider_model_id,
         position=position,
     )
     session.add(message)
@@ -248,7 +205,7 @@ async def prepare_new_message(
 ) -> PreparedGeneration:
     conversation = await get_conversation(session, conversation_id, for_update=True)
     await ensure_no_active_generation(session, conversation.id)
-    target = await _resolve_primary_model(session, cipher)
+    targets = await resolve_chat_targets(session, cipher)
     existing_messages = list(
         await session.scalars(
             select(ChatMessage)
@@ -272,7 +229,7 @@ async def prepare_new_message(
         session,
         conversation=conversation,
         position=next_position + 1,
-        model_id=target.model.model_id,
+        target=targets[0],
     )
     conversation.updated_at = datetime.now(UTC)
     await session.commit()
@@ -287,7 +244,7 @@ async def prepare_new_message(
         current_user_message=user_message,
         assistant_message=assistant_message,
         replace_from_position=None,
-        model_target=target,
+        model_targets=targets,
         stop_event=stop_event,
     )
 
@@ -302,7 +259,7 @@ async def prepare_edit_and_resend(
 ) -> PreparedGeneration:
     conversation = await get_conversation(session, conversation_id, for_update=True)
     await ensure_no_active_generation(session, conversation.id)
-    target = await _resolve_primary_model(session, cipher)
+    targets = await resolve_chat_targets(session, cipher)
     user_message = await session.get(ChatMessage, message_id)
     if user_message is None or user_message.conversation_id != conversation.id:
         raise HTTPException(status_code=404, detail="Message not found")
@@ -325,7 +282,7 @@ async def prepare_edit_and_resend(
         session,
         conversation=conversation,
         position=user_message.position + 1,
-        model_id=target.model.model_id,
+        target=targets[0],
     )
     conversation.updated_at = datetime.now(UTC)
     await session.commit()
@@ -340,7 +297,7 @@ async def prepare_edit_and_resend(
         current_user_message=user_message,
         assistant_message=assistant_message,
         replace_from_position=user_message.position,
-        model_target=target,
+        model_targets=targets,
         stop_event=stop_event,
     )
 
@@ -354,7 +311,7 @@ async def prepare_regeneration(
 ) -> PreparedGeneration:
     conversation = await get_conversation(session, conversation_id, for_update=True)
     await ensure_no_active_generation(session, conversation.id)
-    target = await _resolve_primary_model(session, cipher)
+    targets = await resolve_chat_targets(session, cipher)
     old_assistant = await session.get(ChatMessage, message_id)
     if old_assistant is None or old_assistant.conversation_id != conversation.id:
         raise HTTPException(status_code=404, detail="Message not found")
@@ -389,7 +346,7 @@ async def prepare_regeneration(
         session,
         conversation=conversation,
         position=old_assistant.position,
-        model_id=target.model.model_id,
+        target=targets[0],
     )
     conversation.updated_at = datetime.now(UTC)
     await session.commit()
@@ -403,7 +360,7 @@ async def prepare_regeneration(
         current_user_message=user_message,
         assistant_message=assistant_message,
         replace_from_position=old_assistant.position,
-        model_target=target,
+        model_targets=targets,
         stop_event=stop_event,
     )
 
@@ -442,6 +399,16 @@ async def _persist_progress(
     await session.commit()
 
 
+async def _select_target(
+    session: AsyncSession,
+    message: ChatMessage,
+    target: ModelTarget,
+) -> None:
+    message.model_id = target.provider_model_id
+    await session.commit()
+    await session.refresh(message)
+
+
 async def _finalize_message(
     *,
     session: AsyncSession,
@@ -457,6 +424,14 @@ async def _finalize_message(
     conversation.updated_at = datetime.now(UTC)
     await session.commit()
     await session.refresh(message)
+
+
+def _target_payload(target: ModelTarget) -> dict[str, str]:
+    return {
+        "endpoint_id": str(target.endpoint_id),
+        "endpoint_name": target.endpoint_name,
+        "model_id": target.provider_model_id,
+    }
 
 
 def stream_response(
@@ -482,11 +457,13 @@ def stream_response(
                     )
                 ],
                 "assistant_message_id": str(prepared.assistant_message.id),
+                "model": _target_payload(prepared.model_targets[0]),
             },
         )
         chunks: list[str] = []
         persisted_length = 0
         last_checkpoint = asyncio.get_running_loop().time()
+        last_error: ModelEndpointError | None = None
         try:
             persona = await session.get(PersonaSettings, 1)
             canonical_messages = compose_messages(
@@ -494,49 +471,88 @@ def stream_response(
                 history=_canonical_history(prepared.history),
                 current_user_message=prepared.current_user_message.content,
             )
-            iterator = client.stream_chat_completion(
-                base_url=prepared.model_target.endpoint.base_url,
-                api_key=prepared.model_target.api_key,
-                model_id=prepared.model_target.model.model_id,
-                messages=_provider_messages(canonical_messages),
-            )
+            provider_messages = _provider_messages(canonical_messages)
 
-            while True:
-                delta, stopped, finished = await next_delta_or_stop(
-                    iterator, prepared.stop_event
-                )
-                if stopped:
-                    content = "".join(chunks)
-                    await _finalize_message(
-                        session=session,
-                        conversation=prepared.conversation,
-                        message=prepared.assistant_message,
-                        content=content,
-                        status_value="stopped",
-                        error_message=None,
-                    )
+            for target_index, target in enumerate(prepared.model_targets):
+                if target_index > 0:
+                    previous_target = prepared.model_targets[target_index - 1]
+                    await _select_target(session, prepared.assistant_message, target)
                     yield _sse(
-                        "stopped",
+                        "fallback",
                         {
-                            "message": message_response(
-                                prepared.assistant_message
-                            ).model_dump(mode="json")
+                            "from": _target_payload(previous_target),
+                            "to": _target_payload(target),
+                            "code": last_error.code if last_error else "unavailable",
+                            "message": (
+                                last_error.message
+                                if last_error
+                                else "The previous model was unavailable."
+                            ),
                         },
                     )
-                    return
-                if finished:
-                    break
-                if delta is None:
-                    continue
 
-                chunks.append(delta)
-                yield _sse("delta", {"content": delta})
-                content = "".join(chunks)
-                now = asyncio.get_running_loop().time()
-                if len(content) - persisted_length >= 512 or now - last_checkpoint >= 0.5:
-                    await _persist_progress(session, prepared.assistant_message, content)
-                    persisted_length = len(content)
-                    last_checkpoint = now
+                parameters = target.parameters
+                iterator = client.stream_chat_completion(
+                    base_url=target.base_url,
+                    api_key=target.api_key,
+                    model_id=target.provider_model_id,
+                    messages=provider_messages,
+                    temperature=parameters.temperature,
+                    top_p=parameters.top_p,
+                    max_output_tokens=parameters.max_output_tokens,
+                    token_parameter=parameters.token_parameter,
+                    reasoning_effort=parameters.reasoning_effort,
+                )
+                try:
+                    while True:
+                        delta, stopped, finished = await next_delta_or_stop(
+                            iterator, prepared.stop_event
+                        )
+                        if stopped:
+                            content = "".join(chunks)
+                            await _finalize_message(
+                                session=session,
+                                conversation=prepared.conversation,
+                                message=prepared.assistant_message,
+                                content=content,
+                                status_value="stopped",
+                                error_message=None,
+                            )
+                            yield _sse(
+                                "stopped",
+                                {
+                                    "message": message_response(
+                                        prepared.assistant_message
+                                    ).model_dump(mode="json")
+                                },
+                            )
+                            return
+                        if finished:
+                            break
+                        if delta is None:
+                            continue
+
+                        chunks.append(delta)
+                        yield _sse("delta", {"content": delta})
+                        content = "".join(chunks)
+                        now = asyncio.get_running_loop().time()
+                        if len(content) - persisted_length >= 512 or now - last_checkpoint >= 0.5:
+                            await _persist_progress(session, prepared.assistant_message, content)
+                            persisted_length = len(content)
+                            last_checkpoint = now
+
+                    if not chunks:
+                        raise ModelEndpointError(
+                            "empty_response",
+                            "The endpoint completed without returning any content.",
+                        )
+                    break
+                except ModelEndpointError as error:
+                    has_next_target = target_index + 1 < len(prepared.model_targets)
+                    if not chunks and has_next_target and can_fallback(error):
+                        last_error = error
+                        continue
+                    raise
 
             content = "".join(chunks)
             await _finalize_message(

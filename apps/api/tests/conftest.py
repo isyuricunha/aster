@@ -29,9 +29,14 @@ class FakeOpenAICompatibleClient:
         self.received_api_key: str | None = None
         self.chat_chunks = ["Hello", " from Aster"]
         self.chat_error = None
+        self.chat_chunks_by_model: dict[str, list[str]] = {}
+        self.chat_errors_by_model: dict[str, Exception] = {}
+        self.chat_errors_after_chunks_by_model: dict[str, Exception] = {}
         self.received_chat_api_key: str | None = None
         self.received_chat_model: str | None = None
         self.received_chat_messages: list[dict[str, str]] = []
+        self.received_chat_options: dict[str, object] = {}
+        self.chat_calls: list[str] = []
 
     async def list_models(self, base_url: str, api_key: str | None) -> list[str]:
         self.received_api_key = api_key
@@ -46,14 +51,33 @@ class FakeOpenAICompatibleClient:
         api_key: str | None,
         model_id: str,
         messages: Sequence[dict[str, str]],
+        temperature: float | None = None,
+        top_p: float | None = None,
+        max_output_tokens: int | None = None,
+        token_parameter: str = "max_tokens",
+        reasoning_effort: str | None = None,
     ) -> AsyncIterator[str]:
         self.received_chat_api_key = api_key
         self.received_chat_model = model_id
         self.received_chat_messages = list(messages)
+        self.received_chat_options = {
+            "temperature": temperature,
+            "top_p": top_p,
+            "max_output_tokens": max_output_tokens,
+            "token_parameter": token_parameter,
+            "reasoning_effort": reasoning_effort,
+        }
+        self.chat_calls.append(model_id)
+        model_error = self.chat_errors_by_model.get(model_id)
+        if model_error is not None:
+            raise model_error
         if self.chat_error is not None:
             raise self.chat_error
-        for chunk in self.chat_chunks:
+        for chunk in self.chat_chunks_by_model.get(model_id, self.chat_chunks):
             yield chunk
+        trailing_error = self.chat_errors_after_chunks_by_model.get(model_id)
+        if trailing_error is not None:
+            raise trailing_error
 
 
 TestClientBundle = tuple[

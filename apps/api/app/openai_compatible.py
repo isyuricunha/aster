@@ -81,12 +81,26 @@ class OpenAICompatibleClient:
         api_key: str | None,
         model_id: str,
         messages: Sequence[dict[str, str]],
+        temperature: float | None = None,
+        top_p: float | None = None,
+        max_output_tokens: int | None = None,
+        token_parameter: str = "max_tokens",
+        reasoning_effort: str | None = None,
     ) -> AsyncIterator[str]:
-        payload = {
+        payload: dict[str, object] = {
             "model": model_id,
             "messages": list(messages),
             "stream": True,
         }
+        if temperature is not None:
+            payload["temperature"] = temperature
+        if top_p is not None:
+            payload["top_p"] = top_p
+        if max_output_tokens is not None and token_parameter != "none":
+            payload[token_parameter] = max_output_tokens
+        if reasoning_effort is not None:
+            payload["reasoning_effort"] = reasoning_effort
+
         headers = self._headers(api_key)
         headers["Accept"] = "text/event-stream"
 
@@ -150,6 +164,18 @@ class OpenAICompatibleClient:
                 code,
                 f"The endpoint does not expose a compatible {route} route.",
                 422,
+            )
+        if response.status_code == 429:
+            raise ModelEndpointError(
+                "rate_limited",
+                "The endpoint is temporarily rate limited.",
+                429,
+            )
+        if response.status_code in {400, 409, 422}:
+            raise ModelEndpointError(
+                "request_rejected",
+                f"The endpoint rejected the request with HTTP {response.status_code}.",
+                response.status_code,
             )
         if response.is_error:
             raise ModelEndpointError(
