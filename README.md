@@ -1,6 +1,6 @@
 # Aster
 
-Aster is a self-hosted AI workspace built around user-defined personas, OpenAI-compatible model endpoints, controlled MCP tools, approved personal memory, private document retrieval, and private image generation and editing.
+Aster is a self-hosted AI workspace built around user-defined personas, OpenAI-compatible model endpoints, controlled MCP tools, approved personal memory, private document retrieval, private image generation and editing, and durable automations.
 
 ## Current capabilities
 
@@ -26,17 +26,25 @@ Aster is a self-hosted AI workspace built around user-defined personas, OpenAI-c
 - PNG, JPEG, and WebP visual inputs with optional masks
 - Private image attachments, gallery, operation history, and conversation association
 - Provider-aware image defaults and bounded additional parameters
+- One-time, interval, daily, weekly, and webhook-triggered automations
+- PostgreSQL-backed background worker with leases, heartbeat, retries, and recovery
+- Private automation notifications and complete run history
+- SMTP email, CalDAV calendar, and outbound HTTP webhook integrations
+- Encrypted integration credentials and explicit connection tests
 
 ## Architecture
 
 ```text
-apps/web  Next.js user interface and same-origin API proxy
-apps/api  FastAPI application, model adapters, MCP client, retrieval, private media, and migrations
-postgres  Optional bundled PostgreSQL database
-media     Private image files in the aster-media Docker volume
+apps/web     Next.js user interface and same-origin API proxy
+apps/api     FastAPI application, model adapters, integrations, retrieval, and migrations
+worker       Background scheduler and automation executor built from the API image
+postgres     Optional bundled PostgreSQL database
+media        Private image files in the aster-media Docker volume
 ```
 
-Docker Compose is the initial deployment target. Redis, a background queue, pgvector, ChromaDB, and public object storage are intentionally absent from the default stack.
+Docker Compose is the initial deployment target. Redis, Celery, RabbitMQ, a separate vector database, pgvector, ChromaDB, and public object storage are intentionally absent from the default stack.
+
+PostgreSQL is the durable queue for automations. The worker claims queued runs transactionally with row locks and expiring leases. It does not need a second datastore.
 
 ## Requirements
 
@@ -64,7 +72,7 @@ Generate an encryption key:
 openssl rand -hex 32
 ```
 
-Set the generated value as `ASTER_ENCRYPTION_KEY` in `.env`. Keep it stable after storing endpoint or MCP credentials.
+Set the generated value as `ASTER_ENCRYPTION_KEY` in `.env`. Keep it stable after storing endpoint, MCP, or integration credentials.
 
 The example environment enables the bundled database:
 
@@ -83,6 +91,15 @@ docker compose up -d --build
 ```
 
 The bundled database is stored in the `postgres-data` Docker volume. Private uploaded and generated images are stored separately in the `aster-media` volume. Neither service is published as public storage.
+
+The application starts four services:
+
+```text
+postgres
+api
+worker
+web
+```
 
 ## First sign-up
 
@@ -110,7 +127,9 @@ Start the same stack:
 docker compose up -d --build
 ```
 
-Only the API and web services start when `COMPOSE_PROFILES` is empty. The API applies pending Alembic migrations before starting. The `aster-media` volume remains part of the application stack unless a different `ASTER_MEDIA_ROOT` is mounted deliberately.
+The API, worker, and web services start when `COMPOSE_PROFILES` is empty. The API applies pending Alembic migrations before becoming ready. The worker waits for the API readiness contract and then begins polling PostgreSQL.
+
+The `aster-media` volume remains part of the application stack unless a different `ASTER_MEDIA_ROOT` is mounted deliberately.
 
 ## Open Aster
 
@@ -118,6 +137,7 @@ Default local routes:
 
 - Chat: `http://localhost:3000`
 - Images: `http://localhost:3000/images`
+- Automations: `http://localhost:3000/automations`
 - Models: `http://localhost:3000/settings/models`
 - Personas: `http://localhost:3000/settings/persona`
 - Tools: `http://localhost:3000/settings/tools`
@@ -155,7 +175,7 @@ ASTER_API_INTERNAL_URL=http://api:8000
 ASTER_SESSION_SECURE=true
 ```
 
-Do not route public `/api` traffic directly to port 8000. The session cookie belongs to the web hostname.
+Do not route public private-API traffic directly to port 8000. The owner session cookie belongs to the web hostname. Inbound automation webhooks are also intended to arrive through the web service.
 
 ## OpenAI-compatible endpoints
 
@@ -180,9 +200,11 @@ Authorization: Bearer <api-key>
 
 Image generation uses JSON requests. Image editing uses multipart form data with one or more images and an optional mask. Aster accepts either base64 image results or provider URLs, downloads URL results immediately, validates them, and stores the durable result privately.
 
+Automation runs use the same OpenAI-compatible chat contract. An automation may pin one model or use the Primary model and its normal fallback chain.
+
 ## Model roles
 
-- **Primary** — chat, reasoning, and model-requested tools
+- **Primary** — chat, reasoning, model-requested tools, and default automation generation
 - **Utility** — bounded support work such as memory-candidate extraction; falls back to Primary
 - **Image** — image generation and editing
 - **Embedding** — optional semantic indexing and retrieval
@@ -199,6 +221,8 @@ Personas are reusable identities with independent names, descriptions, instructi
 
 One enabled persona may be selected as the default. New conversations copy it into a frozen snapshot. Editing or deleting the source persona does not rewrite existing conversations.
 
+An automation can save no persona, an explicitly selected persona, or the current default persona. The selected persona is frozen into the automation when it is saved. Later library edits do not silently rewrite unattended work.
+
 ## Tools and MCP
 
 Configure MCP servers under **Settings → Tools**.
@@ -211,6 +235,8 @@ Supported transports:
 HTTP headers and stdio environment values are encrypted and are never returned by the API. Discovered tools start disabled, are not copied to new conversations, and require confirmation by default.
 
 Stdio commands run inside the API container. The executable and every required file must exist there.
+
+Stage 15 automations deliberately do not execute MCP tools unattended. Tool confirmation and user-presence semantics remain inside active chat flows.
 
 ## Approved memory
 
@@ -275,9 +301,89 @@ Stage 14 supports:
 - a private gallery with prompt, model, parameters, result metadata, failures, and conversation links;
 - restart recovery that marks interrupted operations as failed instead of leaving them running forever.
 
-Uploads and outputs are validated by file signature and dimensions. Private metadata is removed from supported formats before storage. SVG, generic multimodal chat, OCR, audio, video, public media sharing, background generation, and scheduled image jobs are outside Stage 14.
+Uploads and outputs are validated by file signature and dimensions. Private metadata is removed from supported formats before storage. SVG, generic multimodal chat, OCR, audio, video, public media sharing, and background image generation are outside Stage 14.
 
 Media bytes are never stored inside chat text or PostgreSQL. The database stores metadata and relationships; the `aster-media` volume stores the files. Media content is available only through authenticated API routes.
+
+## Automations
+
+Open **Automations** to create durable unattended model runs.
+
+Supported triggers:
+
+- one time at an ISO-8601 instant;
+- every fixed interval of at least 60 seconds;
+- daily at a local wall-clock time;
+- weekly on a local weekday and wall-clock time;
+- inbound webhook.
+
+Every automation stores:
+
+- name, description, and instruction;
+- enabled state;
+- trigger, timezone, schedule, and next occurrence;
+- optional pinned model or Primary fallback behavior;
+- optional frozen persona snapshot;
+- success and failure notification policy;
+- timeout, retry delay, and maximum attempts;
+- zero or more SMTP, CalDAV, or outbound-webhook deliveries.
+
+Runs are separate durable records. Each one preserves the trigger payload, instruction snapshot, model used, output, errors, attempt history, lease state, and every external delivery attempt.
+
+Automatic retries happen only while generating the model result. Once external delivery begins, Aster records individual delivery failures and does not silently resend side effects.
+
+After downtime, each overdue automation receives at most one catch-up run. Aster then advances it to the next future occurrence instead of replaying every missed interval.
+
+### Inbound webhooks
+
+Create an automation with the **Inbound webhook** trigger. Aster returns a high-entropy token only when the webhook is created or rotated.
+
+Send requests to the stable automation URL:
+
+```bash
+curl -X POST 'https://aster.example.com/api/webhooks/<automation-id>' \
+  -H 'Content-Type: application/json' \
+  -H 'X-Aster-Webhook-Token: <secret-token>' \
+  -H 'X-Aster-Delivery: unique-event-id' \
+  --data '{"event":"deployment","status":"green"}'
+```
+
+The automation UUID is public routing data. The token is the secret and is stored only as a SHA-256 hash. It stays in a request header so ordinary access logs do not record it in the URL.
+
+`X-Aster-Delivery` and `Idempotency-Key` are optional. Reusing either value for the same automation returns `duplicate` without creating another run. Requests without an identifier are accepted as independent events.
+
+Webhook request bodies are bounded by `ASTER_WEBHOOK_MAX_BYTES`. Trigger payloads enter the model as explicitly untrusted data.
+
+### SMTP email
+
+Create an SMTP integration with:
+
+- host and port;
+- plain, STARTTLS, or TLS/SSL transport;
+- sender address;
+- optional username and password.
+
+Credentials are encrypted. A connection test performs an SMTP handshake and `NOOP`; it does not send a message. Add the integration as an automation delivery and configure recipients and an optional subject.
+
+Stage 15 sends email. It does not poll inboxes or manage provider OAuth.
+
+### CalDAV calendar
+
+Create a CalDAV integration with a calendar collection URL and optional Basic or Bearer authentication.
+
+Each delivery creates one stable `.ics` event using the automation run ID as its UID. Aster sends `If-None-Match: *` to avoid silently replacing an existing event with the same UID.
+
+Stage 15 creates events. It does not synchronize, modify, or delete a remote calendar collection.
+
+### Outbound webhooks
+
+Create an outbound webhook integration with an HTTP or HTTPS URL and optional encrypted headers or bearer token.
+
+Completed automation output is delivered as structured JSON containing the automation ID, run ID, scheduled time, actual model, and result. The receiving system can use the run ID as its deduplication key.
+
+### Notifications
+
+Success and failure notifications are private application data. They can be marked read, deleted, and inspected alongside the associated run history.
 
 ## Conversation transfer
 
@@ -286,7 +392,7 @@ Media bytes are never stored inside chat text or PostgreSQL. The database stores
 - Version 3: portable tool-call history
 - Version 4: retrieval flags and local collection names
 
-Version 4 does not export approved memory, document text, chunks, vectors, retrieval source snapshots, or private image bytes. Image turns include an explicit omission note so an imported transcript never pretends the missing binary was transferred.
+Version 4 does not export approved memory, document text, chunks, vectors, retrieval source snapshots, private image bytes, automation definitions, integration credentials, or automation history. Image turns include an explicit omission note so an imported transcript never pretends the missing binary was transferred.
 
 During import, collection names are matched only against collections that already exist locally.
 
@@ -319,12 +425,21 @@ ASTER_IMAGE_OUTPUT_MAX_BYTES=25000000
 ASTER_IMAGE_MAX_PIXELS=40000000
 ASTER_IMAGE_MAX_INPUTS=8
 ASTER_IMAGE_MAX_OUTPUTS=4
+ASTER_AUTOMATION_POLL_SECONDS=2
+ASTER_AUTOMATION_LEASE_SECONDS=120
+ASTER_AUTOMATION_HEARTBEAT_SECONDS=30
+ASTER_AUTOMATION_SCHEDULER_BATCH_SIZE=25
+ASTER_AUTOMATION_OUTPUT_MAX_CHARACTERS=100000
+ASTER_INTEGRATION_TIMEOUT_SECONDS=30
+ASTER_WEBHOOK_MAX_BYTES=1000000
 ```
 
-Recreate the API container after changing runtime settings:
+The heartbeat must remain less than half of the lease duration.
+
+Recreate the API and worker containers after changing shared runtime settings:
 
 ```bash
-docker compose up -d --force-recreate api
+docker compose up -d --force-recreate api worker
 ```
 
 ## Backup and upgrade
@@ -336,18 +451,9 @@ docker compose exec -T postgres sh -c \
   'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > aster-backup.sql
 ```
 
-Back up private image media separately:
+Automation definitions, schedules, runs, notifications, integrations, and encrypted integration credentials live in PostgreSQL and are covered by that dump.
 
-```bash
-docker run --rm \
-  -v aster_aster-media:/source:ro \
-  -v "$PWD":/backup \
-  alpine sh -c 'cd /source && tar -czf /backup/aster-media-backup.tar.gz .'
-```
-
-The exact Compose volume prefix may differ when the project name is overridden. Confirm it with `docker volume ls` before running the media backup command.
-
-External database deployments should use the backup process provided by their PostgreSQL host.
+Back up the `aster-media` Docker volume separately when image history must be preserved. External database deployments should use the backup process provided by their PostgreSQL host.
 
 Upgrade the source checkout:
 
@@ -356,11 +462,9 @@ git pull --ff-only
 docker compose up -d --build
 ```
 
-The API applies pending migrations automatically.
+The API applies pending migrations automatically. Migration `0012_automations` creates the integration, automation, delivery, run, notification, and webhook-delivery tables. Existing application data remains intact.
 
-Migration `0010_memory_and_rag` creates memory, knowledge, chunk, conversation scope, and retrieval provenance tables. Migration `0011_images` creates image profiles, media metadata, operations, inputs, outputs, and message attachments. Existing conversations, messages, personas, endpoints, model caches, tools, retrieval data, and encrypted credentials remain intact.
-
-Changing `ASTER_ENCRYPTION_KEY` without re-encrypting stored credentials makes them unreadable.
+Changing `ASTER_ENCRYPTION_KEY` without re-encrypting stored credentials makes endpoint, MCP, and integration credentials unreadable.
 
 ## Reset a forgotten password
 
@@ -402,19 +506,28 @@ docker compose config --quiet
 docker compose up -d --build
 ```
 
+Check both active processes:
+
+```bash
+curl -fsS http://localhost:8000/ready
+docker compose exec -T worker test -f /tmp/aster-worker-ready
+```
+
 ## Security baseline
 
 - Passwords are hashed with Argon2id and never stored in plain text.
 - Session tokens are random, delivered through `HttpOnly` cookies, and stored only as hashes.
-- Unsafe browser requests validate their origin.
-- API responses use `Cache-Control: no-store` unless an authenticated media response declares private caching explicitly.
-- Endpoint and MCP credentials are encrypted before storage and never returned by APIs.
-- Provider response bodies, credentials, passwords, and session tokens are excluded from user errors, logs, fixtures, and documentation.
-- Tool results, memory, and retrieved documents are treated as untrusted model context.
+- Unsafe authenticated browser requests validate their origin.
+- API responses use `Cache-Control: no-store` unless a private media response explicitly opts into private caching.
+- Endpoint, MCP, and integration credentials are encrypted before storage and never returned by APIs.
+- Provider response bodies, credentials, passwords, webhook tokens, and session tokens are excluded from user errors, fixtures, and documentation.
+- Inbound webhook secrets remain in headers rather than access-log paths.
+- Trigger payloads, tool results, memory, and retrieved documents are treated as untrusted model context.
 - Generated memory suggestions never become approved memory automatically.
 - Original uploaded documents are not served through public file routes.
-- Image uploads and outputs are bounded, validated, privately stored, and served only through authenticated routes.
-- Temporary provider image URLs are never used as durable history.
+- Image media is served only through authenticated routes.
+- Automation output is stored before external side effects begin.
+- Automatic retry never repeats SMTP, CalDAV, or outbound-webhook delivery.
 - The bundled PostgreSQL service is not published to the host.
 
 ## Project documentation
@@ -424,7 +537,8 @@ docker compose up -d --build
 - [ADR-0012: Tools and MCP](docs/decisions/0012-tools-and-mcp.md)
 - [ADR-0013: Personal memory and bounded retrieval](docs/decisions/0013-memory-and-rag.md)
 - [ADR-0014: Private image operations and media history](docs/decisions/0014-images.md)
+- [ADR-0015: Scheduled automations and bounded integrations](docs/decisions/0015-automations-and-integrations.md)
 
 ## Status
 
-Stages 1 through 13 have passed automated and real deployment validation. Stage 14 remains in draft until its branch passes automated validation and a real deployment test on the target self-hosted installation.
+Stages 1 through 14 have passed automated and real deployment validation. Stage 15 remains in draft until its branch passes the same release gate on the target self-hosted installation.
