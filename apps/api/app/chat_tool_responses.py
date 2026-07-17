@@ -9,6 +9,8 @@ from app.chat_tool_schemas import (
     ToolAwareChatMessageResponse,
     ToolAwareConversationResponse,
 )
+from app.image_schemas import MessageAttachmentResponse
+from app.image_service import attachments_for_messages
 from app.models import ChatMessage, Conversation, ToolExecution
 from app.retrieval_models import ConversationCollection, KnowledgeCollection
 from app.retrieval_schemas import RetrievalSourceResponse
@@ -22,6 +24,7 @@ from app.tool_schemas import ToolExecutionResponse
 def message_response(
     message: ChatMessage,
     retrieval_sources: list[RetrievalSourceResponse] | None = None,
+    attachments: list[MessageAttachmentResponse] | None = None,
 ) -> ToolAwareChatMessageResponse:
     return ToolAwareChatMessageResponse(
         id=message.id,
@@ -35,6 +38,7 @@ def message_response(
         tool_call_id=message.tool_call_id,
         tool_name=message.tool_name,
         retrieval_sources=retrieval_sources or [],
+        attachments=attachments or [],
         position=message.position,
         created_at=message.created_at,
         updated_at=message.updated_at,
@@ -98,10 +102,12 @@ async def conversation_response(
             .order_by(KnowledgeCollection.name.asc())
         )
     ).all()
+    message_ids = [message.id for message in messages]
     sources_by_message = await retrieval_sources_for_messages(
         session,
         [message.id for message in messages if message.role == "assistant"],
     )
+    attachments_by_message = await attachments_for_messages(session, message_ids)
     await session.commit()
     return ToolAwareConversationResponse(
         id=conversation.id,
@@ -114,7 +120,12 @@ async def conversation_response(
             collection_names=[name for _, name in collection_rows],
         ),
         messages=[
-            message_response(message, sources_by_message.get(message.id)) for message in messages
+            message_response(
+                message,
+                sources_by_message.get(message.id),
+                attachments_by_message.get(message.id),
+            )
+            for message in messages
         ],
         tool_executions=[execution_response(execution) for execution in executions],
         created_at=conversation.created_at,
