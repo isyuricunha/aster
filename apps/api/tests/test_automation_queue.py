@@ -36,7 +36,10 @@ async def test_scheduler_enqueues_one_catch_up_run_and_skips_old_backlog(
         stored = await session.get(Automation, automation_id)
         assert stored is not None
         assert stored.next_run_at is not None
-        assert stored.next_run_at > now
+        stored_next = stored.next_run_at
+        if stored_next.tzinfo is None:
+            stored_next = stored_next.replace(tzinfo=UTC)
+        assert stored_next > now
         count = int(
             await session.scalar(
                 select(func.count(AutomationRun.id)).where(
