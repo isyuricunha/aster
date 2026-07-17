@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,17 +25,15 @@ from app.automation_schemas import (
     IntegrationTestResponse,
     NotificationListResponse,
     NotificationResponse,
-    WebhookAcceptedResponse,
 )
 from app.automation_service import (
-    accept_webhook,
     apply_automation_write,
     automation_response,
     enqueue_manual_run,
     enqueue_run,
+    hash_webhook_token,
     integration_response,
     new_webhook_token,
-    hash_webhook_token,
     run_response,
     unread_notification_count,
 )
@@ -44,6 +42,7 @@ from app.db import get_session
 from app.dependencies import get_secret_cipher
 from app.integration_service import (
     IntegrationError,
+    decrypt_credentials,
     encrypt_credentials,
     test_integration,
     validate_integration_config,
@@ -51,12 +50,14 @@ from app.integration_service import (
 from app.security import SecretCipher
 
 private_router = APIRouter(prefix="/api", tags=["automations"])
-public_router = APIRouter(prefix="/api", tags=["webhooks"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 CipherDep = Annotated[SecretCipher, Depends(get_secret_cipher)]
 
 
-async def _get_integration(session: AsyncSession, integration_id: UUID) -> IntegrationConnection:
+async def _get_integration(
+    session: AsyncSession,
+    integration_id: UUID,
+) -> IntegrationConnection:
     integration = await session.get(IntegrationConnection, integration_id)
     if integration is None:
         raise HTTPException(status_code=404, detail="Integration not found")
@@ -77,10 +78,15 @@ async def _get_run(session: AsyncSession, run_id: UUID) -> AutomationRun:
     return run
 
 
-@private_router.get("/integrations", response_model=list[IntegrationConnectionResponse])
+@private_router.get(
+    "/integrations",
+    response_model=list[IntegrationConnectionResponse],
+)
 async def list_integrations(session: SessionDep) -> list[IntegrationConnectionResponse]:
     items = list(
-        await session.scalars(select(IntegrationConnection).order_by(IntegrationConnection.name))
+        await session.scalars(
+            select(IntegrationConnection).order_by(IntegrationConnection.name)
+        )
     )
     return [integration_response(item) for item in items]
 
@@ -112,22 +118,28 @@ async def create_integration(
         await session.commit()
     except IntegrityError as error:
         await session.rollback()
-        raise HTTPException(status_code=409, detail="Integration name already exists") from error
+        raise HTTPException(
+            status_code=409,
+            detail="Integration name already exists",
+        ) from error
     await session.refresh(integration)
     return integration_response(integration)
 
 
 @private_router.get(
-    "/integrations/{integration_id}", response_model=IntegrationConnectionResponse
+    "/integrations/{integration_id}",
+    response_model=IntegrationConnectionResponse,
 )
 async def read_integration(
-    integration_id: UUID, session: SessionDep
+    integration_id: UUID,
+    session: SessionDep,
 ) -> IntegrationConnectionResponse:
     return integration_response(await _get_integration(session, integration_id))
 
 
 @private_router.put(
-    "/integrations/{integration_id}", response_model=IntegrationConnectionResponse
+    "/integrations/{integration_id}",
+    response_model=IntegrationConnectionResponse,
 )
 async def update_integration(
     integration_id: UUID,
@@ -140,28 +152,42 @@ async def update_integration(
         config = validate_integration_config(payload.kind, payload.config)
     except IntegrationError as error:
         raise HTTPException(status_code=422, detail=error.message) from error
+
+    previous_kind = integration.kind
+    if payload.preserve_credentials and payload.kind == previous_kind:
+        credentials = decrypt_credentials(cipher, integration.encrypted_credentials)
+        credentials.update(payload.credentials)
+    else:
+        credentials = dict(payload.credentials)
+
     integration.name = payload.name
     integration.kind = payload.kind
     integration.enabled = payload.enabled
     integration.config = config
-    if payload.credentials or not payload.preserve_credentials:
-        integration.encrypted_credentials = encrypt_credentials(cipher, payload.credentials)
-        integration.credential_names = sorted(payload.credentials)
+    integration.encrypted_credentials = encrypt_credentials(cipher, credentials)
+    integration.credential_names = sorted(credentials)
     integration.last_test_status = None
     integration.last_error = None
     try:
         await session.commit()
     except IntegrityError as error:
         await session.rollback()
-        raise HTTPException(status_code=409, detail="Integration name already exists") from error
+        raise HTTPException(
+            status_code=409,
+            detail="Integration name already exists",
+        ) from error
     await session.refresh(integration)
     return integration_response(integration)
 
 
 @private_router.delete(
-    "/integrations/{integration_id}", status_code=status.HTTP_204_NO_CONTENT
+    "/integrations/{integration_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
 )
-async def delete_integration(integration_id: UUID, session: SessionDep) -> Response:
+async def delete_integration(
+    integration_id: UUID,
+    session: SessionDep,
+) -> Response:
     integration = await _get_integration(session, integration_id)
     referenced = await session.scalar(
         select(AutomationDelivery.id)
@@ -179,7 +205,8 @@ async def delete_integration(integration_id: UUID, session: SessionDep) -> Respo
 
 
 @private_router.post(
-    "/integrations/{integration_id}/test", response_model=IntegrationTestResponse
+    "/integrations/{integration_id}/test",
+    response_model=IntegrationTestResponse,
 )
 async def test_integration_route(
     integration_id: UUID,
@@ -207,9 +234,14 @@ async def test_integration_route(
     return IntegrationTestResponse(status="ok", message=message)
 
 
-@private_router.get("/automations", response_model=list[AutomationResponse])
+@private_router.get(
+    "/automations",
+    response_model=list[AutomationResponse],
+)
 async def list_automations(session: SessionDep) -> list[AutomationResponse]:
-    items = list(await session.scalars(select(Automation).order_by(Automation.name)))
+    items = list(
+        await session.scalars(select(Automation).order_by(Automation.name))
+    )
     return [await automation_response(session, item) for item in items]
 
 
@@ -238,12 +270,24 @@ async def create_automation(
     return await automation_response(session, automation, webhook_token=token)
 
 
-@private_router.get("/automations/{automation_id}", response_model=AutomationResponse)
-async def read_automation(automation_id: UUID, session: SessionDep) -> AutomationResponse:
-    return await automation_response(session, await _get_automation(session, automation_id))
+@private_router.get(
+    "/automations/{automation_id}",
+    response_model=AutomationResponse,
+)
+async def read_automation(
+    automation_id: UUID,
+    session: SessionDep,
+) -> AutomationResponse:
+    return await automation_response(
+        session,
+        await _get_automation(session, automation_id),
+    )
 
 
-@private_router.put("/automations/{automation_id}", response_model=AutomationResponse)
+@private_router.put(
+    "/automations/{automation_id}",
+    response_model=AutomationResponse,
+)
 async def update_automation(
     automation_id: UUID,
     payload: AutomationUpdate,
@@ -261,9 +305,13 @@ async def update_automation(
 
 
 @private_router.delete(
-    "/automations/{automation_id}", status_code=status.HTTP_204_NO_CONTENT
+    "/automations/{automation_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
 )
-async def delete_automation(automation_id: UUID, session: SessionDep) -> Response:
+async def delete_automation(
+    automation_id: UUID,
+    session: SessionDep,
+) -> Response:
     automation = await _get_automation(session, automation_id)
     await session.delete(automation)
     await session.commit()
@@ -275,11 +323,15 @@ async def delete_automation(automation_id: UUID, session: SessionDep) -> Respons
     response_model=AutomationResponse,
 )
 async def rotate_webhook_token(
-    automation_id: UUID, session: SessionDep
+    automation_id: UUID,
+    session: SessionDep,
 ) -> AutomationResponse:
     automation = await _get_automation(session, automation_id)
     if automation.trigger_type != "webhook":
-        raise HTTPException(status_code=422, detail="Only webhook automations have a token.")
+        raise HTTPException(
+            status_code=422,
+            detail="Only webhook automations have a token.",
+        )
     token = new_webhook_token()
     automation.webhook_token_hash = hash_webhook_token(token)
     automation.webhook_rotated_at = datetime.now(UTC)
@@ -294,14 +346,18 @@ async def rotate_webhook_token(
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def run_automation_now(
-    automation_id: UUID, session: SessionDep
+    automation_id: UUID,
+    session: SessionDep,
 ) -> AutomationRunResponse:
     automation = await _get_automation(session, automation_id)
     run = await enqueue_manual_run(session, automation)
     return await run_response(session, run)
 
 
-@private_router.get("/automation-runs", response_model=list[AutomationRunResponse])
+@private_router.get(
+    "/automation-runs",
+    response_model=list[AutomationRunResponse],
+)
 async def list_automation_runs(
     session: SessionDep,
     automation_id: UUID | None = None,
@@ -316,24 +372,39 @@ async def list_automation_runs(
         query = query.where(AutomationRun.status == run_status)
     runs = list(
         await session.scalars(
-            query.order_by(AutomationRun.created_at.desc()).offset(offset).limit(limit)
+            query.order_by(AutomationRun.created_at.desc())
+            .offset(offset)
+            .limit(limit)
         )
     )
     return [await run_response(session, run) for run in runs]
 
 
-@private_router.get("/automation-runs/{run_id}", response_model=AutomationRunResponse)
-async def read_automation_run(run_id: UUID, session: SessionDep) -> AutomationRunResponse:
+@private_router.get(
+    "/automation-runs/{run_id}",
+    response_model=AutomationRunResponse,
+)
+async def read_automation_run(
+    run_id: UUID,
+    session: SessionDep,
+) -> AutomationRunResponse:
     return await run_response(session, await _get_run(session, run_id))
 
 
-@private_router.post("/automation-runs/{run_id}/cancel", response_model=AutomationRunResponse)
+@private_router.post(
+    "/automation-runs/{run_id}/cancel",
+    response_model=AutomationRunResponse,
+)
 async def cancel_automation_run(
-    run_id: UUID, session: SessionDep
+    run_id: UUID,
+    session: SessionDep,
 ) -> AutomationRunResponse:
     run = await _get_run(session, run_id)
     if run.status != "queued":
-        raise HTTPException(status_code=409, detail="Only queued runs can be cancelled.")
+        raise HTTPException(
+            status_code=409,
+            detail="Only queued runs can be cancelled.",
+        )
     run.status = "cancelled"
     run.finished_at = datetime.now(UTC)
     await session.commit()
@@ -346,10 +417,16 @@ async def cancel_automation_run(
     response_model=AutomationRunResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
-async def retry_automation_run(run_id: UUID, session: SessionDep) -> AutomationRunResponse:
+async def retry_automation_run(
+    run_id: UUID,
+    session: SessionDep,
+) -> AutomationRunResponse:
     previous = await _get_run(session, run_id)
     if previous.status != "failed":
-        raise HTTPException(status_code=409, detail="Only failed runs can be retried.")
+        raise HTTPException(
+            status_code=409,
+            detail="Only failed runs can be retried.",
+        )
     automation = await _get_automation(session, previous.automation_id)
     run = await enqueue_run(
         session,
@@ -360,13 +437,19 @@ async def retry_automation_run(run_id: UUID, session: SessionDep) -> AutomationR
         trigger_payload=previous.trigger_payload,
     )
     if run is None:
-        raise HTTPException(status_code=409, detail="The retry could not be queued.")
+        raise HTTPException(
+            status_code=409,
+            detail="The retry could not be queued.",
+        )
     await session.commit()
     await session.refresh(run)
     return await run_response(session, run)
 
 
-@private_router.get("/notifications", response_model=NotificationListResponse)
+@private_router.get(
+    "/notifications",
+    response_model=NotificationListResponse,
+)
 async def list_notifications(
     session: SessionDep,
     unread_only: bool = False,
@@ -380,7 +463,9 @@ async def list_notifications(
         count_query = count_query.where(Notification.read_at.is_(None))
     items = list(
         await session.scalars(
-            query.order_by(Notification.created_at.desc()).offset(offset).limit(limit)
+            query.order_by(Notification.created_at.desc())
+            .offset(offset)
+            .limit(limit)
         )
     )
     return NotificationListResponse(
@@ -391,10 +476,12 @@ async def list_notifications(
 
 
 @private_router.post(
-    "/notifications/{notification_id}/read", response_model=NotificationResponse
+    "/notifications/{notification_id}/read",
+    response_model=NotificationResponse,
 )
 async def mark_notification_read(
-    notification_id: UUID, session: SessionDep
+    notification_id: UUID,
+    session: SessionDep,
 ) -> NotificationResponse:
     notification = await session.get(Notification, notification_id)
     if notification is None:
@@ -405,10 +492,15 @@ async def mark_notification_read(
     return NotificationResponse.model_validate(notification)
 
 
-@private_router.post("/notifications/read-all", status_code=status.HTTP_204_NO_CONTENT)
+@private_router.post(
+    "/notifications/read-all",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
 async def mark_all_notifications_read(session: SessionDep) -> Response:
     items = list(
-        await session.scalars(select(Notification).where(Notification.read_at.is_(None)))
+        await session.scalars(
+            select(Notification).where(Notification.read_at.is_(None))
+        )
     )
     now = datetime.now(UTC)
     for item in items:
@@ -418,33 +510,16 @@ async def mark_all_notifications_read(session: SessionDep) -> Response:
 
 
 @private_router.delete(
-    "/notifications/{notification_id}", status_code=status.HTTP_204_NO_CONTENT
+    "/notifications/{notification_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
 )
-async def delete_notification(notification_id: UUID, session: SessionDep) -> Response:
+async def delete_notification(
+    notification_id: UUID,
+    session: SessionDep,
+) -> Response:
     notification = await session.get(Notification, notification_id)
     if notification is None:
         raise HTTPException(status_code=404, detail="Notification not found")
     await session.delete(notification)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@public_router.post("/webhooks/{token}", response_model=WebhookAcceptedResponse)
-async def receive_automation_webhook(
-    token: str,
-    request: Request,
-    session: SessionDep,
-) -> WebhookAcceptedResponse:
-    body = await request.body()
-    if len(body) > settings.aster_webhook_max_bytes:
-        raise HTTPException(status_code=413, detail="Webhook payload is too large.")
-    webhook_status, run = await accept_webhook(
-        session,
-        token=token,
-        body=body,
-        headers={key.lower(): value for key, value in request.headers.items()},
-    )
-    return WebhookAcceptedResponse(
-        status=webhook_status,
-        run_id=run.id if run else None,
-    )
