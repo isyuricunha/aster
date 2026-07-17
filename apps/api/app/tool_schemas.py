@@ -3,8 +3,13 @@ from typing import Annotated, Literal
 from urllib.parse import urlsplit, urlunsplit
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 SecretMap = Annotated[dict[str, str], Field(max_length=64)]
 
@@ -95,7 +100,9 @@ class McpServerPayload(BaseModel):
             if self.url is None:
                 raise ValueError("Streamable HTTP MCP servers require a URL")
             if self.command is not None or self.arguments or self.environment:
-                raise ValueError("Streamable HTTP MCP servers cannot define a command or environment")
+                raise ValueError(
+                    "Streamable HTTP MCP servers cannot define a command or environment"
+                )
         else:
             if self.command is None:
                 raise ValueError("Stdio MCP servers require a command")
