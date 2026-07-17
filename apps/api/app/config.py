@@ -50,6 +50,17 @@ class Settings(BaseSettings):
     aster_document_chunk_overlap: int = Field(default=200, ge=0, le=2_000)
     aster_document_max_chunks: int = Field(default=2_000, ge=10, le=20_000)
     aster_embedding_batch_size: int = Field(default=64, ge=1, le=256)
+    aster_media_root: str = "/var/lib/aster/media"
+    aster_image_timeout_seconds: float = Field(default=300.0, gt=0, le=1_800)
+    aster_image_upload_max_bytes: int = Field(
+        default=20_000_000, ge=100_000, le=200_000_000
+    )
+    aster_image_output_max_bytes: int = Field(
+        default=25_000_000, ge=100_000, le=200_000_000
+    )
+    aster_image_max_pixels: int = Field(default=40_000_000, ge=1_000_000, le=200_000_000)
+    aster_image_max_inputs: int = Field(default=8, ge=1, le=16)
+    aster_image_max_outputs: int = Field(default=4, ge=1, le=8)
 
     @field_validator("aster_encryption_key")
     @classmethod
@@ -64,6 +75,14 @@ class Settings(BaseSettings):
         normalized = value.strip()
         if not normalized:
             raise ValueError("ASTER_SESSION_COOKIE_NAME cannot be empty")
+        return normalized
+
+    @field_validator("aster_media_root")
+    @classmethod
+    def validate_media_root(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("ASTER_MEDIA_ROOT cannot be empty")
         return normalized
 
     @model_validator(mode="after")
