@@ -64,7 +64,13 @@ def _target(
 ) -> ModelTarget | None:
     supports_chat = profile.supports_chat if profile else True
     supports_streaming = profile.supports_streaming if profile else True
-    if not endpoint.enabled or not model.is_available or not supports_chat or not supports_streaming:
+    unavailable = (
+        not endpoint.enabled
+        or not model.is_available
+        or not supports_chat
+        or not supports_streaming
+    )
+    if unavailable:
         return None
 
     return ModelTarget(
