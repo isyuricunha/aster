@@ -184,6 +184,7 @@ async def create_image_operation(
         raise HTTPException(status_code=422, detail=str(error)) from error
     except ModelEndpointError as error:
         raise HTTPException(status_code=error.status_code, detail=error.message) from error
+    await session.refresh(operation)
     return await operation_response(session, operation)
 
 
