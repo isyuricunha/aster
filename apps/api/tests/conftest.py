@@ -35,7 +35,7 @@ class TestToolStreamException(Exception):
     pass
 
 
-setattr(tool_generation, "Exception", TestToolStreamException)
+tool_generation.Exception = TestToolStreamException
 
 
 class FakeMcpClient:
