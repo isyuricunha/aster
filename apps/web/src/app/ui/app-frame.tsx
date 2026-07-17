@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import { AsterMark, Icon, type IconName } from "./icons";
 
-type NavigationKey = "chat" | "models" | "persona" | "tools" | "account";
+type NavigationKey = "chat" | "models" | "persona" | "tools" | "memory" | "account";
 
 type NavigationItem = {
   key: NavigationKey;
@@ -20,6 +20,12 @@ const configurationItems: NavigationItem[] = [
   { key: "models", href: "/settings/models", icon: "models", label: "Models" },
   { key: "persona", href: "/settings/persona", icon: "persona", label: "Personas" },
   { key: "tools", href: "/settings/tools", icon: "tools", label: "Tools" },
+  {
+    key: "memory",
+    href: "/settings/memory",
+    icon: "memory",
+    label: "Memory & Knowledge",
+  },
 ];
 
 const securityItems: NavigationItem[] = [
