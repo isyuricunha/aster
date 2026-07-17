@@ -3,7 +3,15 @@ import type { ReactNode } from "react";
 
 import { AsterMark, Icon, type IconName } from "./icons";
 
-type NavigationKey = "chat" | "images" | "models" | "persona" | "tools" | "memory" | "account";
+type NavigationKey =
+  | "chat"
+  | "images"
+  | "automations"
+  | "models"
+  | "persona"
+  | "tools"
+  | "memory"
+  | "account";
 
 type NavigationItem = {
   key: NavigationKey;
@@ -15,6 +23,12 @@ type NavigationItem = {
 const workspaceItems: NavigationItem[] = [
   { key: "chat", href: "/", icon: "chat", label: "Chat" },
   { key: "images", href: "/images", icon: "images", label: "Images" },
+  {
+    key: "automations",
+    href: "/automations",
+    icon: "refresh",
+    label: "Automations",
+  },
 ];
 
 const configurationItems: NavigationItem[] = [
