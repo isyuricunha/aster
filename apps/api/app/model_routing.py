@@ -18,6 +18,7 @@ from app.security import SecretCipher
 FALLBACK_ERROR_CODES = {
     "chat_not_supported",
     "connection_error",
+    "empty_response",
     "invalid_response",
     "rate_limited",
     "timeout",
