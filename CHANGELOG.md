@@ -6,6 +6,9 @@ All notable changes to Aster are documented in this file.
 
 ### Added
 
+- Per-model generation profiles for context metadata, output limits, sampling, reasoning effort, and declared chat capabilities.
+- Ordered global fallback routing for chat models and endpoints.
+- Profile and fallback controls in Models settings.
 - Safe Markdown rendering for user and assistant messages.
 - GFM tables, task lists, autolinks, strikethrough, and authored line breaks.
 - Fenced-code syntax highlighting with per-block copy controls.
@@ -32,6 +35,8 @@ All notable changes to Aster are documented in this file.
 
 ### Changed
 
+- Unset model-profile values now preserve provider defaults and are omitted from chat requests.
+- Eligible model failures may advance to the next fallback only before response content begins.
 - Chat content now renders as structured documents instead of plain text.
 - Conversation import validates format, version, roles, statuses, metadata, and total size.
 - Interface hierarchy now derives from a neutral base, restrained accent, and shared contrast system.
@@ -48,6 +53,8 @@ All notable changes to Aster are documented in this file.
 
 ### Fixed
 
+- Fallback routing never combines partial output from different models.
+- Authentication and request-validation failures remain visible instead of triggering fallback.
 - Incomplete fenced code remains readable while a response is still streaming.
 - Real endpoints that need more than ten seconds to return a large model list no longer fail prematurely.
 
