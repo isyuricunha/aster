@@ -36,7 +36,7 @@ class ToolAwareChatMessageResponse(BaseModel):
     tool_calls: list[ToolCall] | None
     tool_call_id: str | None
     tool_name: str | None
-    retrieval_sources: list[RetrievalSourceResponse] = []
+    retrieval_sources: list[RetrievalSourceResponse] = Field(default_factory=list)
     position: int
     created_at: datetime
     updated_at: datetime
