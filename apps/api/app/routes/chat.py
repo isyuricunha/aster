@@ -23,7 +23,18 @@ from app.chat_tool_schemas import (
 )
 from app.config import settings
 from app.db import get_session
-from app.dependencies import get_mcp_client, get_openai_client, get_secret_cipher
+from app.dependencies import (
+    get_mcp_client,
+    get_media_store,
+    get_openai_client,
+    get_secret_cipher,
+)
+from app.image_lifecycle import (
+    delete_conversation_output_media,
+    delete_storage_keys,
+    ensure_message_has_no_image_attachments,
+)
+from app.image_storage import PrivateMediaStore
 from app.mcp_client import McpClient
 from app.models import ChatMessage, Conversation, Persona, PersonaPreferences
 from app.openai_compatible import OpenAICompatibleClient
@@ -50,6 +61,7 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 CipherDep = Annotated[SecretCipher, Depends(get_secret_cipher)]
 ClientDep = Annotated[OpenAICompatibleClient, Depends(get_openai_client)]
 McpClientDep = Annotated[McpClient, Depends(get_mcp_client)]
+StoreDep = Annotated[PrivateMediaStore, Depends(get_media_store)]
 
 
 async def _attach_retrieval(
@@ -223,14 +235,18 @@ async def import_conversation(
         await get_or_create_conversation_settings(session, conversation.id)
     else:
         normalized_names = {name.casefold() for name in payload.retrieval.collection_names}
-        collection_ids = list(
-            await session.scalars(
-                select(KnowledgeCollection.id).where(
-                    KnowledgeCollection.enabled.is_(True),
-                    func.lower(KnowledgeCollection.name).in_(normalized_names),
+        collection_ids = (
+            list(
+                await session.scalars(
+                    select(KnowledgeCollection.id).where(
+                        KnowledgeCollection.enabled.is_(True),
+                        func.lower(KnowledgeCollection.name).in_(normalized_names),
+                    )
                 )
             )
-        ) if normalized_names else []
+            if normalized_names
+            else []
+        )
         await replace_conversation_retrieval_settings(
             session,
             conversation_id=conversation.id,
@@ -311,11 +327,18 @@ async def update_conversation(
 async def delete_conversation(
     conversation_id: UUID,
     session: SessionDep,
+    store: StoreDep,
 ) -> Response:
     conversation = await get_conversation(session, conversation_id, for_update=True)
     await ensure_no_active_generation(session, conversation.id)
+    storage_keys = await delete_conversation_output_media(
+        session,
+        conversation_id=conversation.id,
+        store=store,
+    )
     await session.delete(conversation)
     await session.commit()
+    delete_storage_keys(store, storage_keys)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -335,9 +358,7 @@ async def stream_message(
         conversation_id=conversation_id,
         content=payload.content,
     )
-    await _attach_retrieval(
-        prepared, session=session, client=client, cipher=cipher
-    )
+    await _attach_retrieval(prepared, session=session, client=client, cipher=cipher)
     return await stream_response_with_tools(
         prepared=prepared,
         session=session,
@@ -358,6 +379,10 @@ async def edit_and_resend_message(
     mcp_client: McpClientDep,
 ) -> StreamingResponse:
     await ensure_no_pending_tool_confirmation(session, conversation_id)
+    try:
+        await ensure_message_has_no_image_attachments(session, message_id)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
     prepared = await prepare_edit_and_resend(
         session=session,
         cipher=cipher,
@@ -365,9 +390,7 @@ async def edit_and_resend_message(
         message_id=message_id,
         content=payload.content,
     )
-    await _attach_retrieval(
-        prepared, session=session, client=client, cipher=cipher
-    )
+    await _attach_retrieval(prepared, session=session, client=client, cipher=cipher)
     return await stream_response_with_tools(
         prepared=prepared,
         session=session,
@@ -387,15 +410,17 @@ async def regenerate_message(
     mcp_client: McpClientDep,
 ) -> StreamingResponse:
     await ensure_no_pending_tool_confirmation(session, conversation_id)
+    try:
+        await ensure_message_has_no_image_attachments(session, message_id)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
     prepared = await prepare_regeneration(
         session=session,
         cipher=cipher,
         conversation_id=conversation_id,
         message_id=message_id,
     )
-    await _attach_retrieval(
-        prepared, session=session, client=client, cipher=cipher
-    )
+    await _attach_retrieval(prepared, session=session, client=client, cipher=cipher)
     return await stream_response_with_tools(
         prepared=prepared,
         session=session,
