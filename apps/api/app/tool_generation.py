@@ -24,7 +24,7 @@ from app.config import settings
 from app.mcp_client import McpClient, McpClientError
 from app.message_composition import MessageRole, PersonaConfiguration, compose_persona_messages
 from app.model_routing import ModelTarget, can_fallback, resolve_chat_targets
-from app.models import ChatMessage, McpServer, McpTool, ToolExecution
+from app.models import ChatMessage, Conversation, McpServer, McpTool, ToolExecution
 from app.openai_compatible import (
     ChatCompletionDelta,
     ModelEndpointError,
@@ -59,11 +59,13 @@ class ToolCallBuffer:
 
 @dataclass(slots=True)
 class ToolLoopState:
-    conversation: object
+    conversation: Conversation
     assistant_message: ChatMessage
     provider_messages: list[dict[str, object]]
     model_targets: list[ModelTarget]
     runtimes: list[ToolRuntime]
+    openai_client: OpenAICompatibleClient
+    mcp_client: McpClient
     stop_event: asyncio.Event
     registered_message_id: UUID
     tool_rounds: int
@@ -73,10 +75,8 @@ def _sse(event: str, payload: object) -> str:
     return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
-def _persona_configuration(conversation: object) -> PersonaConfiguration:
-    name = getattr(conversation, "persona_name")
-    role = getattr(conversation, "persona_instruction_role")
-    if name is None or role is None:
+def _persona_configuration(conversation: Conversation) -> PersonaConfiguration:
+    if conversation.persona_name is None or conversation.persona_instruction_role is None:
         return PersonaConfiguration(
             name="",
             instructions="",
@@ -84,10 +84,10 @@ def _persona_configuration(conversation: object) -> PersonaConfiguration:
             instruction_role=MessageRole.DEVELOPER,
         )
     return PersonaConfiguration(
-        name=name,
-        instructions=getattr(conversation, "persona_instructions") or "",
+        name=conversation.persona_name,
+        instructions=conversation.persona_instructions or "",
         enabled=True,
-        instruction_role=MessageRole(role),
+        instruction_role=MessageRole(conversation.persona_instruction_role),
     )
 
 
@@ -102,7 +102,6 @@ def _provider_message(message: ChatMessage) -> dict[str, object]:
         return {
             "role": "tool",
             "tool_call_id": message.tool_call_id,
-            "name": message.tool_name,
             "content": (
                 "[UNTRUSTED_TOOL_RESULT]\n"
                 f"{message.content}\n"
@@ -112,8 +111,14 @@ def _provider_message(message: ChatMessage) -> dict[str, object]:
     return {"role": message.role, "content": message.content}
 
 
+def _include_in_provider_history(message: ChatMessage) -> bool:
+    if message.role == "tool":
+        return message.status in {"completed", "failed"}
+    return message.status == "completed"
+
+
 def _provider_history(
-    conversation: object,
+    conversation: Conversation,
     messages: Sequence[ChatMessage],
 ) -> list[dict[str, object]]:
     result = [
@@ -131,9 +136,19 @@ def _provider_history(
         }
     )
     result.extend(
-        _provider_message(message) for message in messages if message.status == "completed"
+        _provider_message(message) for message in messages if _include_in_provider_history(message)
     )
     return result
+
+
+def _recent_tool_rounds(messages: Sequence[ChatMessage]) -> int:
+    count = 0
+    for message in reversed(messages):
+        if message.role == "user":
+            break
+        if message.role == "assistant" and message.tool_calls:
+            count += 1
+    return count
 
 
 def _target_payload(target: ModelTarget) -> dict[str, str]:
@@ -363,7 +378,6 @@ async def _stream_model_round(
     state: ToolLoopState,
     *,
     session: AsyncSession,
-    client: OpenAICompatibleClient,
 ) -> AsyncIterator[str]:
     chunks: list[str] = []
     call_buffers: dict[int, ToolCallBuffer] = {}
@@ -391,7 +405,7 @@ async def _stream_model_round(
             )
 
         parameters = target.parameters
-        iterator = client.stream_chat_completion_events(
+        iterator = state.openai_client.stream_chat_completion_events(
             base_url=target.base_url,
             api_key=target.api_key,
             model_id=target.provider_model_id,
@@ -492,7 +506,7 @@ async def _stream_model_round(
         buffers=buffers,
         runtimes_by_name=runtimes_by_name,
     )
-    await _execute_automatic_tools(session, client=state_mcp_client.get(), pairs=pairs)
+    await _execute_automatic_tools(session, client=state.mcp_client, pairs=pairs)
 
     pending = [execution for execution, _ in pairs if execution.status == "pending_confirmation"]
     if pending:
@@ -525,24 +539,8 @@ async def _stream_model_round(
         "assistant_started",
         {"message": message_response(next_assistant).model_dump(mode="json")},
     )
-    async for event in _stream_model_round(state, session=session, client=client):
+    async for event in _stream_model_round(state, session=session):
         yield event
-
-
-class _McpClientContext:
-    def __init__(self) -> None:
-        self._client: McpClient | None = None
-
-    def set(self, client: McpClient) -> None:
-        self._client = client
-
-    def get(self) -> McpClient:
-        if self._client is None:
-            raise RuntimeError("MCP client context is not initialized")
-        return self._client
-
-
-state_mcp_client = _McpClientContext()
 
 
 async def stream_response_with_tools(
@@ -563,21 +561,18 @@ async def stream_response_with_tools(
         return stream_response(prepared=prepared, session=session, client=client)
 
     initial_messages = [*prepared.history, prepared.current_user_message]
-    provider_messages = _provider_history(prepared.conversation, initial_messages)
-    previous_tool_rounds = sum(
-        1 for message in prepared.history if message.role == "assistant" and message.tool_calls
-    )
     state = ToolLoopState(
         conversation=prepared.conversation,
         assistant_message=prepared.assistant_message,
-        provider_messages=provider_messages,
+        provider_messages=_provider_history(prepared.conversation, initial_messages),
         model_targets=prepared.model_targets,
         runtimes=runtimes,
+        openai_client=client,
+        mcp_client=mcp_client,
         stop_event=prepared.stop_event,
         registered_message_id=prepared.assistant_message.id,
-        tool_rounds=previous_tool_rounds,
+        tool_rounds=_recent_tool_rounds(initial_messages),
     )
-    state_mcp_client.set(mcp_client)
 
     async def event_stream() -> AsyncIterator[str]:
         yield _sse(
@@ -601,7 +596,7 @@ async def stream_response_with_tools(
             },
         )
         try:
-            async for event in _stream_model_round(state, session=session, client=client):
+            async for event in _stream_model_round(state, session=session):
                 yield event
         except ModelEndpointError as error:
             await _persist_message(
@@ -710,6 +705,8 @@ async def continue_tool_execution(
     await session.commit()
     await session.refresh(execution)
 
+    conversation = await get_conversation(session, execution.conversation_id, for_update=True)
+    await ensure_no_active_generation(session, conversation.id)
     pending_count = await session.scalar(
         select(func.count(ToolExecution.id)).where(
             ToolExecution.assistant_message_id == assistant_message.id,
@@ -766,26 +763,24 @@ async def continue_tool_execution(
                 .order_by(ChatMessage.position.asc())
             )
         )
-        tool_rounds = sum(
-            1 for message in history if message.role == "assistant" and message.tool_calls
-        )
         state = ToolLoopState(
             conversation=conversation,
             assistant_message=next_assistant,
             provider_messages=_provider_history(conversation, history),
             model_targets=targets,
             runtimes=runtimes,
+            openai_client=client,
+            mcp_client=mcp_client,
             stop_event=stop_event,
             registered_message_id=next_assistant.id,
-            tool_rounds=tool_rounds,
+            tool_rounds=_recent_tool_rounds(history),
         )
-        state_mcp_client.set(mcp_client)
         yield _sse(
             "assistant_started",
             {"message": message_response(next_assistant).model_dump(mode="json")},
         )
         try:
-            async for event in _stream_model_round(state, session=session, client=client):
+            async for event in _stream_model_round(state, session=session):
                 yield event
         except ModelEndpointError as error:
             await _persist_message(
@@ -796,6 +791,34 @@ async def continue_tool_execution(
                 error_message=error.message[:500],
             )
             yield _sse("error", {"code": error.code, "message": error.message})
+        except asyncio.CancelledError:
+            with suppress(Exception):
+                await _persist_message(
+                    session,
+                    state.assistant_message,
+                    content=state.assistant_message.content,
+                    status_value="stopped" if state.stop_event.is_set() else "failed",
+                    error_message=(
+                        None if state.stop_event.is_set() else "The response stream was interrupted."
+                    ),
+                )
+            raise
+        except Exception:
+            with suppress(Exception):
+                await _persist_message(
+                    session,
+                    state.assistant_message,
+                    content=state.assistant_message.content,
+                    status_value="failed",
+                    error_message="The tool-enabled response stream failed.",
+                )
+            yield _sse(
+                "error",
+                {
+                    "code": "tool_stream_failed",
+                    "message": "The tool-enabled response stream failed.",
+                },
+            )
         finally:
             await generation_registry.unregister(state.registered_message_id)
 
