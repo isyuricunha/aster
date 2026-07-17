@@ -31,6 +31,7 @@ class FakeOpenAICompatibleClient:
         self.chat_error = None
         self.chat_chunks_by_model: dict[str, list[str]] = {}
         self.chat_errors_by_model: dict[str, Exception] = {}
+        self.chat_errors_after_chunks_by_model: dict[str, Exception] = {}
         self.received_chat_api_key: str | None = None
         self.received_chat_model: str | None = None
         self.received_chat_messages: list[dict[str, str]] = []
@@ -74,6 +75,9 @@ class FakeOpenAICompatibleClient:
             raise self.chat_error
         for chunk in self.chat_chunks_by_model.get(model_id, self.chat_chunks):
             yield chunk
+        trailing_error = self.chat_errors_after_chunks_by_model.get(model_id)
+        if trailing_error is not None:
+            raise trailing_error
 
 
 TestClientBundle = tuple[
