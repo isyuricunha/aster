@@ -12,7 +12,9 @@ RUN python -m pip install --no-cache-dir --disable-pip-version-check uv
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
-RUN useradd --create-home --shell /usr/sbin/nologin appuser
+RUN useradd --create-home --shell /usr/sbin/nologin appuser \
+    && mkdir -p /var/lib/aster/media \
+    && chown -R appuser:appuser /var/lib/aster
 COPY --chown=appuser:appuser . .
 
 USER appuser
