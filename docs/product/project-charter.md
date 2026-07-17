@@ -1,6 +1,6 @@
 # Aster Project Charter
 
-Status: Accepted through Stage 10
+Status: Accepted through Stage 11
 
 ## Product vision
 
@@ -12,9 +12,11 @@ The project starts as a focused chat product. It may grow into a broader assista
 
 ### User-owned identity
 
-The assistant persona is configured by the user. No personal identity, relationship, private endpoint, or provider-specific configuration is embedded in the source code, examples, tests, or public documentation.
+Assistant personas are configured by the user. No personal identity, relationship, private endpoint, or provider-specific configuration is embedded in the source code, examples, tests, or public documentation.
 
 Persona instructions are persistent application configuration. They are composed into the model instruction layer and are never represented as an ordinary user chat message.
+
+A conversation owns a frozen snapshot of its selected persona. Editing or deleting the library source must not retroactively change the instruction context of an existing conversation.
 
 ### Correct message roles
 
@@ -44,7 +46,7 @@ Visual design should clarify product state before adding decoration. New screens
 
 Conversation content is treated as untrusted input. Markdown rendering must not enable raw HTML, executable scripts, or unsafe URL handling.
 
-Conversation transfer formats are versioned, validated, bounded, and imported through authenticated application APIs.
+Conversation and persona transfer formats are versioned, validated, bounded, and imported through authenticated application APIs.
 
 ### Predictable model routing
 
@@ -69,16 +71,22 @@ Fallback improves availability without hiding credential or request errors. Aste
 - Search conversation titles and message content
 - Export conversations as Markdown or versioned Aster JSON
 - Import validated Aster JSON exports
+- Preserve an optional persona snapshot in conversation exports
 
 ### Persona
 
-- Configure one global persona in settings
-- Enable or disable the persona
-- Store a persona name and free-form instructions
-- Apply persona changes to subsequent model requests
-- Keep persona configuration separate from chat history
+- Maintain a reusable library of personas
+- Store a name, description, free-form instructions, enabled state, and instruction role
+- Create, edit, duplicate, delete, import, and export personas
+- Select one optional default persona for new conversations
+- Start a conversation without a persona
+- Freeze persona configuration into each conversation
+- Reassign or clear the persona snapshot used for future responses
+- Preserve existing messages and snapshots when a library persona changes or is deleted
+- Preview canonical role and source separation before use
+- Keep the legacy single-persona API contract available during compatibility transition
 
-Multiple personas, persona versioning, and per-conversation personas are deferred.
+Automatic propagation of library edits into existing conversations and full persona revision history are deferred.
 
 ### Endpoint and model configuration
 
@@ -149,11 +157,11 @@ Application-wide mobile and narrow-screen remediation is deferred to a dedicated
 - Audio features
 - Multiple users, invitations, roles, and per-user data isolation
 - Email-based password recovery
-- Multiple, versioned, or conversation-scoped personas
+- Automatic persona synchronization or full persona revision history
 - Dynamic, cost-aware, latency-aware, or conversation-scoped model routing
 - Image-generation or image-editing interface
 - Detailed usage analytics and billing
-- Application-wide mobile shell remediation in Stage 10
+- Application-wide mobile shell remediation in Stage 11
 
 ## Initial model roles
 
@@ -180,6 +188,9 @@ Aster is stable only when:
 - Container restarts preserve conversations and configuration
 - Endpoint changes do not require source-code edits
 - Persona instructions reach the model in the intended instruction role
+- Persona library edits do not mutate existing conversation snapshots
+- Deleting a source persona does not remove historical conversation identity
+- New conversations inherit the selected default persona or no persona deterministically
 - Streaming does not duplicate or silently truncate messages
 - Incomplete streamed Markdown remains readable
 - Raw HTML is not executed from conversation content
@@ -196,7 +207,7 @@ Aster is stable only when:
 - Desktop navigation remains usable
 - Keyboard focus states remain visible
 - A clean Docker Compose installation is reproducible
-- Database migrations work against an empty database
+- Database migrations work against an empty database and preserve existing configuration
 - Required lint, type checks, builds, and tests pass
 
 ## Milestone status
@@ -210,6 +221,7 @@ Aster is stable only when:
 - Interface and UX foundation: implemented in Stage 8
 - Chat quality and content rendering: implemented in Stage 9
 - Model profiles and fallback routing: implemented in Stage 10
+- Multiple personas and conversation snapshots: implemented in Stage 11
 
 ## Change control
 
