@@ -42,6 +42,42 @@ export type ModelPreferences = {
   resolved_utility: SelectedModel | null;
 };
 
+export type ModelProfile = {
+  model_id: string;
+  endpoint_id: string;
+  endpoint_name: string;
+  provider_model_id: string;
+  display_name: string | null;
+  context_window: number | null;
+  max_output_tokens: number | null;
+  token_parameter: "none" | "max_tokens" | "max_completion_tokens";
+  temperature: number | null;
+  top_p: number | null;
+  reasoning_effort: "minimal" | "low" | "medium" | "high" | "xhigh" | null;
+  supports_chat: boolean;
+  supports_streaming: boolean;
+  endpoint_enabled: boolean;
+  is_available: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type FallbackModel = {
+  id: string;
+  endpoint_id: string;
+  endpoint_name: string;
+  model_id: string;
+  display_name: string | null;
+  endpoint_enabled: boolean;
+  is_available: boolean;
+  supports_chat: boolean;
+  supports_streaming: boolean;
+};
+
+export type ModelRouting = {
+  fallbacks: FallbackModel[];
+};
+
 export type PersonaSettings = {
   name: string;
   instructions: string;
