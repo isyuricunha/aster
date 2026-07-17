@@ -52,6 +52,12 @@ jobs:
         run: python -m pip install --disable-pip-version-check uv
       - name: Install dependencies
         run: uv sync --group dev
+      - name: Upload resolved API lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-uv-lock
+          path: apps/api/uv.lock
+          if-no-files-found: error
       - name: Lint
         run: |
           set -o pipefail
@@ -101,22 +107,29 @@ jobs:
         run: >-
           curl --fail --silent --show-error --retry 30 --retry-all-errors --retry-delay 2
           http://localhost:3000/setup
-      - name: Check Stage 11 legacy upgrade
+      - name: Check Stage 11 legacy upgrade through Stage 12
         run: sh scripts/ci/check-stage11-persona-migration.sh
-      - name: Check runtime authentication configuration
+      - name: Check runtime configuration
         run: >-
           docker compose exec -T api python -c
           'from app.config import settings;
           assert settings.aster_endpoint_timeout_seconds == 30;
           assert settings.aster_stream_timeout_seconds == 120;
           assert settings.aster_session_absolute_days == 30;
-          assert settings.aster_session_idle_hours == 168'
+          assert settings.aster_session_idle_hours == 168;
+          assert settings.aster_mcp_stdio_enabled is False;
+          assert settings.aster_mcp_timeout_seconds == 30;
+          assert settings.aster_tool_max_rounds == 8;
+          assert settings.aster_tool_argument_max_characters == 100000;
+          assert settings.aster_tool_result_max_characters == 100000'
       - name: Check first sign-up state
         run: |
           curl --fail --silent --show-error http://localhost:3000/api/auth/status \
             | grep --quiet '"setup_required":true'
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
             http://localhost:3000/api/persona)" = "401"
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            http://localhost:3000/api/mcp-servers)" = "401"
       - name: Create owner through the web proxy
         run: |
           curl --fail --silent --show-error \
@@ -148,6 +161,24 @@ jobs:
             --data '{"user_message":"Hello"}' \
             http://localhost:3000/api/message-composition/preview \
             | grep --quiet 'Preserve these legacy instructions.'
+      - name: Check MCP server credential contract
+        run: |
+          mcp_payload="$(curl --fail --silent --show-error \
+            --cookie /tmp/aster.cookies \
+            --header 'Content-Type: application/json' \
+            --header 'Origin: http://localhost:3000' \
+            --data '{"name":"CI MCP","transport":"streamable_http","url":"https://mcp.invalid/mcp","headers":{"Authorization":"Bearer ci-secret"},"enabled":true,"timeout_seconds":30}' \
+            http://localhost:3000/api/mcp-servers)"
+          printf '%s' "${mcp_payload}" | python -c \
+            'import json, sys; payload=json.load(sys.stdin); assert payload["header_names"] == ["Authorization"]; assert "ci-secret" not in str(payload); print(payload["id"])' \
+            > /tmp/aster-mcp-id
+          mcp_id="$(cat /tmp/aster-mcp-id)"
+          curl --fail --silent --show-error --cookie /tmp/aster.cookies \
+            "http://localhost:3000/api/mcp-servers/${mcp_id}" \
+            | python -c 'import json, sys; payload=json.load(sys.stdin); assert payload["header_names"] == ["Authorization"]; assert "ci-secret" not in str(payload)'
+          curl --fail --silent --show-error --cookie /tmp/aster.cookies \
+            --header 'Origin: http://localhost:3000' \
+            --request DELETE "http://localhost:3000/api/mcp-servers/${mcp_id}"
       - name: Check persona library and default snapshot
         run: |
           persona_id="$(curl --fail --silent --show-error \
@@ -157,7 +188,6 @@ jobs:
             --data '{"name":"CI Persona","description":"Smoke test","instructions":"Be exact.","enabled":true,"instruction_role":"developer"}' \
             http://localhost:3000/api/personas \
             | python -c 'import json, sys; print(json.load(sys.stdin)["id"])')"
-          printf '%s' "${persona_id}" > /tmp/aster-persona-id
           curl --fail --silent --show-error --cookie /tmp/aster.cookies \
             --header 'Content-Type: application/json' \
             --header 'Origin: http://localhost:3000' \
@@ -171,7 +201,7 @@ jobs:
             --data "{\"user_message\":\"Hello\",\"persona_id\":\"${persona_id}\",\"use_default_persona\":false}" \
             http://localhost:3000/api/message-composition/preview \
             | grep --quiet 'Your name is CI Persona'
-      - name: Check conversation API
+      - name: Check conversation API and transfers
         run: |
           conversation_id="$(curl --fail --silent --show-error \
             --cookie /tmp/aster.cookies \
@@ -197,16 +227,23 @@ jobs:
             --data '{"format":"aster-conversation","version":2,"title":"Snapshot import","persona":{"source_persona_id":null,"name":"Exported Persona","description":"Portable snapshot","instructions":"Stay portable.","instruction_role":"system"},"messages":[]}' \
             http://localhost:3000/api/conversations/import \
             | grep --quiet '"name":"Exported Persona"'
+          curl --fail --silent --show-error \
+            --cookie /tmp/aster.cookies \
+            --header 'Content-Type: application/json' \
+            --header 'Origin: http://localhost:3000' \
+            --data '{"format":"aster-conversation","version":3,"title":"Tool history import","messages":[{"role":"user","content":"Use a tool.","status":"completed","error_message":null,"model_id":null},{"role":"assistant","content":"","status":"completed","error_message":null,"model_id":"chat-model","tool_calls":[{"id":"call-ci","type":"function","function":{"name":"mcp_ci_echo","arguments":"{\"value\":\"portable\"}"}}]},{"role":"tool","content":"portable","status":"completed","error_message":null,"model_id":null,"tool_call_id":"call-ci","tool_name":"echo"},{"role":"assistant","content":"Portable result used.","status":"completed","error_message":null,"model_id":"chat-model"}]}' \
+            http://localhost:3000/api/conversations/import \
+            | python -c 'import json, sys; payload=json.load(sys.stdin); assert payload["messages"][1]["tool_calls"][0]["id"] == "call-ci"; assert payload["messages"][2]["role"] == "tool"'
           curl --fail --silent --show-error --cookie /tmp/aster.cookies \
             'http://localhost:3000/api/conversations?query=Searchable' \
             | grep --quiet '"title":"Imported CI chat"'
-      - name: Check chat and authentication contracts
+      - name: Check API contracts
         run: |
           curl --fail --silent --show-error http://localhost:8000/openapi.json \
-            | python -c 'import json, sys; paths = json.load(sys.stdin)["paths"]; required = ["/api/model-profiles/{model_id}", "/api/model-routing", "/api/personas", "/api/personas/{persona_id}", "/api/persona-preferences", "/api/conversations/import", "/api/conversations/{conversation_id}/messages/{message_id}/edit-and-resend", "/api/conversations/{conversation_id}/messages/{message_id}/regenerate", "/api/messages/{message_id}/stop", "/api/auth/setup", "/api/auth/login", "/api/auth/password"]; assert all(path in paths for path in required)'
+            | python -c 'import json, sys; paths=json.load(sys.stdin)["paths"]; required=["/api/model-profiles/{model_id}", "/api/model-routing", "/api/personas", "/api/personas/{persona_id}", "/api/persona-preferences", "/api/conversations/import", "/api/conversations/{conversation_id}/tools", "/api/conversations/{conversation_id}/tool-executions", "/api/conversations/{conversation_id}/messages/{message_id}/edit-and-resend", "/api/conversations/{conversation_id}/messages/{message_id}/regenerate", "/api/messages/{message_id}/stop", "/api/mcp-servers", "/api/mcp-servers/{server_id}", "/api/mcp-servers/{server_id}/test", "/api/mcp-servers/{server_id}/sync", "/api/mcp-tools", "/api/mcp-tools/{tool_id}", "/api/tool-executions/{execution_id}/approve", "/api/tool-executions/{execution_id}/deny", "/api/auth/setup", "/api/auth/login", "/api/auth/password"]; assert all(path in paths for path in required)'
       - name: Check authenticated pages
         run: |
-          for path in / /settings/models /settings/persona /settings/account; do
+          for path in / /settings/models /settings/persona /settings/tools /settings/account; do
             curl --fail --silent --show-error --cookie /tmp/aster.cookies \
               "http://localhost:3000${path}" >/dev/null
           done
