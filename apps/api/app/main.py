@@ -1,4 +1,3 @@
-import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -25,7 +24,6 @@ from app.routes.tools import router as tools_router
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    os.makedirs(settings.aster_media_root, exist_ok=True)
     async with AsyncSessionFactory() as session:
         await recover_interrupted_image_operations(session)
     yield
