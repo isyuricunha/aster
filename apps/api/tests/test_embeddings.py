@@ -14,7 +14,6 @@ async def test_embeddings_preserve_provider_indexes() -> None:
         assert payload == {
             "model": "embedding-model",
             "input": ["alpha", "beta"],
-            "encoding_format": "float",
         }
         return httpx.Response(
             200,
