@@ -126,9 +126,11 @@ async def _create_persona(
 @router.get("/personas", response_model=list[PersonaResponse])
 async def list_personas(session: SessionDep) -> list[PersonaResponse]:
     preferences = await _get_preferences(session)
-    personas = list(
-        await session.scalars(select(Persona).order_by(Persona.updated_at.desc(), Persona.name.asc()))
+    statement = select(Persona).order_by(
+        Persona.updated_at.desc(),
+        Persona.name.asc(),
     )
+    personas = list(await session.scalars(statement))
     await session.commit()
     return [
         _persona_response(persona, preferences.default_persona_id) for persona in personas
