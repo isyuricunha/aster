@@ -51,7 +51,7 @@ jobs:
       - name: Install uv
         run: python -m pip install --disable-pip-version-check uv
       - name: Install dependencies
-        run: uv sync --group dev
+        run: uv sync --frozen --group dev
       - name: Lint
         run: |
           set -o pipefail
@@ -80,17 +80,15 @@ jobs:
         uses: actions/checkout@v4
       - name: Prepare environment
         run: cp .env.example .env
-      - name: Validate configuration
+      - name: Validate bundled database configuration
         run: docker compose config --quiet
-      - name: Validate external database mode
+      - name: Validate external database configuration
         env:
           COMPOSE_PROFILES: ""
           DATABASE_URL: postgresql+asyncpg://aster:aster@database.invalid:5432/aster
         run: docker compose config --quiet
-      - name: Build API image
-        run: docker compose build --progress=plain api
-      - name: Build web image
-        run: docker compose build --progress=plain web
+      - name: Build images
+        run: docker compose build --progress=plain api web
       - name: Start application stack
         run: docker compose up --detach
       - name: Check API readiness
@@ -101,122 +99,25 @@ jobs:
         run: >-
           curl --fail --silent --show-error --retry 30 --retry-all-errors --retry-delay 2
           http://localhost:3000/setup
-      - name: Check Stage 11 legacy upgrade
+      - name: Check Stage 11 upgrade through Stage 12
         run: sh scripts/ci/check-stage11-persona-migration.sh
-      - name: Check runtime authentication configuration
+      - name: Check runtime configuration
         run: >-
           docker compose exec -T api python -c
           'from app.config import settings;
           assert settings.aster_endpoint_timeout_seconds == 30;
           assert settings.aster_stream_timeout_seconds == 120;
           assert settings.aster_session_absolute_days == 30;
-          assert settings.aster_session_idle_hours == 168'
-      - name: Check first sign-up state
-        run: |
-          curl --fail --silent --show-error http://localhost:3000/api/auth/status \
-            | grep --quiet '"setup_required":true'
-          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
-            http://localhost:3000/api/persona)" = "401"
-      - name: Create owner through the web proxy
-        run: |
-          curl --fail --silent --show-error \
-            --cookie-jar /tmp/aster.cookies \
-            --header 'Content-Type: application/json' \
-            --header 'Origin: http://localhost:3000' \
-            --data '{"username":"owner","password":"correct horse battery staple"}' \
-            http://localhost:3000/api/auth/setup | grep --quiet '"username":"owner"'
-          curl --fail --silent --show-error --cookie /tmp/aster.cookies \
-            http://localhost:3000/api/auth/status | grep --quiet '"authenticated":true'
-          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
-            --header 'Content-Type: application/json' \
-            --header 'Origin: http://localhost:3000' \
-            --data '{"username":"another","password":"another secure password"}' \
-            http://localhost:3000/api/auth/setup)" = "409"
-      - name: Check protected APIs through the web proxy
-        run: |
-          curl --fail --silent --show-error --cookie /tmp/aster.cookies \
-            http://localhost:3000/api/model-endpoints >/dev/null
-          curl --fail --silent --show-error --cookie /tmp/aster.cookies \
-            http://localhost:3000/api/model-routing | grep --quiet '"fallbacks":\[\]'
-          curl --fail --silent --show-error --cookie /tmp/aster.cookies \
-            http://localhost:3000/api/persona | grep --quiet '"name":"Migrated Assistant"'
-          curl --fail --silent --show-error --cookie /tmp/aster.cookies \
-            http://localhost:3000/api/personas | grep --quiet '"name":"Migrated Assistant"'
-          curl --fail --silent --show-error --cookie /tmp/aster.cookies \
-            --header 'Content-Type: application/json' \
-            --header 'Origin: http://localhost:3000' \
-            --data '{"user_message":"Hello"}' \
-            http://localhost:3000/api/message-composition/preview \
-            | grep --quiet 'Preserve these legacy instructions.'
-      - name: Check persona library and default snapshot
-        run: |
-          persona_id="$(curl --fail --silent --show-error \
-            --cookie /tmp/aster.cookies \
-            --header 'Content-Type: application/json' \
-            --header 'Origin: http://localhost:3000' \
-            --data '{"name":"CI Persona","description":"Smoke test","instructions":"Be exact.","enabled":true,"instruction_role":"developer"}' \
-            http://localhost:3000/api/personas \
-            | python -c 'import json, sys; print(json.load(sys.stdin)["id"])')"
-          printf '%s' "${persona_id}" > /tmp/aster-persona-id
-          curl --fail --silent --show-error --cookie /tmp/aster.cookies \
-            --header 'Content-Type: application/json' \
-            --header 'Origin: http://localhost:3000' \
-            --request PUT \
-            --data "{\"default_persona_id\":\"${persona_id}\"}" \
-            http://localhost:3000/api/persona-preferences \
-            | grep --quiet '"name":"CI Persona"'
-          curl --fail --silent --show-error --cookie /tmp/aster.cookies \
-            --header 'Content-Type: application/json' \
-            --header 'Origin: http://localhost:3000' \
-            --data "{\"user_message\":\"Hello\",\"persona_id\":\"${persona_id}\",\"use_default_persona\":false}" \
-            http://localhost:3000/api/message-composition/preview \
-            | grep --quiet 'Your name is CI Persona'
-      - name: Check conversation API
-        run: |
-          conversation_id="$(curl --fail --silent --show-error \
-            --cookie /tmp/aster.cookies \
-            --header 'Content-Type: application/json' \
-            --header 'Origin: http://localhost:3000' \
-            --data '{"title":"CI chat"}' \
-            http://localhost:3000/api/conversations \
-            | python -c 'import json, sys; payload=json.load(sys.stdin); assert payload["persona"]["name"] == "CI Persona"; print(payload["id"])')"
-          curl --fail --silent --show-error --cookie /tmp/aster.cookies \
-            "http://localhost:3000/api/conversations/${conversation_id}" \
-            | grep --quiet '"title":"CI chat"'
-          curl --fail --silent --show-error \
-            --cookie /tmp/aster.cookies \
-            --header 'Content-Type: application/json' \
-            --header 'Origin: http://localhost:3000' \
-            --data '{"format":"aster-conversation","version":1,"title":"Imported CI chat","messages":[{"role":"user","content":"Searchable import","status":"completed","error_message":null,"model_id":null}]}' \
-            http://localhost:3000/api/conversations/import \
-            | grep --quiet '"title":"Imported CI chat"'
-          curl --fail --silent --show-error \
-            --cookie /tmp/aster.cookies \
-            --header 'Content-Type: application/json' \
-            --header 'Origin: http://localhost:3000' \
-            --data '{"format":"aster-conversation","version":2,"title":"Snapshot import","persona":{"source_persona_id":null,"name":"Exported Persona","description":"Portable snapshot","instructions":"Stay portable.","instruction_role":"system"},"messages":[]}' \
-            http://localhost:3000/api/conversations/import \
-            | grep --quiet '"name":"Exported Persona"'
-          curl --fail --silent --show-error --cookie /tmp/aster.cookies \
-            'http://localhost:3000/api/conversations?query=Searchable' \
-            | grep --quiet '"title":"Imported CI chat"'
-      - name: Check chat and authentication contracts
-        run: |
-          curl --fail --silent --show-error http://localhost:8000/openapi.json \
-            | python -c 'import json, sys; paths = json.load(sys.stdin)["paths"]; required = ["/api/model-profiles/{model_id}", "/api/model-routing", "/api/personas", "/api/personas/{persona_id}", "/api/persona-preferences", "/api/conversations/import", "/api/conversations/{conversation_id}/messages/{message_id}/edit-and-resend", "/api/conversations/{conversation_id}/messages/{message_id}/regenerate", "/api/messages/{message_id}/stop", "/api/auth/setup", "/api/auth/login", "/api/auth/password"]; assert all(path in paths for path in required)'
-      - name: Check authenticated pages
-        run: |
-          for path in / /settings/models /settings/persona /settings/account; do
-            curl --fail --silent --show-error --cookie /tmp/aster.cookies \
-              "http://localhost:3000${path}" >/dev/null
-          done
-      - name: Check logout through the web proxy
-        run: |
-          curl --fail --silent --show-error --cookie /tmp/aster.cookies \
-            --cookie-jar /tmp/aster.cookies --header 'Origin: http://localhost:3000' \
-            --request POST http://localhost:3000/api/auth/logout >/dev/null
-          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
-            --cookie /tmp/aster.cookies http://localhost:3000/api/auth/me)" = "401"
+          assert settings.aster_session_idle_hours == 168;
+          assert settings.aster_mcp_stdio_enabled is False;
+          assert settings.aster_mcp_timeout_seconds == 30;
+          assert settings.aster_tool_max_rounds == 8;
+          assert settings.aster_tool_argument_max_characters == 100000;
+          assert settings.aster_tool_result_max_characters == 100000'
+      - name: Check core application contracts
+        run: sh scripts/ci/check-stack-core.sh
+      - name: Check Stage 12 tool contracts
+        run: sh scripts/ci/check-stage12-tools.sh
       - name: Show service state
         if: always()
         run: docker compose ps

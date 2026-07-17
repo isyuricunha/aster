@@ -8,34 +8,40 @@ from sqlalchemy import exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.chat_generation import (
-    conversation_response,
     ensure_no_active_generation,
     get_conversation,
     prepare_edit_and_resend,
     prepare_new_message,
     prepare_regeneration,
-    stream_response,
 )
 from app.chat_runtime import generation_registry
+from app.chat_tool_responses import conversation_response
+from app.chat_tool_schemas import (
+    ToolAwareConversationImportRequest,
+    ToolAwareConversationResponse,
+)
 from app.db import get_session
-from app.dependencies import get_openai_client, get_secret_cipher
+from app.dependencies import get_mcp_client, get_openai_client, get_secret_cipher
+from app.mcp_client import McpClient
 from app.models import ChatMessage, Conversation, Persona, PersonaPreferences
 from app.openai_compatible import OpenAICompatibleClient
 from app.schemas import (
     ConversationCreate,
-    ConversationImportRequest,
-    ConversationResponse,
     ConversationSummaryResponse,
     ConversationUpdate,
     SendMessageRequest,
     StopGenerationResponse,
 )
 from app.security import SecretCipher
+from app.tool_generation import stream_response_with_tools
+from app.tool_guards import ensure_no_pending_tool_confirmation
+from app.tool_service import copy_default_tools_to_conversation
 
 router = APIRouter(prefix="/api", tags=["chat"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 CipherDep = Annotated[SecretCipher, Depends(get_secret_cipher)]
 ClientDep = Annotated[OpenAICompatibleClient, Depends(get_openai_client)]
+McpClientDep = Annotated[McpClient, Depends(get_mcp_client)]
 
 
 def _contains_pattern(value: str) -> str:
@@ -136,13 +142,13 @@ async def list_conversations(
 
 @router.post(
     "/conversations",
-    response_model=ConversationResponse,
+    response_model=ToolAwareConversationResponse,
     status_code=status.HTTP_201_CREATED,
 )
 async def create_conversation(
     payload: ConversationCreate,
     session: SessionDep,
-) -> ConversationResponse:
+) -> ToolAwareConversationResponse:
     conversation = Conversation(title=payload.title or "New chat")
     persona = await _resolve_persona(
         session,
@@ -151,6 +157,8 @@ async def create_conversation(
     )
     _apply_persona_snapshot(conversation, persona)
     session.add(conversation)
+    await session.flush()
+    await copy_default_tools_to_conversation(session, conversation_id=conversation.id)
     await session.commit()
     await session.refresh(conversation)
     return await conversation_response(session, conversation)
@@ -158,13 +166,13 @@ async def create_conversation(
 
 @router.post(
     "/conversations/import",
-    response_model=ConversationResponse,
+    response_model=ToolAwareConversationResponse,
     status_code=status.HTTP_201_CREATED,
 )
 async def import_conversation(
-    payload: ConversationImportRequest,
+    payload: ToolAwareConversationImportRequest,
     session: SessionDep,
-) -> ConversationResponse:
+) -> ToolAwareConversationResponse:
     conversation = Conversation(title=payload.title)
     if payload.persona is not None:
         source_persona = (
@@ -190,6 +198,13 @@ async def import_conversation(
                 status=message.status,
                 error_message=message.error_message,
                 model_id=message.model_id,
+                tool_calls=(
+                    [call.model_dump(mode="json") for call in message.tool_calls]
+                    if message.tool_calls
+                    else None
+                ),
+                tool_call_id=message.tool_call_id,
+                tool_name=message.tool_name,
                 position=position,
                 created_at=now,
                 updated_at=now,
@@ -202,26 +217,33 @@ async def import_conversation(
     return await conversation_response(session, conversation)
 
 
-@router.get("/conversations/{conversation_id}", response_model=ConversationResponse)
+@router.get(
+    "/conversations/{conversation_id}",
+    response_model=ToolAwareConversationResponse,
+)
 async def read_conversation(
     conversation_id: UUID,
     session: SessionDep,
-) -> ConversationResponse:
+) -> ToolAwareConversationResponse:
     conversation = await get_conversation(session, conversation_id)
     return await conversation_response(session, conversation)
 
 
-@router.patch("/conversations/{conversation_id}", response_model=ConversationResponse)
+@router.patch(
+    "/conversations/{conversation_id}",
+    response_model=ToolAwareConversationResponse,
+)
 async def update_conversation(
     conversation_id: UUID,
     payload: ConversationUpdate,
     session: SessionDep,
-) -> ConversationResponse:
+) -> ToolAwareConversationResponse:
     conversation = await get_conversation(session, conversation_id, for_update=True)
     if "title" in payload.model_fields_set and payload.title is not None:
         conversation.title = payload.title
     if "persona_id" in payload.model_fields_set:
         await ensure_no_active_generation(session, conversation.id)
+        await ensure_no_pending_tool_confirmation(session, conversation.id)
         persona = await _resolve_persona(
             session,
             use_default_persona=False,
@@ -253,14 +275,22 @@ async def stream_message(
     session: SessionDep,
     cipher: CipherDep,
     client: ClientDep,
+    mcp_client: McpClientDep,
 ) -> StreamingResponse:
+    await ensure_no_pending_tool_confirmation(session, conversation_id)
     prepared = await prepare_new_message(
         session=session,
         cipher=cipher,
         conversation_id=conversation_id,
         content=payload.content,
     )
-    return stream_response(prepared=prepared, session=session, client=client)
+    return await stream_response_with_tools(
+        prepared=prepared,
+        session=session,
+        client=client,
+        mcp_client=mcp_client,
+        cipher=cipher,
+    )
 
 
 @router.post("/conversations/{conversation_id}/messages/{message_id}/edit-and-resend")
@@ -271,7 +301,9 @@ async def edit_and_resend_message(
     session: SessionDep,
     cipher: CipherDep,
     client: ClientDep,
+    mcp_client: McpClientDep,
 ) -> StreamingResponse:
+    await ensure_no_pending_tool_confirmation(session, conversation_id)
     prepared = await prepare_edit_and_resend(
         session=session,
         cipher=cipher,
@@ -279,7 +311,13 @@ async def edit_and_resend_message(
         message_id=message_id,
         content=payload.content,
     )
-    return stream_response(prepared=prepared, session=session, client=client)
+    return await stream_response_with_tools(
+        prepared=prepared,
+        session=session,
+        client=client,
+        mcp_client=mcp_client,
+        cipher=cipher,
+    )
 
 
 @router.post("/conversations/{conversation_id}/messages/{message_id}/regenerate")
@@ -289,14 +327,22 @@ async def regenerate_message(
     session: SessionDep,
     cipher: CipherDep,
     client: ClientDep,
+    mcp_client: McpClientDep,
 ) -> StreamingResponse:
+    await ensure_no_pending_tool_confirmation(session, conversation_id)
     prepared = await prepare_regeneration(
         session=session,
         cipher=cipher,
         conversation_id=conversation_id,
         message_id=message_id,
     )
-    return stream_response(prepared=prepared, session=session, client=client)
+    return await stream_response_with_tools(
+        prepared=prepared,
+        session=session,
+        client=client,
+        mcp_client=mcp_client,
+        cipher=cipher,
+    )
 
 
 @router.post("/messages/{message_id}/stop", response_model=StopGenerationResponse)

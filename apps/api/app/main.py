@@ -14,6 +14,7 @@ from app.routes.health import router as health_router
 from app.routes.model_endpoints import router as model_endpoints_router
 from app.routes.model_profiles import router as model_profiles_router
 from app.routes.persona import router as persona_router
+from app.routes.tools import router as tools_router
 
 
 @asynccontextmanager
@@ -45,4 +46,5 @@ private_route_dependencies = [Depends(require_auth)]
 app.include_router(model_endpoints_router, dependencies=private_route_dependencies)
 app.include_router(model_profiles_router, dependencies=private_route_dependencies)
 app.include_router(persona_router, dependencies=private_route_dependencies)
+app.include_router(tools_router, dependencies=private_route_dependencies)
 app.include_router(chat_router, dependencies=private_route_dependencies)

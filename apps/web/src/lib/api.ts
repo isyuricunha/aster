@@ -123,14 +123,44 @@ export type CompositionPreview = {
   messages: CanonicalMessage[];
 };
 
+export type ToolCall = {
+  id: string;
+  type: "function";
+  function: {
+    name: string;
+    arguments: string;
+  };
+};
+
+export type ToolExecution = {
+  id: string;
+  conversation_id: string;
+  assistant_message_id: string;
+  tool_message_id: string | null;
+  tool_id: string | null;
+  tool_call_id: string;
+  tool_name: string;
+  arguments: Record<string, unknown>;
+  status: "pending_confirmation" | "running" | "completed" | "failed" | "denied";
+  result: string | null;
+  error_message: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ChatMessage = {
   id: string;
   conversation_id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "tool";
   content: string;
   status: "completed" | "streaming" | "failed" | "stopped";
   error_message: string | null;
   model_id: string | null;
+  tool_calls?: ToolCall[] | null;
+  tool_call_id?: string | null;
+  tool_name?: string | null;
   position: number;
   created_at: string;
   updated_at: string;
@@ -158,24 +188,70 @@ export type Conversation = {
   title: string;
   persona?: ConversationPersona | null;
   messages: ChatMessage[];
+  tool_executions?: ToolExecution[];
   created_at: string;
   updated_at: string;
 };
 
 export type ConversationTransferMessage = {
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "tool";
   content: string;
   status: "completed" | "failed" | "stopped";
   error_message: string | null;
   model_id: string | null;
+  tool_calls?: ToolCall[] | null;
+  tool_call_id?: string | null;
+  tool_name?: string | null;
 };
 
 export type ConversationTransfer = {
   format: "aster-conversation";
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   title: string;
   persona?: ConversationPersona | null;
   messages: ConversationTransferMessage[];
+};
+
+export type McpServer = {
+  id: string;
+  name: string;
+  transport: "streamable_http" | "stdio";
+  url: string | null;
+  command: string | null;
+  arguments: string[];
+  header_names: string[];
+  environment_names: string[];
+  enabled: boolean;
+  timeout_seconds: number;
+  tool_count: number;
+  available_tool_count: number;
+  last_sync_status: "succeeded" | "failed" | null;
+  last_sync_at: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type McpTool = {
+  id: string;
+  server_id: string;
+  server_name: string;
+  name: string;
+  public_name: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+  enabled: boolean;
+  default_enabled: boolean;
+  requires_confirmation: boolean;
+  is_available: boolean;
+  last_seen_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ConversationToolSettings = {
+  conversation_id: string;
+  tools: McpTool[];
 };
 
 export type AuthStatus = {

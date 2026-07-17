@@ -60,4 +60,4 @@ SQL
 snapshot_result="$(printf '%s' "${snapshot_result}" | tr -d '\r')"
 test "${snapshot_result}" = "Migrated Assistant|Preserve these legacy instructions."
 
-docker compose exec -T api alembic current | grep --quiet '0008_multiple_personas'
+docker compose exec -T api alembic current | grep --quiet '0009_tools_and_mcp'

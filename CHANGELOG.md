@@ -6,6 +6,18 @@ All notable changes to Aster are documented in this file.
 
 ### Added
 
+- MCP server configuration for Streamable HTTP and opt-in stdio transports.
+- Encrypted MCP HTTP headers and process environment values.
+- MCP tool discovery, synchronization, availability tracking, and stable namespaced tool identifiers.
+- Global tool policies for enablement, new-conversation defaults, and confirmation requirements.
+- Explicit per-conversation tool scopes.
+- Native OpenAI-compatible streamed tool calling with persisted assistant calls and tool-role results.
+- Owner approval and denial flows for sensitive tool calls.
+- Tool execution history with arguments, status, results, errors, and timestamps.
+- Bounded tool rounds, argument sizes, result sizes, and execution timeouts.
+- Restart recovery for interrupted tool executions.
+- Version 3 conversation transfer with portable tool-call and tool-result history.
+- Tools settings and in-chat request, result, approval, and denial interfaces.
 - Reusable persona library with create, edit, duplicate, delete, import, and export workflows.
 - Optional default persona for new conversations.
 - Frozen persona snapshots for individual conversations.
@@ -40,6 +52,10 @@ All notable changes to Aster are documented in this file.
 
 ### Changed
 
+- Tool results are treated as untrusted data when returned to the model.
+- New MCP tools start disabled, are not assigned to new conversations, and require confirmation.
+- Conversation changes are blocked while a tool approval is pending.
+- Changing an MCP transport removes secrets that belong to the previous transport.
 - The original global persona is migrated into the persona library without discarding its instructions.
 - Chat generation now reads persona context from the conversation snapshot instead of mutable global configuration.
 - Editing or deleting a library persona no longer changes existing conversations.
@@ -61,6 +77,10 @@ All notable changes to Aster are documented in this file.
 
 ### Fixed
 
+- Tool names from different MCP servers cannot collide in model requests.
+- A model cannot execute a tool that is disabled, unavailable, or outside the conversation scope.
+- Tool execution failures and denials remain visible instead of disappearing from the model loop.
+- Interrupted running tool executions are marked failed after restart.
 - Persona library changes cannot retroactively rewrite the instruction context of old conversations.
 - Fallback routing never combines partial output from different models.
 - Authentication and request-validation failures remain visible instead of triggering fallback.

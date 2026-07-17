@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     aster_session_touch_seconds: int = Field(default=300, ge=30, le=3600)
     aster_login_attempts: int = Field(default=5, ge=1, le=100)
     aster_login_window_seconds: int = Field(default=300, ge=30, le=86400)
+    aster_mcp_stdio_enabled: bool = False
+    aster_mcp_timeout_seconds: float = Field(default=30.0, gt=0, le=600)
+    aster_tool_max_rounds: int = Field(default=8, ge=1, le=32)
+    aster_tool_argument_max_characters: int = Field(default=100_000, ge=1_000, le=1_000_000)
+    aster_tool_result_max_characters: int = Field(default=100_000, ge=1_000, le=1_000_000)
 
     @field_validator("aster_encryption_key")
     @classmethod

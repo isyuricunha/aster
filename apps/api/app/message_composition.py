@@ -44,30 +44,32 @@ def _render_persona(persona: PersonaConfiguration) -> str:
     return "\n\n".join(parts)
 
 
+def compose_persona_messages(persona: PersonaConfiguration) -> list[CanonicalMessage]:
+    persona_content = _render_persona(persona)
+    if not persona.enabled or not persona_content:
+        return []
+    if persona.instruction_role is MessageRole.SYSTEM:
+        persona_content = (
+            "[USER_DEFINED_PERSONA]\n"
+            f"{persona_content}\n"
+            "[/USER_DEFINED_PERSONA]"
+        )
+    return [
+        CanonicalMessage(
+            role=persona.instruction_role,
+            source=MessageSource.PERSONA,
+            content=persona_content,
+        )
+    ]
+
+
 def compose_messages(
     *,
     persona: PersonaConfiguration,
     history: Sequence[CanonicalMessage] = (),
     current_user_message: str,
 ) -> list[CanonicalMessage]:
-    messages: list[CanonicalMessage] = []
-    persona_content = _render_persona(persona)
-
-    if persona.enabled and persona_content:
-        if persona.instruction_role is MessageRole.SYSTEM:
-            persona_content = (
-                "[USER_DEFINED_PERSONA]\n"
-                f"{persona_content}\n"
-                "[/USER_DEFINED_PERSONA]"
-            )
-        messages.append(
-            CanonicalMessage(
-                role=persona.instruction_role,
-                source=MessageSource.PERSONA,
-                content=persona_content,
-            )
-        )
-
+    messages = compose_persona_messages(persona)
     messages.extend(history)
     messages.append(
         CanonicalMessage(
