@@ -18,7 +18,9 @@ import {
   type Conversation,
   type ConversationSummary,
   type ModelPreferences,
+  type ToolExecution,
 } from "../lib/api";
+import { ToolCallList, ToolExecutionCard } from "./chat-tool-cards";
 import {
   createConversationMarkdown,
   createConversationTransfer,
@@ -44,6 +46,7 @@ type MetaEvent = {
 
 type DeltaEvent = { content: string };
 type TerminalEvent = { message: ChatMessage };
+type ToolExecutionEvent = { execution: ToolExecution };
 type ErrorEvent = { code: string; message: string };
 
 async function readEventStream(
@@ -81,6 +84,23 @@ async function readEventStream(
     if (done) break;
   }
   if (buffer.trim()) processBlock(buffer);
+}
+
+function upsertMessage(messages: ChatMessage[], nextMessage: ChatMessage): ChatMessage[] {
+  const exists = messages.some((message) => message.id === nextMessage.id);
+  if (!exists) return [...messages, nextMessage].sort((left, right) => left.position - right.position);
+  return messages.map((message) => (message.id === nextMessage.id ? nextMessage : message));
+}
+
+function upsertExecution(
+  executions: ToolExecution[] | undefined,
+  nextExecution: ToolExecution,
+): ToolExecution[] {
+  const current = executions ?? [];
+  const exists = current.some((execution) => execution.id === nextExecution.id);
+  return exists
+    ? current.map((execution) => (execution.id === nextExecution.id ? nextExecution : execution))
+    : [...current, nextExecution];
 }
 
 export function ChatShell({
@@ -125,6 +145,13 @@ export function ChatShell({
   }, [preferences]);
 
   const visibleConversations = searchResults ?? conversations;
+  const pendingConfirmation = useMemo(
+    () =>
+      (conversation?.tool_executions ?? []).some(
+        (execution) => execution.status === "pending_confirmation",
+      ),
+    [conversation],
+  );
 
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
@@ -360,7 +387,9 @@ export function ChatShell({
         return {
           id: meta.conversation_id,
           title: meta.title,
+          persona: current?.persona ?? null,
           messages: [...retained, ...meta.messages],
+          tool_executions: current?.tool_executions ?? [],
           created_at: current?.created_at ?? meta.messages[0]?.created_at ?? new Date().toISOString(),
           updated_at: meta.messages.at(-1)?.updated_at ?? new Date().toISOString(),
         };
@@ -385,15 +414,40 @@ export function ChatShell({
       return;
     }
 
+    if (event.event === "assistant_started" || event.event === "tool_calls") {
+      const terminal = event.data as TerminalEvent;
+      if (event.event === "assistant_started") {
+        activeAssistantIdRef.current = terminal.message.id;
+        setActiveAssistantId(terminal.message.id);
+      }
+      setConversation((current) =>
+        current
+          ? { ...current, messages: upsertMessage(current.messages, terminal.message) }
+          : current,
+      );
+      return;
+    }
+
+    if (event.event === "confirmation_required" || event.event === "tool_result") {
+      const toolEvent = event.data as ToolExecutionEvent;
+      setConversation((current) =>
+        current
+          ? {
+              ...current,
+              tool_executions: upsertExecution(current.tool_executions, toolEvent.execution),
+            }
+          : current,
+      );
+      return;
+    }
+
     if (event.event === "done" || event.event === "stopped") {
       const terminal = event.data as TerminalEvent;
       setConversation((current) => {
         if (!current) return current;
         return {
           ...current,
-          messages: current.messages.map((message) =>
-            message.id === terminal.message.id ? terminal.message : message,
-          ),
+          messages: upsertMessage(current.messages, terminal.message),
         };
       });
       return;
@@ -424,7 +478,7 @@ export function ChatShell({
   }: {
     conversationId: string;
     path: string;
-    body?: Record<string, string>;
+    body?: Record<string, unknown>;
   }) {
     setStreaming(true);
     setStopping(false);
@@ -471,7 +525,7 @@ export function ChatShell({
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const content = draft;
-    if (!content.trim() || streaming) return;
+    if (!content.trim() || streaming || pendingConfirmation) return;
     if (!primaryLabel) {
       setError("Configure a primary model before starting a chat.");
       return;
@@ -492,7 +546,7 @@ export function ChatShell({
   }
 
   function startEditing(message: ChatMessage) {
-    if (streaming || message.role !== "user") return;
+    if (streaming || pendingConfirmation || message.role !== "user") return;
     setEditingMessageId(message.id);
     setEditingDraft(message.content);
     setError(null);
@@ -500,7 +554,7 @@ export function ChatShell({
 
   async function editAndResend(event: FormEvent<HTMLFormElement>, message: ChatMessage) {
     event.preventDefault();
-    if (!conversation || streaming || !editingDraft.trim()) return;
+    if (!conversation || streaming || pendingConfirmation || !editingDraft.trim()) return;
     const removesLaterMessages = conversation.messages.some(
       (candidate) => candidate.position > message.position + 1,
     );
@@ -527,7 +581,7 @@ export function ChatShell({
   }
 
   async function regenerate(message: ChatMessage) {
-    if (!conversation || streaming || message.role !== "assistant") return;
+    if (!conversation || streaming || pendingConfirmation || message.role !== "assistant") return;
     const removesLaterMessages = conversation.messages.some(
       (candidate) => candidate.position > message.position,
     );
@@ -545,6 +599,18 @@ export function ChatShell({
       });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not regenerate the response.");
+    }
+  }
+
+  async function decideTool(execution: ToolExecution, decision: "approve" | "deny") {
+    if (!conversation || streaming) return;
+    try {
+      await runStream({
+        conversationId: conversation.id,
+        path: `/api/tool-executions/${execution.id}/${decision}`,
+      });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : `Could not ${decision} the tool call.`);
     }
   }
 
@@ -687,7 +753,11 @@ export function ChatShell({
           </Link>
           <Link href="/settings/persona">
             <Icon name="persona" />
-            <span>Persona</span>
+            <span>Personas</span>
+          </Link>
+          <Link href="/settings/tools">
+            <Icon name="tools" />
+            <span>Tools</span>
           </Link>
           <Link href="/settings/account">
             <Icon name="account" />
@@ -793,108 +863,154 @@ export function ChatShell({
             </div>
           ) : (
             <div className="message-stack">
-              {conversation.messages.map((message) => (
-                <article className={`chat-message ${message.role}`} key={message.id}>
-                  <div className="message-avatar">
-                    {message.role === "user" ? <span>Y</span> : <AsterMark size={26} />}
-                  </div>
-                  <div className="message-body">
-                    <div className="message-label">
-                      <span>{message.role === "user" ? "You" : "Aster"}</span>
-                      {message.status === "streaming" && <small>Generating</small>}
-                      {message.status === "failed" && <small className="failed">Failed</small>}
-                      {message.status === "stopped" && <small>Stopped</small>}
+              {conversation.messages.map((message) => {
+                const executions = (conversation.tool_executions ?? []).filter(
+                  (execution) => execution.assistant_message_id === message.id,
+                );
+                return (
+                  <article className={`chat-message ${message.role}`} key={message.id}>
+                    <div className="message-avatar">
+                      {message.role === "user" ? (
+                        <span>Y</span>
+                      ) : message.role === "tool" ? (
+                        <Icon name="tools" size={16} />
+                      ) : (
+                        <AsterMark size={26} />
+                      )}
                     </div>
+                    <div className="message-body">
+                      <div className="message-label">
+                        <span>
+                          {message.role === "user"
+                            ? "You"
+                            : message.role === "tool"
+                              ? `Tool · ${message.tool_name ?? "unknown"}`
+                              : "Aster"}
+                        </span>
+                        {message.status === "streaming" && <small>Generating</small>}
+                        {message.status === "failed" && <small className="failed">Failed</small>}
+                        {message.status === "stopped" && <small>Stopped</small>}
+                      </div>
 
-                    {editingMessageId === message.id ? (
-                      <form
-                        className="message-edit-form"
-                        onSubmit={(event) => void editAndResend(event, message)}
-                      >
-                        <textarea
-                          autoFocus
-                          onChange={(event) => setEditingDraft(event.target.value)}
-                          rows={4}
-                          value={editingDraft}
-                        />
-                        <div className="message-edit-actions">
-                          <button
-                            className="message-action"
-                            type="button"
-                            onClick={() => setEditingMessageId(null)}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            className="message-action primary"
-                            disabled={!editingDraft.trim()}
-                            type="submit"
-                          >
-                            Save and resend
-                          </button>
-                        </div>
-                      </form>
-                    ) : (
-                      <>
-                        <MarkdownMessage
-                          content={message.content}
-                          streaming={message.status === "streaming"}
-                        />
-                        {message.error_message && (
-                          <p className="message-error">{message.error_message}</p>
-                        )}
-                        {!streaming && (
-                          <div className="message-actions">
+                      {editingMessageId === message.id ? (
+                        <form
+                          className="message-edit-form"
+                          onSubmit={(event) => void editAndResend(event, message)}
+                        >
+                          <textarea
+                            autoFocus
+                            onChange={(event) => setEditingDraft(event.target.value)}
+                            rows={4}
+                            value={editingDraft}
+                          />
+                          <div className="message-edit-actions">
                             <button
                               className="message-action"
-                              onClick={() => void copyMessage(message)}
+                              type="button"
+                              onClick={() => setEditingMessageId(null)}
                             >
-                              <Icon
-                                name={copiedMessageId === message.id ? "check" : "copy"}
-                                size={13}
-                              />
-                              {copiedMessageId === message.id ? "Copied" : "Copy"}
+                              Cancel
                             </button>
-                            {message.role === "user" && message.status === "completed" && (
-                              <button className="message-action" onClick={() => startEditing(message)}>
-                                <Icon name="edit" size={13} />
-                                Edit
-                              </button>
-                            )}
-                            {message.role === "assistant" && message.status !== "streaming" && (
-                              <button
-                                className="message-action"
-                                onClick={() => void regenerate(message)}
-                              >
-                                <Icon name="refresh" size={13} />
-                                Regenerate
-                              </button>
-                            )}
+                            <button
+                              className="message-action primary"
+                              disabled={!editingDraft.trim()}
+                              type="submit"
+                            >
+                              Save and resend
+                            </button>
                           </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </article>
-              ))}
+                        </form>
+                      ) : (
+                        <>
+                          {message.tool_calls?.length ? (
+                            <ToolCallList calls={message.tool_calls} />
+                          ) : null}
+                          {message.content ? (
+                            <MarkdownMessage
+                              content={message.content}
+                              streaming={message.status === "streaming"}
+                            />
+                          ) : null}
+                          {executions.map((execution) => (
+                            <ToolExecutionCard
+                              disabled={streaming}
+                              execution={execution}
+                              key={execution.id}
+                              onDecision={(item, decision) => void decideTool(item, decision)}
+                            />
+                          ))}
+                          {message.error_message && (
+                            <p className="message-error">{message.error_message}</p>
+                          )}
+                          {!streaming && (
+                            <div className="message-actions">
+                              {message.content ? (
+                                <button
+                                  className="message-action"
+                                  onClick={() => void copyMessage(message)}
+                                >
+                                  <Icon
+                                    name={copiedMessageId === message.id ? "check" : "copy"}
+                                    size={13}
+                                  />
+                                  {copiedMessageId === message.id ? "Copied" : "Copy"}
+                                </button>
+                              ) : null}
+                              {message.role === "user" && message.status === "completed" && (
+                                <button className="message-action" onClick={() => startEditing(message)}>
+                                  <Icon name="edit" size={13} />
+                                  Edit
+                                </button>
+                              )}
+                              {message.role === "assistant" && message.status !== "streaming" && (
+                                <button
+                                  className="message-action"
+                                  disabled={pendingConfirmation}
+                                  onClick={() => void regenerate(message)}
+                                >
+                                  <Icon name="refresh" size={13} />
+                                  Regenerate
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
         </section>
 
         <footer className="chat-composer-wrap">
           {error && <div className="chat-error">{error}</div>}
+          {pendingConfirmation ? (
+            <div className="chat-error">Review the pending tool request before continuing.</div>
+          ) : null}
           <form className="chat-composer" onSubmit={sendMessage}>
             <div className="composer-status">
               <span className={primaryLabel ? "configured" : ""} />
-              <p>{primaryLabel ?? "Configure a primary model to start chatting"}</p>
+              <p>
+                {pendingConfirmation
+                  ? "Tool approval required"
+                  : primaryLabel ?? "Configure a primary model to start chatting"}
+              </p>
             </div>
             <div className="composer-row">
               <textarea
                 aria-label="Message"
-                disabled={streaming}
+                disabled={streaming || pendingConfirmation}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={handleComposerKeyDown}
-                placeholder={primaryLabel ? "Message Aster…" : "Primary model required"}
+                placeholder={
+                  pendingConfirmation
+                    ? "Approve or deny the pending tool call"
+                    : primaryLabel
+                      ? "Message Aster…"
+                      : "Primary model required"
+                }
                 ref={composerRef}
                 rows={1}
                 value={draft}
@@ -913,7 +1029,7 @@ export function ChatShell({
                 <button
                   aria-label="Send message"
                   className="send-message"
-                  disabled={!draft.trim() || !primaryLabel}
+                  disabled={!draft.trim() || !primaryLabel || pendingConfirmation}
                   type="submit"
                 >
                   <Icon name="arrow-up" />
