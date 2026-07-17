@@ -10,6 +10,7 @@ export type IconName =
   | "copy"
   | "download"
   | "edit"
+  | "images"
   | "lock"
   | "memory"
   | "models"
@@ -68,6 +69,13 @@ export function Icon({ name, size = 16, ...props }: IconProps) {
       <>
         <path d="m14.5 5.5 4 4L9 19H5v-4l9.5-9.5Z" />
         <path d="m12.5 7.5 4 4" />
+      </>
+    ),
+    images: (
+      <>
+        <rect x="4" y="5" width="16" height="14" rx="2" />
+        <circle cx="9" cy="10" r="1.5" />
+        <path d="m6.5 17 4.2-4.2 2.8 2.8 1.8-1.8 2.2 3.2" />
       </>
     ),
     lock: (
