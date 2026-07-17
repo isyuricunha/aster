@@ -104,7 +104,6 @@ class OpenAICompatibleClient:
         payload: dict[str, object] = {
             "model": model_id,
             "input": list(inputs),
-            "encoding_format": "float",
         }
         try:
             async with httpx.AsyncClient(
