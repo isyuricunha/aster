@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import exists, select
+from sqlalchemy import delete, exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.image_models import (
@@ -80,6 +80,30 @@ async def delete_unreferenced_media_assets(
     storage_keys = [asset.storage_key for asset in assets]
     for asset in assets:
         await session.delete(asset)
+    await session.flush()
+    return storage_keys
+
+
+async def delete_conversation_output_media(
+    session: AsyncSession,
+    *,
+    conversation_id: UUID,
+    store: PrivateMediaStore,
+) -> list[str]:
+    del store
+    rows = (
+        await session.execute(
+            select(MediaAsset.id, MediaAsset.storage_key)
+            .join(ImageOperationOutput, ImageOperationOutput.asset_id == MediaAsset.id)
+            .join(ImageOperation, ImageOperation.id == ImageOperationOutput.operation_id)
+            .where(ImageOperation.conversation_id == conversation_id)
+        )
+    ).all()
+    if not rows:
+        return []
+    asset_ids = [asset_id for asset_id, _ in rows]
+    storage_keys = [storage_key for _, storage_key in rows]
+    await session.execute(delete(MediaAsset).where(MediaAsset.id.in_(asset_ids)))
     await session.flush()
     return storage_keys
 
