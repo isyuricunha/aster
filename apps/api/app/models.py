@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -240,6 +241,67 @@ class PersonaPreferences(TimestampMixin, Base):
     )
 
 
+class McpServer(TimestampMixin, Base):
+    __tablename__ = "mcp_servers"
+    __table_args__ = (
+        CheckConstraint(
+            "transport IN ('streamable_http', 'stdio')",
+            name="ck_mcp_servers_transport",
+        ),
+        CheckConstraint("timeout_seconds > 0", name="ck_mcp_servers_timeout"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+    transport: Mapped[str] = mapped_column(String(32), nullable=False)
+    url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    command: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    arguments: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    encrypted_headers: Mapped[str | None] = mapped_column(Text, nullable=True)
+    header_names: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    encrypted_environment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    environment_names: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    enabled: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true", nullable=False
+    )
+    timeout_seconds: Mapped[int] = mapped_column(
+        Integer, default=30, server_default="30", nullable=False
+    )
+    last_sync_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+
+class McpTool(TimestampMixin, Base):
+    __tablename__ = "mcp_tools"
+    __table_args__ = (
+        UniqueConstraint("server_id", "name", name="uq_mcp_tools_server_name"),
+        UniqueConstraint("public_name", name="uq_mcp_tools_public_name"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    server_id: Mapped[UUID] = mapped_column(
+        ForeignKey("mcp_servers.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(256), nullable=False)
+    public_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", server_default="", nullable=False)
+    input_schema: Mapped[dict[str, object]] = mapped_column(JSON, default=dict, nullable=False)
+    enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    default_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    requires_confirmation: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true", nullable=False
+    )
+    is_available: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true", nullable=False
+    )
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class Conversation(TimestampMixin, Base):
     __tablename__ = "conversations"
     __table_args__ = (
@@ -263,11 +325,25 @@ class Conversation(TimestampMixin, Base):
     persona_instruction_role: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
 
+class ConversationTool(Base):
+    __tablename__ = "conversation_tools"
+
+    conversation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), primary_key=True
+    )
+    tool_id: Mapped[UUID] = mapped_column(
+        ForeignKey("mcp_tools.id", ondelete="CASCADE"), primary_key=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class ChatMessage(TimestampMixin, Base):
     __tablename__ = "chat_messages"
     __table_args__ = (
         UniqueConstraint("conversation_id", "position", name="uq_chat_message_position"),
-        CheckConstraint("role IN ('user', 'assistant')", name="ck_chat_message_role"),
+        CheckConstraint("role IN ('user', 'assistant', 'tool')", name="ck_chat_message_role"),
         CheckConstraint(
             "status IN ('completed', 'streaming', 'failed', 'stopped')",
             name="ck_chat_message_status",
@@ -283,4 +359,42 @@ class ChatMessage(TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     error_message: Mapped[str | None] = mapped_column(String(500), nullable=True)
     model_id: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    tool_calls: Mapped[list[dict[str, object]] | None] = mapped_column(JSON, nullable=True)
+    tool_call_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    tool_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
     position: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class ToolExecution(TimestampMixin, Base):
+    __tablename__ = "tool_executions"
+    __table_args__ = (
+        UniqueConstraint(
+            "conversation_id", "tool_call_id", name="uq_tool_execution_conversation_call"
+        ),
+        CheckConstraint(
+            "status IN ('pending_confirmation', 'running', 'completed', 'failed', 'denied')",
+            name="ck_tool_executions_status",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    conversation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    assistant_message_id: Mapped[UUID] = mapped_column(
+        ForeignKey("chat_messages.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    tool_message_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("chat_messages.id", ondelete="SET NULL"), nullable=True
+    )
+    tool_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("mcp_tools.id", ondelete="SET NULL"), nullable=True
+    )
+    tool_call_id: Mapped[str] = mapped_column(String(256), nullable=False)
+    tool_name: Mapped[str] = mapped_column(String(256), nullable=False)
+    arguments: Mapped[dict[str, object]] = mapped_column(JSON, default=dict, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    result: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
