@@ -207,34 +207,60 @@ class ModelFallbackEntry(TimestampMixin, Base):
     position: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
-class PersonaSettings(TimestampMixin, Base):
-    __tablename__ = "persona_settings"
+class Persona(TimestampMixin, Base):
+    __tablename__ = "personas"
     __table_args__ = (
-        CheckConstraint("id = 1", name="ck_persona_settings_singleton"),
         CheckConstraint(
             "instruction_role IN ('developer', 'system')",
-            name="ck_persona_instruction_role",
+            name="ck_personas_instruction_role",
         ),
     )
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
-    name: Mapped[str] = mapped_column(String(120), default="", server_default="", nullable=False)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    description: Mapped[str] = mapped_column(
+        String(500), default="", server_default="", nullable=False
+    )
     instructions: Mapped[str] = mapped_column(Text, default="", server_default="", nullable=False)
     enabled: Mapped[bool] = mapped_column(
-        Boolean, default=False, server_default="false", nullable=False
+        Boolean, default=True, server_default="true", nullable=False
     )
     instruction_role: Mapped[str] = mapped_column(
         String(16), default="developer", server_default="developer", nullable=False
     )
 
 
+class PersonaPreferences(TimestampMixin, Base):
+    __tablename__ = "persona_preferences"
+    __table_args__ = (CheckConstraint("id = 1", name="ck_persona_preferences_singleton"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    default_persona_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("personas.id", ondelete="SET NULL"), nullable=True
+    )
+
+
 class Conversation(TimestampMixin, Base):
     __tablename__ = "conversations"
+    __table_args__ = (
+        CheckConstraint(
+            "persona_instruction_role IS NULL OR "
+            "persona_instruction_role IN ('developer', 'system')",
+            name="ck_conversation_persona_role",
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     title: Mapped[str] = mapped_column(
         String(200), default="New chat", server_default="New chat", nullable=False
     )
+    persona_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("personas.id", ondelete="SET NULL"), index=True, nullable=True
+    )
+    persona_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    persona_description: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    persona_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    persona_instruction_role: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
 
 class ChatMessage(TimestampMixin, Base):
