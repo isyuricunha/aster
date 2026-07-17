@@ -7,8 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import image_models, retrieval_models  # noqa: F401
 from app.auth_dependencies import require_auth
 from app.config import settings
-from app.db import AsyncSessionFactory, engine
-from app.image_service import recover_interrupted_image_operations
+from app.db import engine
 from app.middleware import security_middleware
 from app.routes.auth import router as auth_router
 from app.routes.chat import router as chat_router
@@ -24,8 +23,6 @@ from app.routes.tools import router as tools_router
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    async with AsyncSessionFactory() as session:
-        await recover_interrupted_image_operations(session)
     yield
     await engine.dispose()
 
