@@ -21,9 +21,13 @@ from app.message_composition import (
     compose_messages,
 )
 from app.model_routing import ModelTarget, can_fallback, resolve_chat_targets
-from app.models import ChatMessage, Conversation, PersonaSettings
+from app.models import ChatMessage, Conversation
 from app.openai_compatible import ModelEndpointError, OpenAICompatibleClient
-from app.schemas import ChatMessageResponse, ConversationResponse
+from app.schemas import (
+    ChatMessageResponse,
+    ConversationPersonaResponse,
+    ConversationResponse,
+)
 from app.security import SecretCipher
 
 GenerationOperation = Literal["send", "edit", "regenerate"]
@@ -56,6 +60,20 @@ def message_response(message: ChatMessage) -> ChatMessageResponse:
     )
 
 
+def conversation_persona_response(
+    conversation: Conversation,
+) -> ConversationPersonaResponse | None:
+    if conversation.persona_name is None or conversation.persona_instruction_role is None:
+        return None
+    return ConversationPersonaResponse(
+        source_persona_id=conversation.persona_id,
+        name=conversation.persona_name,
+        description=conversation.persona_description or "",
+        instructions=conversation.persona_instructions or "",
+        instruction_role=conversation.persona_instruction_role,
+    )
+
+
 async def conversation_response(
     session: AsyncSession, conversation: Conversation
 ) -> ConversationResponse:
@@ -69,6 +87,7 @@ async def conversation_response(
     return ConversationResponse(
         id=conversation.id,
         title=conversation.title,
+        persona=conversation_persona_response(conversation),
         messages=[message_response(message) for message in messages],
         created_at=conversation.created_at,
         updated_at=conversation.updated_at,
@@ -97,8 +116,8 @@ def _title_from_message(content: str) -> str:
     return f"{normalized[:57].rstrip()}..."
 
 
-def _persona_configuration(persona: PersonaSettings | None) -> PersonaConfiguration:
-    if persona is None:
+def _persona_configuration(conversation: Conversation) -> PersonaConfiguration:
+    if conversation.persona_name is None or conversation.persona_instruction_role is None:
         return PersonaConfiguration(
             name="",
             instructions="",
@@ -106,10 +125,10 @@ def _persona_configuration(persona: PersonaSettings | None) -> PersonaConfigurat
             instruction_role=MessageRole.DEVELOPER,
         )
     return PersonaConfiguration(
-        name=persona.name,
-        instructions=persona.instructions,
-        enabled=persona.enabled,
-        instruction_role=MessageRole(persona.instruction_role),
+        name=conversation.persona_name,
+        instructions=conversation.persona_instructions or "",
+        enabled=True,
+        instruction_role=MessageRole(conversation.persona_instruction_role),
     )
 
 
@@ -465,9 +484,8 @@ def stream_response(
         last_checkpoint = asyncio.get_running_loop().time()
         last_error: ModelEndpointError | None = None
         try:
-            persona = await session.get(PersonaSettings, 1)
             canonical_messages = compose_messages(
-                persona=_persona_configuration(persona),
+                persona=_persona_configuration(prepared.conversation),
                 history=_canonical_history(prepared.history),
                 current_user_message=prepared.current_user_message.content,
             )
@@ -584,9 +602,7 @@ def stream_response(
         except asyncio.CancelledError:
             status_value = "stopped" if prepared.stop_event.is_set() else "failed"
             error_message = (
-                None
-                if status_value == "stopped"
-                else "The response stream was interrupted."
+                None if status_value == "stopped" else "The response stream was interrupted."
             )
             with suppress(Exception):
                 await _finalize_message(

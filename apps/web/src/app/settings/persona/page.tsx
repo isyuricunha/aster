@@ -1,48 +1,63 @@
-import type { PersonaSettings } from "../../../lib/api";
+import type {
+  ConversationSummary,
+  Persona,
+  PersonaPreferences,
+} from "../../../lib/api";
 import { requireServerAuth, serverApiFetch } from "../../../lib/server-api";
 import { AppFrame } from "../../ui/app-frame";
 import { PersonaSettingsForm } from "./persona-settings";
 
 export const dynamic = "force-dynamic";
 
-const neutralPersona: PersonaSettings = {
-  name: "",
-  instructions: "",
-  enabled: false,
-  instruction_role: "developer",
-  created_at: "",
-  updated_at: "",
+type PersonaPageData = {
+  personas: Persona[];
+  preferences: PersonaPreferences;
+  conversations: ConversationSummary[];
+  error: string | null;
 };
 
-async function getPersona(): Promise<{ persona: PersonaSettings; error: string | null }> {
+async function getPersonaPageData(): Promise<PersonaPageData> {
   try {
-    const response = await serverApiFetch("/api/persona");
-    if (!response.ok) {
-      throw new Error(`Persona API returned HTTP ${response.status}.`);
+    const [personaResponse, preferenceResponse, conversationResponse] = await Promise.all([
+      serverApiFetch("/api/personas"),
+      serverApiFetch("/api/persona-preferences"),
+      serverApiFetch("/api/conversations"),
+    ]);
+    if (!personaResponse.ok || !preferenceResponse.ok || !conversationResponse.ok) {
+      throw new Error("The persona API returned an error.");
     }
-    return { persona: (await response.json()) as PersonaSettings, error: null };
+    return {
+      personas: (await personaResponse.json()) as Persona[],
+      preferences: (await preferenceResponse.json()) as PersonaPreferences,
+      conversations: (await conversationResponse.json()) as ConversationSummary[],
+      error: null,
+    };
   } catch (caught) {
     return {
-      persona: neutralPersona,
-      error: caught instanceof Error ? caught.message : "Could not load the persona.",
+      personas: [],
+      preferences: { default_persona: null },
+      conversations: [],
+      error: caught instanceof Error ? caught.message : "Could not load personas.",
     };
   }
 }
 
 export default async function PersonaSettingsPage() {
   await requireServerAuth();
-  const initialData = await getPersona();
+  const data = await getPersonaPageData();
 
   return (
     <AppFrame
       active="persona"
       kicker="Configuration"
-      title="Persona"
-      description="Define the identity and instruction layer applied before the real conversation while preserving the user message as its own role."
+      title="Personas"
+      description="Build reusable assistant identities, choose the default for new chats, and freeze a persona snapshot into each conversation."
     >
       <PersonaSettingsForm
-        initialPersona={initialData.persona}
-        initialError={initialData.error}
+        initialConversations={data.conversations}
+        initialError={data.error}
+        initialPersonas={data.personas}
+        initialPreferences={data.preferences}
       />
     </AppFrame>
   );

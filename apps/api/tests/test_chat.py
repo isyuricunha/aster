@@ -6,7 +6,8 @@ from app.models import (
     ModelCacheEntry,
     ModelEndpoint,
     ModelPreferences,
-    PersonaSettings,
+    Persona,
+    PersonaPreferences,
 )
 from app.openai_compatible import ModelEndpointError
 
@@ -22,18 +23,17 @@ async def configure_primary(session_factory: async_sessionmaker[AsyncSession]) -
             is_manual=True,
             is_available=True,
         )
-        session.add(model)
+        persona = Persona(
+            name="Assistant",
+            description="Test persona",
+            instructions="Be direct.",
+            enabled=True,
+            instruction_role="developer",
+        )
+        session.add_all([model, persona])
         await session.flush()
         session.add(ModelPreferences(id=1, primary_model_id=model.id))
-        session.add(
-            PersonaSettings(
-                id=1,
-                name="Assistant",
-                instructions="Be direct.",
-                enabled=True,
-                instruction_role="developer",
-            )
-        )
+        session.add(PersonaPreferences(id=1, default_persona_id=persona.id))
         await session.commit()
 
 
@@ -59,6 +59,7 @@ async def test_chat_persists_streamed_messages_and_uses_primary_model(api_client
 
     detail = (await client.get(f"/api/conversations/{conversation_id}")).json()
     assert detail["title"] == "Keep my spacing"
+    assert detail["persona"]["name"] == "Assistant"
     assert detail["messages"][0]["content"] == "  Keep my spacing  "
     assert detail["messages"][1]["content"] == "Hello from Aster"
     assert detail["messages"][1]["status"] == "completed"
@@ -171,6 +172,7 @@ async def test_conversation_import_preserves_content_and_order(api_client: tuple
     assert response.status_code == 201
     detail = response.json()
     assert detail["title"] == "Imported chat"
+    assert detail["persona"] is None
     assert [message["position"] for message in detail["messages"]] == [0, 1]
     assert detail["messages"][0]["content"] == "Show me `code`."
     assert detail["messages"][1]["status"] == "stopped"

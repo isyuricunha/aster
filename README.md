@@ -2,7 +2,7 @@
 
 Aster is a self-hosted AI chat application built around user-defined personas and OpenAI-compatible model endpoints.
 
-MVP 1 is feature-complete and has been validated against a real endpoint with a model cache containing more than one thousand entries. Stage 7 adds single-owner authentication for safe remote access.
+The focused chat foundation is complete. Stages 7 through 11 add single-owner authentication, the shared application interface, structured chat rendering, model profiles and fallback routing, and multiple reusable personas with stable conversation snapshots.
 
 ## Current capabilities
 
@@ -17,12 +17,17 @@ MVP 1 is feature-complete and has been validated against a real endpoint with a 
 - Add model IDs manually
 - Search and browse large model caches without rendering the entire list at once
 - Select primary, utility, and image model roles through searchable selectors
-- Resolve utility to primary when utility is not configured
-- Configure one global persona with a developer or system instruction role
+- Configure per-model output, sampling, reasoning, and compatibility profiles
+- Configure one ordered global fallback chain without combining partial model output
+- Maintain a reusable persona library with create, edit, duplicate, delete, import, and export workflows
+- Select one optional default persona for new conversations
+- Freeze persona configuration into each conversation so library edits do not rewrite old chats
+- Reassign or clear the persona used for future responses in an existing conversation
 - Preview canonical message roles without sending a model request
 - Preserve the real user message separately and unchanged
-- Create, rename, open, and delete persistent conversations
-- Stream responses from the primary model through `POST /chat/completions`
+- Create, rename, open, search, import, export, and delete persistent conversations
+- Render safe Markdown, GFM structures, tables, and highlighted code blocks
+- Stream responses from the selected model through `POST /chat/completions`
 - Persist completed messages and sanitized streaming failures
 - Generate the first conversation title locally without spending a model request
 - Edit a user message and replace the conversation tail with a new response
@@ -42,10 +47,10 @@ Utility falls back to primary when it is not configured. Image generation remain
 - MCP integrations
 - Schedulers and automations
 - Email and calendar integrations
-- Multiple or versioned personas
-- Advanced per-model parameters
-- Intelligent routing and fallback chains
+- Automatic persona synchronization or full persona revision history
+- Dynamic cost-aware, latency-aware, or conversation-scoped model routing
 - Image-generation user interface
+- Application-wide mobile shell remediation
 
 ## Architecture
 
@@ -266,7 +271,17 @@ POST {base_url}/chat/completions
 Authorization: Bearer <api-key>
 ```
 
-Chat requests use the configured primary model and set `stream: true`. The API key is optional for local services that do not require authentication.
+Chat requests use the configured primary model and set `stream: true`. Optional model profiles add only explicitly configured generation fields. The API key is optional for local services that do not require authentication.
+
+## Persona library and conversation snapshots
+
+Persona settings support reusable identities with independent names, descriptions, instructions, enabled states, and instruction roles.
+
+One enabled persona may be selected as the default. New conversations copy that persona into a frozen snapshot. Selecting no default creates new conversations without persona instructions.
+
+Editing or deleting the source persona does not alter existing conversation snapshots. Reassigning a conversation replaces only the snapshot used for later model requests; existing messages remain unchanged.
+
+Persona exports use the versioned `aster-persona` JSON format. Conversation export version 2 includes the optional persona snapshot, while version 1 conversation imports remain supported.
 
 ## Backup and upgrade
 
@@ -298,7 +313,7 @@ docker compose up -d --build
 
 The API applies pending migrations automatically.
 
-The authentication migration does not change conversations, endpoint credentials, model caches, or persona settings. Existing installations complete first sign-up after the upgrade.
+The Stage 11 migration moves the original global persona into the persona library, preserves its instructions, selects it as the default when it was enabled, and snapshots it into existing conversations. Conversations, messages, endpoints, model caches, and encrypted credentials are otherwise preserved.
 
 Changing `ASTER_ENCRYPTION_KEY` without re-encrypting stored endpoint credentials makes those credentials unreadable.
 
@@ -335,6 +350,10 @@ uv run alembic upgrade head
 - [ADR-0005: Linear chat replacement and generation lifecycle](docs/decisions/0005-chat-generation-lifecycle.md)
 - [ADR-0006: Runtime deployment configuration](docs/decisions/0006-runtime-deployment-configuration.md)
 - [ADR-0007: Single-owner authentication](docs/decisions/0007-single-owner-authentication.md)
+- [ADR-0008: Interface foundation](docs/decisions/0008-interface-foundation.md)
+- [ADR-0009: Chat content rendering and transfer](docs/decisions/0009-chat-content-and-transfer.md)
+- [ADR-0010: Model profiles and fallback routing](docs/decisions/0010-model-profiles-and-fallback-routing.md)
+- [ADR-0011: Persona library and conversation snapshots](docs/decisions/0011-persona-library-and-conversation-snapshots.md)
 
 ## Security baseline
 
@@ -351,4 +370,4 @@ uv run alembic upgrade head
 
 ## Status
 
-MVP 1 and the production deployment stage have passed real-endpoint validation. Stage 7 adds single-owner authentication before chat UX and later platform features continue.
+Stages 1 through 11 have passed automated validation. Real deployment validation remains the release gate for each new stage before merge.

@@ -12,7 +12,8 @@ from app.models import (
     ModelCacheEntry,
     ModelEndpoint,
     ModelPreferences,
-    PersonaSettings,
+    Persona,
+    PersonaPreferences,
 )
 
 
@@ -27,18 +28,17 @@ async def configure_primary(session_factory: async_sessionmaker[AsyncSession]) -
             is_manual=True,
             is_available=True,
         )
-        session.add(model)
+        persona = Persona(
+            name="Assistant",
+            description="Test persona",
+            instructions="Be direct.",
+            enabled=True,
+            instruction_role="developer",
+        )
+        session.add_all([model, persona])
         await session.flush()
         session.add(ModelPreferences(id=1, primary_model_id=model.id))
-        session.add(
-            PersonaSettings(
-                id=1,
-                name="Assistant",
-                instructions="Be direct.",
-                enabled=True,
-                instruction_role="developer",
-            )
-        )
+        session.add(PersonaPreferences(id=1, default_persona_id=persona.id))
         await session.commit()
 
 

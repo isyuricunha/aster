@@ -1,0 +1,412 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.library,
+.editor,
+.assignment {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-panel);
+}
+
+.library {
+  position: sticky;
+  top: 12px;
+  overflow: hidden;
+}
+
+.libraryHeader,
+.editorHeader,
+.assignmentHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.libraryHeader h2,
+.editorHeader h2,
+.assignmentHeader h2 {
+  margin: 2px 0 0;
+  font-size: 0.94rem;
+}
+
+.libraryHeader p,
+.editorHeader p,
+.assignmentHeader p {
+  margin: 5px 0 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.compactButton,
+.iconButton,
+.personaItem,
+.secondaryButton,
+.primaryButton,
+.dangerButton {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+  transition: 120ms ease;
+}
+
+.compactButton,
+.iconButton,
+.secondaryButton,
+.primaryButton,
+.dangerButton {
+  background: var(--surface-raised);
+}
+
+.compactButton:hover,
+.iconButton:hover,
+.secondaryButton:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.compactButton {
+  padding: 7px 9px;
+  white-space: nowrap;
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 6px;
+}
+
+.personaList {
+  display: grid;
+  gap: 3px;
+  max-height: 520px;
+  padding: 7px;
+  overflow: auto;
+}
+
+.personaItem {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  width: 100%;
+  padding: 8px;
+  border-color: transparent;
+  background: transparent;
+  text-align: left;
+}
+
+.personaItem:hover {
+  background: var(--surface-hover);
+}
+
+.personaItemSelected {
+  border-color: var(--border);
+  background: var(--surface-selected);
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--accent-strong);
+  font-size: 0.76rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.personaCopy {
+  min-width: 0;
+}
+
+.personaCopy strong,
+.personaCopy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.personaCopy strong {
+  color: var(--text-strong);
+  font-size: 0.79rem;
+}
+
+.personaCopy small {
+  margin-top: 2px;
+  color: var(--text-faint);
+  font-size: 0.69rem;
+}
+
+.badge {
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.emptyLibrary {
+  padding: 22px 16px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.editorBody {
+  display: grid;
+  gap: 18px;
+  padding: 18px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.45fr);
+  gap: 14px;
+}
+
+.field,
+.fieldWide {
+  display: grid;
+  gap: 7px;
+}
+
+.fieldWide {
+  grid-column: 1 / -1;
+}
+
+.field > span,
+.fieldWide > span {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.field input,
+.field select,
+.fieldWide textarea,
+.assignment select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: 0;
+  background: var(--background);
+  color: var(--text);
+}
+
+.field input,
+.field select,
+.assignment select {
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+.fieldWide textarea {
+  min-height: 230px;
+  padding: 11px;
+  resize: vertical;
+  line-height: 1.55;
+}
+
+.field input:focus,
+.field select:focus,
+.fieldWide textarea:focus,
+.assignment select:focus {
+  border-color: var(--border-focus);
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.checkbox input {
+  accent-color: var(--accent);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.primaryButton,
+.secondaryButton,
+.dangerButton {
+  min-height: 34px;
+  padding: 0 11px;
+  font-size: 0.75rem;
+  font-weight: 680;
+}
+
+.primaryButton {
+  border-color: rgba(242, 169, 59, 0.35);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.primaryButton:hover {
+  border-color: var(--border-focus);
+}
+
+.dangerButton {
+  color: var(--danger);
+}
+
+.dangerButton:hover {
+  border-color: rgba(251, 113, 133, 0.35);
+  background: rgba(251, 113, 133, 0.08);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.dangerButton:disabled,
+.compactButton:disabled,
+.iconButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.notice,
+.error {
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+}
+
+.notice {
+  background: rgba(74, 222, 128, 0.06);
+  color: var(--success);
+}
+
+.error {
+  background: rgba(251, 113, 133, 0.06);
+  color: var(--danger);
+}
+
+.preview {
+  display: grid;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.previewControls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.previewControls textarea {
+  min-height: 80px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: 0;
+  background: var(--background);
+  color: var(--text);
+  resize: vertical;
+}
+
+.previewMessages {
+  display: grid;
+  gap: 8px;
+}
+
+.previewMessage {
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--background);
+}
+
+.previewMessage header {
+  display: flex;
+  gap: 7px;
+  margin-bottom: 8px;
+  color: var(--text-faint);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.previewMessage pre {
+  margin: 0;
+  overflow: auto;
+  color: var(--text);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.assignment {
+  grid-column: 1 / -1;
+}
+
+.assignmentBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.6fr) auto;
+  gap: 10px;
+  align-items: end;
+  padding: 16px;
+}
+
+.assignmentField {
+  display: grid;
+  gap: 6px;
+}
+
+.assignmentField span {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .library {
+    position: static;
+  }
+
+  .assignment {
+    grid-column: auto;
+  }
+
+  .assignmentBody,
+  .formGrid,
+  .previewControls {
+    grid-template-columns: 1fr;
+  }
+}

@@ -19,7 +19,7 @@ from app.chat_generation import (
 from app.chat_runtime import generation_registry
 from app.db import get_session
 from app.dependencies import get_openai_client, get_secret_cipher
-from app.models import ChatMessage, Conversation
+from app.models import ChatMessage, Conversation, Persona, PersonaPreferences
 from app.openai_compatible import OpenAICompatibleClient
 from app.schemas import (
     ConversationCreate,
@@ -41,6 +41,48 @@ ClientDep = Annotated[OpenAICompatibleClient, Depends(get_openai_client)]
 def _contains_pattern(value: str) -> str:
     escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     return f"%{escaped}%"
+
+
+def _clear_persona_snapshot(conversation: Conversation) -> None:
+    conversation.persona_id = None
+    conversation.persona_name = None
+    conversation.persona_description = None
+    conversation.persona_instructions = None
+    conversation.persona_instruction_role = None
+
+
+def _apply_persona_snapshot(conversation: Conversation, persona: Persona | None) -> None:
+    if persona is None:
+        _clear_persona_snapshot(conversation)
+        return
+    conversation.persona_id = persona.id
+    conversation.persona_name = persona.name
+    conversation.persona_description = persona.description
+    conversation.persona_instructions = persona.instructions
+    conversation.persona_instruction_role = persona.instruction_role
+
+
+async def _resolve_persona(
+    session: AsyncSession,
+    *,
+    use_default_persona: bool,
+    persona_id: UUID | None,
+) -> Persona | None:
+    if use_default_persona:
+        preferences = await session.get(PersonaPreferences, 1)
+        if preferences is None or preferences.default_persona_id is None:
+            return None
+        persona = await session.get(Persona, preferences.default_persona_id)
+    elif persona_id is None:
+        return None
+    else:
+        persona = await session.get(Persona, persona_id)
+        if persona is None:
+            raise HTTPException(status_code=404, detail="Persona not found")
+
+    if persona is None or not persona.enabled:
+        return None
+    return persona
 
 
 @router.get("/conversations", response_model=list[ConversationSummaryResponse])
@@ -84,6 +126,7 @@ async def list_conversations(
             id=conversation.id,
             title=conversation.title,
             message_count=count,
+            persona_name=conversation.persona_name,
             created_at=conversation.created_at,
             updated_at=conversation.updated_at,
         )
@@ -101,6 +144,12 @@ async def create_conversation(
     session: SessionDep,
 ) -> ConversationResponse:
     conversation = Conversation(title=payload.title or "New chat")
+    persona = await _resolve_persona(
+        session,
+        use_default_persona=payload.use_default_persona,
+        persona_id=payload.persona_id,
+    )
+    _apply_persona_snapshot(conversation, persona)
     session.add(conversation)
     await session.commit()
     await session.refresh(conversation)
@@ -117,6 +166,17 @@ async def import_conversation(
     session: SessionDep,
 ) -> ConversationResponse:
     conversation = Conversation(title=payload.title)
+    if payload.persona is not None:
+        source_persona = (
+            await session.get(Persona, payload.persona.source_persona_id)
+            if payload.persona.source_persona_id is not None
+            else None
+        )
+        conversation.persona_id = source_persona.id if source_persona else None
+        conversation.persona_name = payload.persona.name
+        conversation.persona_description = payload.persona.description
+        conversation.persona_instructions = payload.persona.instructions
+        conversation.persona_instruction_role = payload.persona.instruction_role
     session.add(conversation)
     await session.flush()
 
@@ -157,8 +217,17 @@ async def update_conversation(
     payload: ConversationUpdate,
     session: SessionDep,
 ) -> ConversationResponse:
-    conversation = await get_conversation(session, conversation_id)
-    conversation.title = payload.title
+    conversation = await get_conversation(session, conversation_id, for_update=True)
+    if "title" in payload.model_fields_set and payload.title is not None:
+        conversation.title = payload.title
+    if "persona_id" in payload.model_fields_set:
+        await ensure_no_active_generation(session, conversation.id)
+        persona = await _resolve_persona(
+            session,
+            use_default_persona=False,
+            persona_id=payload.persona_id,
+        )
+        _apply_persona_snapshot(conversation, persona)
     conversation.updated_at = datetime.now(UTC)
     await session.commit()
     await session.refresh(conversation)
