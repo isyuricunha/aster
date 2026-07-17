@@ -8,6 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.chat_generation import recover_interrupted_streams
 from app.db import AsyncSessionFactory, engine
+from app.tool_recovery import recover_interrupted_tool_executions
 
 router = APIRouter(tags=["system"])
 _recovery_lock = asyncio.Lock()
@@ -18,7 +19,7 @@ class HealthResponse(BaseModel):
     status: Literal["ok"]
 
 
-async def _recover_interrupted_streams_once() -> None:
+async def _recover_interrupted_work_once() -> None:
     global _recovery_complete
     if _recovery_complete:
         return
@@ -27,6 +28,7 @@ async def _recover_interrupted_streams_once() -> None:
             return
         async with AsyncSessionFactory() as session:
             await recover_interrupted_streams(session)
+            await recover_interrupted_tool_executions(session)
         _recovery_complete = True
 
 
@@ -40,7 +42,7 @@ async def ready() -> HealthResponse:
     try:
         async with engine.connect() as connection:
             await connection.execute(text("SELECT 1"))
-        await _recover_interrupted_streams_once()
+        await _recover_interrupted_work_once()
     except (OSError, SQLAlchemyError) as error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
