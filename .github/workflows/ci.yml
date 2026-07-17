@@ -139,11 +139,32 @@ jobs:
           curl --fail --silent --show-error --cookie /tmp/aster.cookies \
             http://localhost:3000/api/persona >/dev/null
           curl --fail --silent --show-error --cookie /tmp/aster.cookies \
+            http://localhost:3000/api/personas | grep --quiet '^\[\]$'
+          curl --fail --silent --show-error --cookie /tmp/aster.cookies \
             --header 'Content-Type: application/json' \
             --header 'Origin: http://localhost:3000' \
             --data '{"user_message":"Hello"}' \
             http://localhost:3000/api/message-composition/preview \
             | grep --quiet '"role":"user"'
+      - name: Check persona library and default snapshot
+        run: |
+          persona_id="$(curl --fail --silent --show-error \
+            --cookie /tmp/aster.cookies \
+            --header 'Content-Type: application/json' \
+            --header 'Origin: http://localhost:3000' \
+            --data '{"name":"CI Persona","description":"Smoke test","instructions":"Be exact.","enabled":true,"instruction_role":"developer"}' \
+            http://localhost:3000/api/personas \
+            | python -c 'import json, sys; print(json.load(sys.stdin)["id"])')"
+          printf '%s' "${persona_id}" > /tmp/aster-persona-id
+          curl --fail --silent --show-error --cookie /tmp/aster.cookies \
+            http://localhost:3000/api/persona-preferences \
+            | grep --quiet '"name":"CI Persona"'
+          curl --fail --silent --show-error --cookie /tmp/aster.cookies \
+            --header 'Content-Type: application/json' \
+            --header 'Origin: http://localhost:3000' \
+            --data "{\"user_message\":\"Hello\",\"persona_id\":\"${persona_id}\",\"use_default_persona\":false}" \
+            http://localhost:3000/api/message-composition/preview \
+            | grep --quiet 'Your name is CI Persona'
       - name: Check conversation API
         run: |
           conversation_id="$(curl --fail --silent --show-error \
@@ -152,7 +173,7 @@ jobs:
             --header 'Origin: http://localhost:3000' \
             --data '{"title":"CI chat"}' \
             http://localhost:3000/api/conversations \
-            | python -c 'import json, sys; print(json.load(sys.stdin)["id"])')"
+            | python -c 'import json, sys; payload=json.load(sys.stdin); assert payload["persona"]["name"] == "CI Persona"; print(payload["id"])')"
           curl --fail --silent --show-error --cookie /tmp/aster.cookies \
             "http://localhost:3000/api/conversations/${conversation_id}" \
             | grep --quiet '"title":"CI chat"'
@@ -163,13 +184,20 @@ jobs:
             --data '{"format":"aster-conversation","version":1,"title":"Imported CI chat","messages":[{"role":"user","content":"Searchable import","status":"completed","error_message":null,"model_id":null}]}' \
             http://localhost:3000/api/conversations/import \
             | grep --quiet '"title":"Imported CI chat"'
+          curl --fail --silent --show-error \
+            --cookie /tmp/aster.cookies \
+            --header 'Content-Type: application/json' \
+            --header 'Origin: http://localhost:3000' \
+            --data '{"format":"aster-conversation","version":2,"title":"Snapshot import","persona":{"source_persona_id":null,"name":"Exported Persona","description":"Portable snapshot","instructions":"Stay portable.","instruction_role":"system"},"messages":[]}' \
+            http://localhost:3000/api/conversations/import \
+            | grep --quiet '"name":"Exported Persona"'
           curl --fail --silent --show-error --cookie /tmp/aster.cookies \
             'http://localhost:3000/api/conversations?query=Searchable' \
             | grep --quiet '"title":"Imported CI chat"'
       - name: Check chat and authentication contracts
         run: |
           curl --fail --silent --show-error http://localhost:8000/openapi.json \
-            | python -c 'import json, sys; paths = json.load(sys.stdin)["paths"]; required = ["/api/model-profiles/{model_id}", "/api/model-routing", "/api/conversations/import", "/api/conversations/{conversation_id}/messages/{message_id}/edit-and-resend", "/api/conversations/{conversation_id}/messages/{message_id}/regenerate", "/api/messages/{message_id}/stop", "/api/auth/setup", "/api/auth/login", "/api/auth/password"]; assert all(path in paths for path in required)'
+            | python -c 'import json, sys; paths = json.load(sys.stdin)["paths"]; required = ["/api/model-profiles/{model_id}", "/api/model-routing", "/api/personas", "/api/personas/{persona_id}", "/api/persona-preferences", "/api/conversations/import", "/api/conversations/{conversation_id}/messages/{message_id}/edit-and-resend", "/api/conversations/{conversation_id}/messages/{message_id}/regenerate", "/api/messages/{message_id}/stop", "/api/auth/setup", "/api/auth/login", "/api/auth/password"]; assert all(path in paths for path in required)'
       - name: Check authenticated pages
         run: |
           for path in / /settings/models /settings/persona /settings/account; do
