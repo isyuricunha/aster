@@ -1,3 +1,4 @@
+from collections.abc import AsyncIterator
 from typing import Annotated
 from uuid import UUID
 
@@ -15,6 +16,7 @@ from app.mcp_client import McpClient, McpClientError
 from app.models import ConversationTool, McpServer, McpTool, ToolExecution
 from app.openai_compatible import OpenAICompatibleClient
 from app.security import SecretCipher
+from app.tool_decision_runtime import tool_decision_registry
 from app.tool_generation import continue_tool_execution
 from app.tool_guards import ensure_no_pending_tool_confirmation
 from app.tool_schemas import (
@@ -302,6 +304,53 @@ async def list_tool_executions(
     return [execution_response(execution) for execution in executions]
 
 
+async def _continue_tool_decision(
+    *,
+    execution_id: UUID,
+    approved: bool,
+    session: AsyncSession,
+    cipher: SecretCipher,
+    openai_client: OpenAICompatibleClient,
+    mcp_client: McpClient,
+) -> StreamingResponse:
+    execution = await session.get(ToolExecution, execution_id)
+    if execution is None:
+        raise HTTPException(status_code=404, detail="Tool execution not found")
+
+    lease = await tool_decision_registry.acquire(execution.conversation_id)
+    try:
+        response = await continue_tool_execution(
+            execution_id=execution_id,
+            approved=approved,
+            session=session,
+            cipher=cipher,
+            client=openai_client,
+            mcp_client=mcp_client,
+        )
+    except BaseException:
+        await lease.release()
+        raise
+
+    async def body() -> AsyncIterator[bytes | str]:
+        try:
+            async for chunk in response.body_iterator:
+                yield chunk
+        finally:
+            await lease.release()
+
+    headers = {
+        name: value
+        for name, value in response.headers.items()
+        if name.lower() not in {"content-length", "content-type"}
+    }
+    return StreamingResponse(
+        body(),
+        status_code=response.status_code,
+        media_type=response.media_type,
+        headers=headers,
+    )
+
+
 @router.post("/tool-executions/{execution_id}/approve")
 async def approve_tool_execution(
     execution_id: UUID,
@@ -310,12 +359,12 @@ async def approve_tool_execution(
     openai_client: OpenAIClientDep,
     mcp_client: McpClientDep,
 ) -> StreamingResponse:
-    return await continue_tool_execution(
+    return await _continue_tool_decision(
         execution_id=execution_id,
         approved=True,
         session=session,
         cipher=cipher,
-        client=openai_client,
+        openai_client=openai_client,
         mcp_client=mcp_client,
     )
 
@@ -328,11 +377,11 @@ async def deny_tool_execution(
     openai_client: OpenAIClientDep,
     mcp_client: McpClientDep,
 ) -> StreamingResponse:
-    return await continue_tool_execution(
+    return await _continue_tool_decision(
         execution_id=execution_id,
         approved=False,
         session=session,
         cipher=cipher,
-        client=openai_client,
+        openai_client=openai_client,
         mcp_client=mcp_client,
     )
