@@ -34,6 +34,7 @@ from app.schemas import (
 )
 from app.security import SecretCipher
 from app.tool_generation import stream_response_with_tools
+from app.tool_guards import ensure_no_pending_tool_confirmation
 from app.tool_service import copy_default_tools_to_conversation
 
 router = APIRouter(prefix="/api", tags=["chat"])
@@ -242,6 +243,7 @@ async def update_conversation(
         conversation.title = payload.title
     if "persona_id" in payload.model_fields_set:
         await ensure_no_active_generation(session, conversation.id)
+        await ensure_no_pending_tool_confirmation(session, conversation.id)
         persona = await _resolve_persona(
             session,
             use_default_persona=False,
@@ -275,6 +277,7 @@ async def stream_message(
     client: ClientDep,
     mcp_client: McpClientDep,
 ) -> StreamingResponse:
+    await ensure_no_pending_tool_confirmation(session, conversation_id)
     prepared = await prepare_new_message(
         session=session,
         cipher=cipher,
@@ -300,6 +303,7 @@ async def edit_and_resend_message(
     client: ClientDep,
     mcp_client: McpClientDep,
 ) -> StreamingResponse:
+    await ensure_no_pending_tool_confirmation(session, conversation_id)
     prepared = await prepare_edit_and_resend(
         session=session,
         cipher=cipher,
@@ -325,6 +329,7 @@ async def regenerate_message(
     client: ClientDep,
     mcp_client: McpClientDep,
 ) -> StreamingResponse:
+    await ensure_no_pending_tool_confirmation(session, conversation_id)
     prepared = await prepare_regeneration(
         session=session,
         cipher=cipher,
