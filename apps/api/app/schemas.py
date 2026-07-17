@@ -26,6 +26,13 @@ def _normalize_base_url(value: str) -> str:
     return urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
 
 
+def _normalize_persona_name(value: str) -> str:
+    normalized = " ".join(value.split())
+    if not normalized:
+        raise ValueError("Persona name cannot be empty")
+    return normalized
+
+
 class EndpointBase(BaseModel):
     name: Annotated[str, Field(min_length=1, max_length=120)]
     base_url: Annotated[str, Field(min_length=1, max_length=2048)]
@@ -162,7 +169,47 @@ class ModelPreferencesResponse(BaseModel):
     resolved_utility: SelectedModelResponse | None
 
 
-class PersonaUpdate(BaseModel):
+class PersonaPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: Annotated[str, Field(min_length=1, max_length=120)]
+    description: Annotated[str, Field(default="", max_length=500)] = ""
+    instructions: Annotated[str, Field(default="", max_length=100_000)] = ""
+    enabled: bool = True
+    instruction_role: Literal["developer", "system"] = "developer"
+
+    @field_validator("name")
+    @classmethod
+    def normalize_persona_name(cls, value: str) -> str:
+        return _normalize_persona_name(value)
+
+    @field_validator("description")
+    @classmethod
+    def normalize_description(cls, value: str) -> str:
+        return value.strip()
+
+
+class PersonaCreate(PersonaPayload):
+    pass
+
+
+class PersonaUpdate(PersonaPayload):
+    pass
+
+
+class PersonaResponse(BaseModel):
+    id: UUID
+    name: str
+    description: str
+    instructions: str
+    enabled: bool
+    instruction_role: Literal["developer", "system"]
+    is_default: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class LegacyPersonaUpdate(BaseModel):
     name: Annotated[str, Field(default="", max_length=120)] = ""
     instructions: Annotated[str, Field(default="", max_length=100_000)] = ""
     enabled: bool = False
@@ -174,17 +221,34 @@ class PersonaUpdate(BaseModel):
         return value.strip()
 
 
-class PersonaResponse(BaseModel):
+class LegacyPersonaResponse(BaseModel):
     name: str
     instructions: str
     enabled: bool
-    instruction_role: str
+    instruction_role: Literal["developer", "system"]
     created_at: datetime
     updated_at: datetime
 
 
+class PersonaPreferencesUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    default_persona_id: UUID | None = None
+
+
+class PersonaPreferencesResponse(BaseModel):
+    default_persona: PersonaResponse | None
+
+
+class PersonaTransferRequest(PersonaPayload):
+    format: Literal["aster-persona"]
+    version: Literal[1]
+
+
 class CompositionPreviewRequest(BaseModel):
     user_message: Annotated[str, Field(min_length=1, max_length=100_000)]
+    persona_id: UUID | None = None
+    use_default_persona: bool = True
 
     @field_validator("user_message")
     @classmethod
@@ -192,6 +256,12 @@ class CompositionPreviewRequest(BaseModel):
         if not value.strip():
             raise ValueError("User message cannot be empty")
         return value
+
+    @model_validator(mode="after")
+    def validate_persona_selection(self) -> "CompositionPreviewRequest":
+        if self.use_default_persona and self.persona_id is not None:
+            raise ValueError("persona_id cannot be combined with use_default_persona")
+        return self
 
 
 class CanonicalMessageResponse(BaseModel):
@@ -204,8 +274,33 @@ class CompositionPreviewResponse(BaseModel):
     messages: list[CanonicalMessageResponse]
 
 
+class ConversationPersonaResponse(BaseModel):
+    source_persona_id: UUID | None
+    name: str
+    description: str
+    instructions: str
+    instruction_role: Literal["developer", "system"]
+
+
+class ConversationPersonaImport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source_persona_id: UUID | None = None
+    name: Annotated[str, Field(min_length=1, max_length=120)]
+    description: Annotated[str, Field(default="", max_length=500)] = ""
+    instructions: Annotated[str, Field(default="", max_length=100_000)] = ""
+    instruction_role: Literal["developer", "system"] = "developer"
+
+    @field_validator("name")
+    @classmethod
+    def normalize_persona_name(cls, value: str) -> str:
+        return _normalize_persona_name(value)
+
+
 class ConversationCreate(BaseModel):
     title: Annotated[str | None, Field(default=None, max_length=200)] = None
+    persona_id: UUID | None = None
+    use_default_persona: bool = True
 
     @field_validator("title")
     @classmethod
@@ -215,13 +310,24 @@ class ConversationCreate(BaseModel):
         normalized = " ".join(value.split())
         return normalized or None
 
+    @model_validator(mode="after")
+    def validate_persona_selection(self) -> "ConversationCreate":
+        if self.use_default_persona and self.persona_id is not None:
+            raise ValueError("persona_id cannot be combined with use_default_persona")
+        return self
+
 
 class ConversationUpdate(BaseModel):
-    title: Annotated[str, Field(min_length=1, max_length=200)]
+    model_config = ConfigDict(extra="forbid")
+
+    title: Annotated[str | None, Field(default=None, min_length=1, max_length=200)] = None
+    persona_id: UUID | None = None
 
     @field_validator("title")
     @classmethod
-    def normalize_title(cls, value: str) -> str:
+    def normalize_title(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         normalized = " ".join(value.split())
         if not normalized:
             raise ValueError("Conversation title cannot be empty")
@@ -245,6 +351,7 @@ class ConversationSummaryResponse(BaseModel):
     id: UUID
     title: str
     message_count: int
+    persona_name: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -252,6 +359,7 @@ class ConversationSummaryResponse(BaseModel):
 class ConversationResponse(BaseModel):
     id: UUID
     title: str
+    persona: ConversationPersonaResponse | None
     messages: list[ChatMessageResponse]
     created_at: datetime
     updated_at: datetime
@@ -290,8 +398,9 @@ class ConversationImportRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     format: Literal["aster-conversation"]
-    version: Literal[1]
+    version: Literal[1, 2]
     title: Annotated[str, Field(min_length=1, max_length=200)]
+    persona: ConversationPersonaImport | None = None
     messages: Annotated[list[ConversationImportMessage], Field(max_length=2_000)]
 
     @field_validator("title")
@@ -303,8 +412,12 @@ class ConversationImportRequest(BaseModel):
         return normalized
 
     @model_validator(mode="after")
-    def validate_total_content_size(self) -> "ConversationImportRequest":
+    def validate_transfer(self) -> "ConversationImportRequest":
+        if self.version == 1 and self.persona is not None:
+            raise ValueError("Version 1 conversation exports cannot contain a persona snapshot")
         total_characters = sum(len(message.content) for message in self.messages)
+        if self.persona is not None:
+            total_characters += len(self.persona.instructions)
         if total_characters > 5_000_000:
             raise ValueError("Imported conversation content exceeds 5,000,000 characters")
         return self
