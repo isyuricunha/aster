@@ -1,0 +1,243 @@
+.composerExtension {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.toggle {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-elevated);
+  color: var(--muted);
+  padding: 6px 9px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.toggle.active {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--border));
+}
+
+.panel {
+  display: grid;
+  gap: 11px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-elevated);
+  padding: 12px;
+}
+
+.panelHeading,
+.actions,
+.editAsset,
+.editAsset > div {
+  display: flex;
+  align-items: center;
+}
+
+.panelHeading {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panelHeading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.panelHeading span,
+.editAsset span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.panelHeading a {
+  color: var(--accent);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.panel textarea,
+.parameters input,
+.parameters select,
+.parameters textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  padding: 9px 10px;
+}
+
+.panel > textarea {
+  resize: vertical;
+}
+
+.actions {
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.actions button,
+.editAsset button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  padding: 7px 9px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.actions input {
+  display: none;
+}
+
+.actions .submit {
+  margin-left: auto;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast, #111);
+}
+
+.actions button:disabled,
+.toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.editAsset {
+  gap: 9px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 7px;
+}
+
+.editAsset img {
+  width: 46px;
+  height: 46px;
+  object-fit: cover;
+  border-radius: 7px;
+}
+
+.editAsset > div {
+  align-items: start;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.editAsset button {
+  padding: 5px;
+}
+
+.fileList {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.fileList span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 4px 7px;
+}
+
+.fileList button {
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+.parameters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.parameters label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.providerJson {
+  grid-column: 1 / -1;
+}
+
+.providerJson textarea {
+  font-family: var(--font-mono, monospace);
+}
+
+.messageAttachments {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 280px));
+  gap: 9px;
+  margin: 10px 0;
+}
+
+.messageAttachments figure {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-elevated);
+}
+
+.messageAttachments img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
+
+.messageAttachments figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.messageAttachments button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+@media (max-width: 720px) {
+  .messageAttachments {
+    grid-template-columns: 1fr;
+  }
+
+  .actions .submit {
+    margin-left: 0;
+  }
+}
