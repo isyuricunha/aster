@@ -141,10 +141,16 @@ async def update_retrieval_preferences(
             )
         ).one_or_none()
         if row is None:
-            raise HTTPException(status_code=422, detail="The selected embedding model does not exist")
+            raise HTTPException(
+                status_code=422,
+                detail="The selected embedding model does not exist",
+            )
         model, endpoint = row
         if not endpoint.enabled or not model.is_available:
-            raise HTTPException(status_code=422, detail="The selected embedding model is unavailable")
+            raise HTTPException(
+                status_code=422,
+                detail="The selected embedding model is unavailable",
+            )
     preferences = await _get_or_create_preferences(session)
     preferences.embedding_model_id = payload.embedding_model_id
     await session.commit()
@@ -346,7 +352,11 @@ async def accept_suggestion(
     suggestion = await _get_suggestion(session, suggestion_id)
     if suggestion.status != "pending":
         raise HTTPException(status_code=409, detail="This suggestion is no longer pending")
-    persona_id = payload.persona_id if "persona_id" in payload.model_fields_set else suggestion.persona_id
+    persona_id = (
+        payload.persona_id
+        if "persona_id" in payload.model_fields_set
+        else suggestion.persona_id
+    )
     persona = await _validate_persona(session, persona_id)
     memory = Memory(
         persona_id=persona_id,

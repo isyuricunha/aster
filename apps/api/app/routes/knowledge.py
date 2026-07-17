@@ -173,7 +173,10 @@ async def upload_document(
 ) -> KnowledgeDocumentResponse:
     collection = await _get_collection(session, collection_id)
     if not collection.enabled:
-        raise HTTPException(status_code=422, detail="Documents cannot be added to a disabled collection")
+        raise HTTPException(
+            status_code=422,
+            detail="Documents cannot be added to a disabled collection",
+        )
     data = await request.body()
     media_type = request.headers.get("content-type", "application/octet-stream")
     try:
