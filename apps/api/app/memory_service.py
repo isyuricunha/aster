@@ -128,7 +128,10 @@ async def _utility_target(
         parameters=GenerationParameters(
             temperature=0.1,
             top_p=profile.top_p if profile else None,
-            max_output_tokens=min(profile.max_output_tokens or 2_000, 4_000),
+            max_output_tokens=min(
+                profile.max_output_tokens if profile and profile.max_output_tokens else 2_000,
+                4_000,
+            ),
             token_parameter=profile.token_parameter if profile else "max_tokens",
             reasoning_effort=profile.reasoning_effort if profile else None,
         ),
