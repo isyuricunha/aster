@@ -1,6 +1,6 @@
 # Aster Project Charter
 
-Status: Accepted through Stage 9
+Status: Accepted through Stage 10
 
 ## Product vision
 
@@ -45,6 +45,12 @@ Visual design should clarify product state before adding decoration. New screens
 Conversation content is treated as untrusted input. Markdown rendering must not enable raw HTML, executable scripts, or unsafe URL handling.
 
 Conversation transfer formats are versioned, validated, bounded, and imported through authenticated application APIs.
+
+### Predictable model routing
+
+Generation settings are explicit and model-scoped. Unset values preserve provider defaults.
+
+Fallback improves availability without hiding credential or request errors. Aster must never combine partial output from different models in one response.
 
 ## MVP 1 capabilities
 
@@ -95,6 +101,21 @@ Multiple personas, persona versioning, and per-conversation personas are deferre
 - Allow manual model identifiers when model listing is unsupported or incomplete
 - Mark models missing from the latest refresh instead of deleting them silently
 
+### Model profiles and routing
+
+- Store optional generation settings for each cached model
+- Preserve provider defaults when a setting is not configured
+- Configure output-token field compatibility per model
+- Declare chat and streaming capabilities
+- Apply temperature, top-p, output limits, and reasoning effort to chat requests
+- Configure one ordered global chat fallback chain
+- Skip unavailable, disabled, or incompatible fallback targets at runtime
+- Fall back only before the first response token
+- Keep authentication and request-validation failures visible
+- Preserve the actual provider model identifier on assistant messages
+
+Dynamic routing, automatic cost or latency decisions, and conversation-scoped fallback chains are deferred.
+
 ### Authentication
 
 - Create one owner through first-access setup
@@ -109,11 +130,12 @@ Multiple personas, persona versioning, and per-conversation personas are deferre
 
 - Use one consistent workspace navigation model
 - Keep chat optimized for long-running desktop use
-- Preserve usable navigation and controls on narrow screens
 - Share typography, spacing, surfaces, status colors, and focus states
 - Make selected conversations and active settings unambiguous
 - Keep high-volume model lists bounded and searchable
 - Avoid external UI dependencies for the Stage 8 foundation
+
+Application-wide mobile and narrow-screen remediation is deferred to a dedicated stage instead of being patched screen by screen.
 
 ## Current non-goals
 
@@ -128,10 +150,10 @@ Multiple personas, persona versioning, and per-conversation personas are deferre
 - Multiple users, invitations, roles, and per-user data isolation
 - Email-based password recovery
 - Multiple, versioned, or conversation-scoped personas
-- Advanced user-defined model parameters
-- Intelligent model routing and fallback chains
+- Dynamic, cost-aware, latency-aware, or conversation-scoped model routing
 - Image-generation or image-editing interface
 - Detailed usage analytics and billing
+- Application-wide mobile shell remediation in Stage 10
 
 ## Initial model roles
 
@@ -164,11 +186,14 @@ Aster is stable only when:
 - Conversation imports reject unsupported formats and active stream states
 - Remote API failures produce clear user-facing errors
 - Cached models remain usable while an endpoint is temporarily unavailable
+- Model profiles omit unset provider parameters
+- Fallback never combines output from different models
+- Authentication and request-validation failures do not trigger fallback
 - Credentials and session tokens never appear in logs or API responses
 - First sign-up cannot create more than one owner
 - Private routes reject unauthenticated requests
 - Password changes revoke existing sessions
-- Desktop and narrow-screen navigation remain usable
+- Desktop navigation remains usable
 - Keyboard focus states remain visible
 - A clean Docker Compose installation is reproducible
 - Database migrations work against an empty database
@@ -184,6 +209,7 @@ Aster is stable only when:
 - Single-owner authentication: implemented in Stage 7
 - Interface and UX foundation: implemented in Stage 8
 - Chat quality and content rendering: implemented in Stage 9
+- Model profiles and fallback routing: implemented in Stage 10
 
 ## Change control
 
