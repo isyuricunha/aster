@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import socket
 from contextlib import suppress
@@ -17,6 +18,8 @@ from app.automation_queue import (
 from app.config import settings
 from app.db import AsyncSessionFactory, engine
 from app.dependencies import get_openai_client, get_secret_cipher
+
+logger = logging.getLogger(__name__)
 
 
 class LeaseLostError(RuntimeError):
@@ -80,7 +83,7 @@ async def _set_ready(path: Path, ready: bool) -> None:
 async def run_worker() -> None:
     worker_id = f"{socket.gethostname()}:{os.getpid()}:{uuid4().hex[:8]}"
     ready_path = Path("/tmp/aster-worker-ready")
-    await _set_ready(ready_path, True)
+    ready = False
     try:
         while True:
             try:
@@ -90,6 +93,9 @@ async def run_worker() -> None:
                         session,
                         limit=settings.aster_automation_scheduler_batch_size,
                     )
+                if not ready:
+                    await _set_ready(ready_path, True)
+                    ready = True
                 async with AsyncSessionFactory() as session:
                     run = await claim_next_run(
                         session,
@@ -100,9 +106,11 @@ async def run_worker() -> None:
                     await asyncio.sleep(settings.aster_automation_poll_seconds)
                     continue
                 await _execute_claimed(run.id, worker_id)
-            except (LeaseLostError, OSError, SQLAlchemyError):
+            except (LeaseLostError, OSError, SQLAlchemyError) as error:
+                logger.warning("Automation worker is waiting for recovery: %s", error)
                 await asyncio.sleep(settings.aster_automation_poll_seconds)
             except Exception:
+                logger.exception("Unexpected automation worker failure")
                 await asyncio.sleep(settings.aster_automation_poll_seconds)
     finally:
         await _set_ready(ready_path, False)

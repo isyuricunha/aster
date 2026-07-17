@@ -81,7 +81,7 @@ async def enqueue_due_automations(session: AsyncSession, *, limit: int) -> int:
             automation.schedule,
             automation.timezone,
             now=now,
-            after=scheduled_for,
+            after=now,
         )
     await session.commit()
     return created

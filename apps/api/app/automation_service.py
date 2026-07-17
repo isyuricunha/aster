@@ -1,7 +1,7 @@
 import hashlib
 import json
 import secrets
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException
@@ -18,6 +18,11 @@ from app.automation_models import (
     Notification,
     WebhookDelivery,
 )
+from app.automation_queue import (
+    enqueue_manual_run,
+    enqueue_run,
+    recover_expired_automation_runs,
+)
 from app.automation_schedule import ScheduleValidationError, next_run_at, validate_schedule
 from app.automation_schemas import (
     AutomationDeliveryAttemptResponse,
@@ -27,9 +32,21 @@ from app.automation_schemas import (
     AutomationWrite,
     IntegrationConnectionResponse,
 )
-from app.integration_service import encrypt_credentials, validate_integration_config
 from app.models import ModelCacheEntry, Persona, PersonaPreferences
-from app.security import SecretCipher
+
+__all__ = [
+    "accept_webhook",
+    "apply_automation_write",
+    "automation_response",
+    "enqueue_manual_run",
+    "enqueue_run",
+    "hash_webhook_token",
+    "integration_response",
+    "new_webhook_token",
+    "recover_expired_automation_runs",
+    "run_response",
+    "unread_notification_count",
+]
 
 CHANNEL_KINDS = {"email": "smtp", "calendar": "caldav", "webhook": "webhook"}
 
@@ -72,7 +89,8 @@ async def _validate_model(session: AsyncSession, model_id: UUID | None) -> None:
 
 
 async def _delivery_responses(
-    session: AsyncSession, automation_id: UUID
+    session: AsyncSession,
+    automation_id: UUID,
 ) -> list[AutomationDeliveryResponse]:
     rows = (
         await session.execute(
@@ -154,8 +172,8 @@ async def _replace_deliveries(
         integration = await session.get(IntegrationConnection, item.integration_id)
         if integration is None:
             raise HTTPException(status_code=422, detail="An integration no longer exists.")
-        expected = CHANNEL_KINDS[item.channel]
-        if integration.kind != expected:
+        expected_kind = CHANNEL_KINDS[item.channel]
+        if integration.kind != expected_kind:
             raise HTTPException(
                 status_code=422,
                 detail=f"The {integration.name} integration cannot deliver {item.channel}.",
@@ -178,7 +196,11 @@ async def apply_automation_write(
     payload: AutomationWrite,
 ) -> str | None:
     try:
-        schedule = validate_schedule(payload.trigger_type, payload.schedule, payload.timezone)
+        schedule = validate_schedule(
+            payload.trigger_type,
+            payload.schedule,
+            payload.timezone,
+        )
     except ScheduleValidationError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     await _validate_model(session, payload.model_id)
@@ -223,183 +245,6 @@ async def apply_automation_write(
     return webhook_token
 
 
-async def enqueue_run(
-    session: AsyncSession,
-    automation: Automation,
-    *,
-    trigger_source: str,
-    occurrence_key: str,
-    scheduled_for: datetime,
-    trigger_payload: dict[str, object] | None = None,
-) -> AutomationRun | None:
-    run = AutomationRun(
-        automation_id=automation.id,
-        trigger_source=trigger_source,
-        status="queued",
-        occurrence_key=occurrence_key,
-        scheduled_for=scheduled_for,
-        available_at=datetime.now(UTC),
-        max_attempts=automation.max_attempts,
-        retry_delay_seconds=automation.retry_delay_seconds,
-        timeout_seconds=automation.timeout_seconds,
-        trigger_payload=trigger_payload or {},
-        instruction_snapshot=automation.instruction,
-        persona_name=automation.persona_name,
-        persona_instructions=automation.persona_instructions,
-        persona_instruction_role=automation.persona_instruction_role,
-        requested_model_id=automation.model_id,
-    )
-    session.add(run)
-    try:
-        await session.flush()
-    except IntegrityError:
-        await session.rollback()
-        return None
-    automation.last_enqueued_at = datetime.now(UTC)
-    return run
-
-
-async def enqueue_due_automations(session: AsyncSession, *, limit: int) -> int:
-    now = datetime.now(UTC)
-    statement = (
-        select(Automation)
-        .where(
-            Automation.enabled.is_(True),
-            Automation.trigger_type != "webhook",
-            Automation.next_run_at.is_not(None),
-            Automation.next_run_at <= now,
-        )
-        .order_by(Automation.next_run_at)
-        .limit(limit)
-        .with_for_update(skip_locked=True)
-    )
-    automations = list(await session.scalars(statement))
-    created = 0
-    for automation in automations:
-        scheduled_for = automation.next_run_at
-        if scheduled_for is None:
-            continue
-        key = f"schedule:{automation.id}:{scheduled_for.isoformat()}"
-        run = await enqueue_run(
-            session,
-            automation,
-            trigger_source="schedule",
-            occurrence_key=key,
-            scheduled_for=scheduled_for,
-        )
-        if run is not None:
-            created += 1
-        automation.next_run_at = next_run_at(
-            automation.trigger_type,
-            automation.schedule,
-            automation.timezone,
-            now=now,
-            after=scheduled_for,
-        )
-    await session.commit()
-    return created
-
-
-async def enqueue_manual_run(session: AsyncSession, automation: Automation) -> AutomationRun:
-    now = datetime.now(UTC)
-    run = await enqueue_run(
-        session,
-        automation,
-        trigger_source="manual",
-        occurrence_key=f"manual:{automation.id}:{uuid4()}",
-        scheduled_for=now,
-    )
-    if run is None:
-        raise HTTPException(status_code=409, detail="The run could not be queued.")
-    await session.commit()
-    await session.refresh(run)
-    return run
-
-
-async def recover_expired_automation_runs(session: AsyncSession) -> int:
-    now = datetime.now(UTC)
-    runs = list(
-        await session.scalars(
-            select(AutomationRun).where(
-                AutomationRun.status.in_(["running", "delivering"]),
-                AutomationRun.lease_expires_at.is_not(None),
-                AutomationRun.lease_expires_at < now,
-            )
-        )
-    )
-    for run in runs:
-        history = list(run.attempt_history)
-        history.append(
-            {
-                "attempt": run.attempt,
-                "status": "interrupted",
-                "finished_at": now.isoformat(),
-                "error": "Worker lease expired.",
-            }
-        )
-        run.attempt_history = history
-        run.lease_owner = None
-        run.lease_expires_at = None
-        if run.status == "running" and run.response is None and run.attempt < run.max_attempts:
-            run.status = "queued"
-            run.available_at = now + timedelta(seconds=run.retry_delay_seconds)
-            run.error_code = "worker_interrupted"
-            run.error_message = "The worker lease expired before the model completed."
-        else:
-            run.status = "failed" if run.response is None else "completed_with_errors"
-            run.error_code = "worker_interrupted"
-            run.error_message = "The worker lease expired."
-            run.finished_at = now
-    if runs:
-        await session.commit()
-    return len(runs)
-
-
-async def claim_next_run(
-    session: AsyncSession,
-    *,
-    worker_id: str,
-    lease_seconds: int,
-) -> AutomationRun | None:
-    now = datetime.now(UTC)
-    run = await session.scalar(
-        select(AutomationRun)
-        .where(
-            AutomationRun.status == "queued",
-            AutomationRun.available_at <= now,
-        )
-        .order_by(AutomationRun.available_at, AutomationRun.created_at)
-        .limit(1)
-        .with_for_update(skip_locked=True)
-    )
-    if run is None:
-        return None
-    run.status = "running"
-    run.attempt += 1
-    run.lease_owner = worker_id
-    run.lease_expires_at = now + timedelta(seconds=lease_seconds)
-    run.started_at = now
-    run.finished_at = None
-    await session.commit()
-    await session.refresh(run)
-    return run
-
-
-async def renew_run_lease(
-    session: AsyncSession,
-    *,
-    run_id: UUID,
-    worker_id: str,
-    lease_seconds: int,
-) -> bool:
-    run = await session.get(AutomationRun, run_id)
-    if run is None or run.lease_owner != worker_id or run.status not in {"running", "delivering"}:
-        return False
-    run.lease_expires_at = datetime.now(UTC) + timedelta(seconds=lease_seconds)
-    await session.commit()
-    return True
-
-
 async def run_response(session: AsyncSession, run: AutomationRun) -> AutomationRunResponse:
     automation = await session.get(Automation, run.automation_id)
     attempts = list(
@@ -429,7 +274,9 @@ async def run_response(session: AsyncSession, run: AutomationRun) -> AutomationR
         error_code=run.error_code,
         error_message=run.error_message,
         attempt_history=run.attempt_history,
-        deliveries=[AutomationDeliveryAttemptResponse.model_validate(item) for item in attempts],
+        deliveries=[
+            AutomationDeliveryAttemptResponse.model_validate(item) for item in attempts
+        ],
         started_at=run.started_at,
         finished_at=run.finished_at,
         created_at=run.created_at,
@@ -468,8 +315,7 @@ async def accept_webhook(
     except (UnicodeDecodeError, json.JSONDecodeError):
         payload = {"raw": body.decode("utf-8", errors="replace")}
     supplied_key = headers.get("x-aster-delivery") or headers.get("idempotency-key")
-    hour = datetime.now(UTC).strftime("%Y%m%d%H")
-    delivery_key = supplied_key or hashlib.sha256(body + hour.encode()).hexdigest()
+    delivery_key = supplied_key or f"generated:{uuid4()}"
     delivery = WebhookDelivery(
         automation_id=automation.id,
         delivery_key=delivery_key[:256],
@@ -477,14 +323,20 @@ async def accept_webhook(
         headers={
             key: value[:500]
             for key, value in headers.items()
-            if key.lower() in {"content-type", "user-agent", "x-aster-delivery", "idempotency-key"}
+            if key.casefold()
+            in {
+                "content-type",
+                "user-agent",
+                "x-aster-delivery",
+                "idempotency-key",
+            }
         },
     )
-    session.add(delivery)
     try:
-        await session.flush()
+        async with session.begin_nested():
+            session.add(delivery)
+            await session.flush()
     except IntegrityError:
-        await session.rollback()
         return "duplicate", None
     now = datetime.now(UTC)
     run = await enqueue_run(
