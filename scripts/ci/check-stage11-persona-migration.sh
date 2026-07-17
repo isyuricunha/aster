@@ -60,4 +60,15 @@ SQL
 snapshot_result="$(printf '%s' "${snapshot_result}" | tr -d '\r')"
 test "${snapshot_result}" = "Migrated Assistant|Preserve these legacy instructions."
 
-docker compose exec -T api alembic current | grep --quiet '0009_tools_and_mcp'
+retrieval_result="$(
+  docker compose exec -T postgres sh -lc \
+    'psql -At -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
+SELECT memory_enabled || '|' || rag_enabled
+FROM conversation_retrieval_settings
+WHERE conversation_id = '00000000-0000-0000-0000-000000000111';
+SQL
+)"
+retrieval_result="$(printf '%s' "${retrieval_result}" | tr -d '\r')"
+test "${retrieval_result}" = "true|true" || test "${retrieval_result}" = "t|t"
+
+docker compose exec -T api alembic current | grep --quiet '0010_memory_and_rag'
