@@ -20,6 +20,9 @@ import {
   type ModelPreferences,
   type ToolExecution,
 } from "../lib/api";
+import type { MediaAsset, MessageAttachment } from "../lib/image-api";
+import type { RetrievalSource } from "../lib/retrieval-api";
+import { ChatImageComposer, MessageAttachments } from "./chat-image-tools";
 import { RetrievalSourceList } from "./chat-retrieval-sources";
 import { ToolCallList, ToolExecutionCard } from "./chat-tool-cards";
 import {
@@ -29,7 +32,6 @@ import {
   parseConversationTransfer,
 } from "./conversation-transfer";
 import { copyText, MarkdownMessage } from "./markdown-message";
-import type { RetrievalSource } from "../lib/retrieval-api";
 import { AsterMark, Icon } from "./ui/icons";
 
 type StreamEvent = {
@@ -51,6 +53,7 @@ type DeltaEvent = { content: string };
 type TerminalEvent = { message: ChatMessage };
 type ToolExecutionEvent = { execution: ToolExecution };
 type ErrorEvent = { code: string; message: string };
+type ImageAwareMessage = ChatMessage & { attachments?: MessageAttachment[] };
 
 async function readEventStream(
   response: Response,
@@ -91,13 +94,17 @@ async function readEventStream(
 
 function upsertMessage(messages: ChatMessage[], nextMessage: ChatMessage): ChatMessage[] {
   const exists = messages.some((message) => message.id === nextMessage.id);
-  if (!exists) return [...messages, nextMessage].sort((left, right) => left.position - right.position);
+  if (!exists) {
+    return [...messages, nextMessage].sort((left, right) => left.position - right.position);
+  }
   return messages.map((message) =>
     message.id === nextMessage.id
       ? {
           ...nextMessage,
-          retrieval_sources:
-            nextMessage.retrieval_sources ?? message.retrieval_sources,
+          retrieval_sources: nextMessage.retrieval_sources ?? message.retrieval_sources,
+          attachments:
+            (nextMessage as ImageAwareMessage).attachments ??
+            (message as ImageAwareMessage).attachments,
         }
       : message,
   );
@@ -141,6 +148,7 @@ export function ChatShell({
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(initialError);
+  const [imageEditAsset, setImageEditAsset] = useState<MediaAsset | null>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const renameRef = useRef<HTMLInputElement>(null);
@@ -242,6 +250,7 @@ export function ChatShell({
     if (streaming) return;
     setError(null);
     setEditingMessageId(null);
+    setImageEditAsset(null);
     setRenaming(false);
     try {
       await refreshConversation(id);
@@ -255,6 +264,7 @@ export function ChatShell({
     setConversation(null);
     setDraft("");
     setEditingMessageId(null);
+    setImageEditAsset(null);
     setRenaming(false);
     setError(null);
     requestAnimationFrame(() => composerRef.current?.focus());
@@ -310,6 +320,7 @@ export function ChatShell({
       await apiRequest(`/api/conversations/${conversation.id}`, { method: "DELETE" });
       const remaining = conversations.filter((item) => item.id !== conversation.id);
       setConversations(remaining);
+      setImageEditAsset(null);
       if (searchQuery.trim()) scheduleConversationSearch(searchQuery);
       if (remaining[0]) {
         await selectConversation(remaining[0].id);
@@ -375,6 +386,7 @@ export function ChatShell({
       scheduleConversationSearch("");
       setConversation(imported);
       setEditingMessageId(null);
+      setImageEditAsset(null);
       setRenaming(false);
       setError(null);
       await refreshConversations();
@@ -407,7 +419,8 @@ export function ChatShell({
           retrieval: current?.retrieval,
           messages: [...retained, ...incoming],
           tool_executions: current?.tool_executions ?? [],
-          created_at: current?.created_at ?? meta.messages[0]?.created_at ?? new Date().toISOString(),
+          created_at:
+            current?.created_at ?? meta.messages[0]?.created_at ?? new Date().toISOString(),
           updated_at: meta.messages.at(-1)?.updated_at ?? new Date().toISOString(),
         };
       });
@@ -577,7 +590,9 @@ export function ChatShell({
     );
     if (
       removesLaterMessages &&
-      !window.confirm("Editing this message will replace every response and message after it. Continue?")
+      !window.confirm(
+        "Editing this message will replace every response and message after it. Continue?",
+      )
     ) {
       return;
     }
@@ -686,6 +701,10 @@ export function ChatShell({
           <Icon name="chat" />
           <span>Chat</span>
         </div>
+        <Link className="chat-navigation-item" href="/images">
+          <Icon name="images" />
+          <span>Images</span>
+        </Link>
 
         <div className="conversation-search">
           <Icon name="search" size={14} />
@@ -801,7 +820,10 @@ export function ChatShell({
             <span className="chat-header-section">Chat</span>
             <Icon name="chevron-right" size={13} />
             {renaming && conversation ? (
-              <form className="chat-title-editor" onSubmit={(event) => void renameConversation(event)}>
+              <form
+                className="chat-title-editor"
+                onSubmit={(event) => void renameConversation(event)}
+              >
                 <input
                   aria-label="Conversation title"
                   maxLength={200}
@@ -815,7 +837,11 @@ export function ChatShell({
                 <button aria-label="Save title" disabled={!renameDraft.trim()} type="submit">
                   <Icon name="check" size={13} />
                 </button>
-                <button aria-label="Cancel rename" onClick={() => setRenaming(false)} type="button">
+                <button
+                  aria-label="Cancel rename"
+                  onClick={() => setRenaming(false)}
+                  type="button"
+                >
                   <Icon name="close" size={13} />
                 </button>
               </form>
@@ -885,6 +911,7 @@ export function ChatShell({
           ) : (
             <div className="message-stack">
               {conversation.messages.map((message) => {
+                const attachments = (message as ImageAwareMessage).attachments ?? [];
                 const executions = (conversation.tool_executions ?? []).filter(
                   (execution) => execution.assistant_message_id === message.id,
                 );
@@ -952,8 +979,13 @@ export function ChatShell({
                               streaming={message.status === "streaming"}
                             />
                           ) : null}
+                          <MessageAttachments
+                            attachments={attachments}
+                            disabled={streaming}
+                            onEdit={(asset) => setImageEditAsset(asset)}
+                          />
                           <RetrievalSourceList sources={message.retrieval_sources ?? []} />
-                           {executions.map((execution) => (
+                          {executions.map((execution) => (
                             <ToolExecutionCard
                               disabled={streaming}
                               execution={execution}
@@ -978,22 +1010,29 @@ export function ChatShell({
                                   {copiedMessageId === message.id ? "Copied" : "Copy"}
                                 </button>
                               ) : null}
-                              {message.role === "user" && message.status === "completed" && (
-                                <button className="message-action" onClick={() => startEditing(message)}>
-                                  <Icon name="edit" size={13} />
-                                  Edit
-                                </button>
-                              )}
-                              {message.role === "assistant" && message.status !== "streaming" && (
-                                <button
-                                  className="message-action"
-                                  disabled={pendingConfirmation}
-                                  onClick={() => void regenerate(message)}
-                                >
-                                  <Icon name="refresh" size={13} />
-                                  Regenerate
-                                </button>
-                              )}
+                              {message.role === "user" &&
+                                message.status === "completed" &&
+                                attachments.length === 0 && (
+                                  <button
+                                    className="message-action"
+                                    onClick={() => startEditing(message)}
+                                  >
+                                    <Icon name="edit" size={13} />
+                                    Edit
+                                  </button>
+                                )}
+                              {message.role === "assistant" &&
+                                message.status !== "streaming" &&
+                                attachments.length === 0 && (
+                                  <button
+                                    className="message-action"
+                                    disabled={pendingConfirmation}
+                                    onClick={() => void regenerate(message)}
+                                  >
+                                    <Icon name="refresh" size={13} />
+                                    Regenerate
+                                  </button>
+                                )}
                             </div>
                           )}
                         </>
@@ -1011,6 +1050,19 @@ export function ChatShell({
           {pendingConfirmation ? (
             <div className="chat-error">Review the pending tool request before continuing.</div>
           ) : null}
+          <ChatImageComposer
+            conversation={conversation}
+            disabled={streaming || pendingConfirmation}
+            editAsset={imageEditAsset}
+            ensureConversation={createConversation}
+            onClearEdit={() => setImageEditAsset(null)}
+            onCompleted={async (conversationId) => {
+              await refreshConversation(conversationId);
+              await refreshConversations();
+            }}
+            onError={(message) => setError(message || null)}
+            preferences={preferences}
+          />
           <form className="chat-composer" onSubmit={sendMessage}>
             <div className="composer-status">
               <span className={primaryLabel ? "configured" : ""} />
