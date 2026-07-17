@@ -1,5 +1,6 @@
 import json
 from collections.abc import AsyncIterator, Iterable, Sequence
+from dataclasses import dataclass
 
 import httpx
 
@@ -10,6 +11,21 @@ class ModelEndpointError(Exception):
         self.code = code
         self.message = message
         self.status_code = status_code
+
+
+@dataclass(frozen=True, slots=True)
+class ToolCallDelta:
+    index: int
+    call_id: str | None
+    name: str | None
+    arguments: str
+
+
+@dataclass(frozen=True, slots=True)
+class ChatCompletionDelta:
+    content: str = ""
+    tool_calls: tuple[ToolCallDelta, ...] = ()
+    finish_reason: str | None = None
 
 
 class OpenAICompatibleClient:
@@ -31,7 +47,7 @@ class OpenAICompatibleClient:
     def _headers(api_key: str | None) -> dict[str, str]:
         headers = {
             "Accept": "application/json",
-            "User-Agent": "Aster/0.4",
+            "User-Agent": "Aster/0.5",
         }
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
@@ -80,18 +96,49 @@ class OpenAICompatibleClient:
         base_url: str,
         api_key: str | None,
         model_id: str,
-        messages: Sequence[dict[str, str]],
+        messages: Sequence[dict[str, object]],
         temperature: float | None = None,
         top_p: float | None = None,
         max_output_tokens: int | None = None,
         token_parameter: str = "max_tokens",
         reasoning_effort: str | None = None,
     ) -> AsyncIterator[str]:
+        async for delta in self.stream_chat_completion_events(
+            base_url=base_url,
+            api_key=api_key,
+            model_id=model_id,
+            messages=messages,
+            temperature=temperature,
+            top_p=top_p,
+            max_output_tokens=max_output_tokens,
+            token_parameter=token_parameter,
+            reasoning_effort=reasoning_effort,
+        ):
+            if delta.content:
+                yield delta.content
+
+    async def stream_chat_completion_events(
+        self,
+        *,
+        base_url: str,
+        api_key: str | None,
+        model_id: str,
+        messages: Sequence[dict[str, object]],
+        tools: Sequence[dict[str, object]] = (),
+        temperature: float | None = None,
+        top_p: float | None = None,
+        max_output_tokens: int | None = None,
+        token_parameter: str = "max_tokens",
+        reasoning_effort: str | None = None,
+    ) -> AsyncIterator[ChatCompletionDelta]:
         payload: dict[str, object] = {
             "model": model_id,
             "messages": list(messages),
             "stream": True,
         }
+        if tools:
+            payload["tools"] = list(tools)
+            payload["tool_choice"] = "auto"
         if temperature is not None:
             payload["temperature"] = temperature
         if top_p is not None:
@@ -137,9 +184,9 @@ class OpenAICompatibleClient:
                                 "upstream_error",
                                 "The endpoint reported an error while streaming the response.",
                             )
-                        content = self._extract_delta_content(event)
-                        if content:
-                            yield content
+                        delta = self._extract_completion_delta(event)
+                        if delta.content or delta.tool_calls or delta.finish_reason:
+                            yield delta
         except httpx.TimeoutException as error:
             raise ModelEndpointError(
                 "timeout", "The endpoint did not respond before the timeout."
@@ -183,25 +230,34 @@ class OpenAICompatibleClient:
                 f"The endpoint returned HTTP {response.status_code}.",
             )
 
-    @staticmethod
-    def _extract_delta_content(event: object) -> str:
+    @classmethod
+    def _extract_completion_delta(cls, event: object) -> ChatCompletionDelta:
         if not isinstance(event, dict):
-            return ""
+            return ChatCompletionDelta()
         choices = event.get("choices")
         if not isinstance(choices, list) or not choices:
-            return ""
+            return ChatCompletionDelta()
         choice = choices[0]
         if not isinstance(choice, dict):
-            return ""
+            return ChatCompletionDelta()
+        finish_reason = choice.get("finish_reason")
+        if not isinstance(finish_reason, str):
+            finish_reason = None
         delta = choice.get("delta")
         if not isinstance(delta, dict):
-            return ""
-        content = delta.get("content")
+            return ChatCompletionDelta(finish_reason=finish_reason)
+        return ChatCompletionDelta(
+            content=cls._extract_content(delta.get("content")),
+            tool_calls=cls._extract_tool_call_deltas(delta.get("tool_calls")),
+            finish_reason=finish_reason,
+        )
+
+    @staticmethod
+    def _extract_content(content: object) -> str:
         if isinstance(content, str):
             return content
         if not isinstance(content, list):
             return ""
-
         parts: list[str] = []
         for item in content:
             if not isinstance(item, dict):
@@ -210,6 +266,36 @@ class OpenAICompatibleClient:
             if isinstance(text, str):
                 parts.append(text)
         return "".join(parts)
+
+    @staticmethod
+    def _extract_tool_call_deltas(value: object) -> tuple[ToolCallDelta, ...]:
+        if not isinstance(value, list):
+            return ()
+        deltas: list[ToolCallDelta] = []
+        for item in value:
+            if not isinstance(item, dict):
+                continue
+            index = item.get("index")
+            call_id = item.get("id")
+            function = item.get("function")
+            name: str | None = None
+            arguments = ""
+            if isinstance(function, dict):
+                raw_name = function.get("name")
+                raw_arguments = function.get("arguments")
+                if isinstance(raw_name, str):
+                    name = raw_name
+                if isinstance(raw_arguments, str):
+                    arguments = raw_arguments
+            deltas.append(
+                ToolCallDelta(
+                    index=index if isinstance(index, int) and index >= 0 else 0,
+                    call_id=call_id if isinstance(call_id, str) else None,
+                    name=name,
+                    arguments=arguments,
+                )
+            )
+        return tuple(deltas)
 
     @staticmethod
     def _extract_model_ids(items: Iterable[object]) -> list[str]:
