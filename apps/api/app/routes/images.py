@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.db import get_session
 from app.dependencies import get_image_client, get_media_store, get_secret_cipher
-from app.image_models import ImageModelProfile, ImageOperation, MediaAsset
+from app.image_models import ImageModelProfile, ImageOperation
 from app.image_provider import OpenAICompatibleImageClient
 from app.image_schemas import (
     ImageGalleryResponse,
@@ -192,7 +192,8 @@ async def read_image_operation(
     operation_id: UUID,
     session: SessionDep,
 ) -> ImageOperationResponse:
-    return await operation_response(session, await _get_operation(session, operation_id))
+    operation = await _get_operation(session, operation_id)
+    return await operation_response(session, operation)
 
 
 @router.get("/image-gallery", response_model=ImageGalleryResponse)
@@ -219,7 +220,9 @@ async def list_image_gallery(
     total = int(await session.scalar(count_query) or 0)
     operations = list(
         await session.scalars(
-            list_query.order_by(ImageOperation.created_at.desc()).offset(offset).limit(limit)
+            list_query.order_by(ImageOperation.created_at.desc())
+            .offset(offset)
+            .limit(limit)
         )
     )
     return ImageGalleryResponse(
