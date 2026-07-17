@@ -210,10 +210,8 @@ jobs:
           )
           replace(
               'apps/web/src/app/chat-shell.tsx',
-              '                           {executions.map((execution) => (\n',
-              '                           <RetrievalSourceList\n'
-              '                             sources={message.retrieval_sources ?? []}\n'
-              '                           />\n'
+              '{executions.map((execution) => (\n',
+              '<RetrievalSourceList sources={message.retrieval_sources ?? []} />\n'
               '                           {executions.map((execution) => (\n',
           )
           PY
