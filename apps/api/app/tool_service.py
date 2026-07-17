@@ -222,7 +222,7 @@ async def replace_conversation_tools(
         [ConversationTool(conversation_id=conversation_id, tool_id=tool_id) for tool_id in tool_ids]
     )
     await session.commit()
-    by_id = {tool.id: (tool, server) for tool, server in rows}
+    by_id = {tool.id: (tool, server.name) for tool, server in rows}
     return [tool_response(*by_id[tool_id]) for tool_id in tool_ids]
 
 
