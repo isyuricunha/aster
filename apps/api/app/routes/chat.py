@@ -25,6 +25,11 @@ from app.dependencies import get_mcp_client, get_openai_client, get_secret_ciphe
 from app.mcp_client import McpClient
 from app.models import ChatMessage, Conversation, Persona, PersonaPreferences
 from app.openai_compatible import OpenAICompatibleClient
+from app.retrieval_models import KnowledgeCollection
+from app.retrieval_service import (
+    get_or_create_conversation_settings,
+    replace_conversation_retrieval_settings,
+)
 from app.schemas import (
     ConversationCreate,
     ConversationSummaryResponse,
@@ -159,6 +164,7 @@ async def create_conversation(
     session.add(conversation)
     await session.flush()
     await copy_default_tools_to_conversation(session, conversation_id=conversation.id)
+    await get_or_create_conversation_settings(session, conversation.id)
     await session.commit()
     await session.refresh(conversation)
     return await conversation_response(session, conversation)
@@ -187,6 +193,26 @@ async def import_conversation(
         conversation.persona_instruction_role = payload.persona.instruction_role
     session.add(conversation)
     await session.flush()
+
+    if payload.retrieval is None:
+        await get_or_create_conversation_settings(session, conversation.id)
+    else:
+        normalized_names = {name.casefold() for name in payload.retrieval.collection_names}
+        collection_ids = list(
+            await session.scalars(
+                select(KnowledgeCollection.id).where(
+                    KnowledgeCollection.enabled.is_(True),
+                    func.lower(KnowledgeCollection.name).in_(normalized_names),
+                )
+            )
+        ) if normalized_names else []
+        await replace_conversation_retrieval_settings(
+            session,
+            conversation_id=conversation.id,
+            memory_enabled=payload.retrieval.memory_enabled,
+            rag_enabled=payload.retrieval.rag_enabled,
+            collection_ids=collection_ids,
+        )
 
     now = datetime.now(UTC)
     session.add_all(
