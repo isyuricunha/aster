@@ -33,9 +33,11 @@ The bounded trigger set is:
 - fixed interval execution;
 - daily execution at a local wall-clock time;
 - weekly execution at a local weekday and wall-clock time;
-- inbound webhook execution through a random endpoint token.
+- inbound webhook execution through a public automation UUID plus a secret request header.
 
 Timezone-aware schedules use the standard library `zoneinfo` database. Cron expressions, calendar-event triggers, email inbox polling, and arbitrary conditional graphs are deferred.
+
+When Aster returns after downtime, each overdue automation receives at most one catch-up run. Its schedule then advances directly to the next future occurrence instead of replaying every missed interval.
 
 ### Execution
 
@@ -51,9 +53,20 @@ Stage 15 provides explicit owner-configured connections for:
 - CalDAV-compatible calendar event creation;
 - outbound HTTP webhooks.
 
-Secrets and sensitive headers are encrypted before storage and are never placed in model context. Connection tests are explicit and never run automatically during normal page rendering.
+Secrets and sensitive headers are encrypted before storage and are never placed in model context or returned by integration APIs. Connection tests are explicit and never run automatically during normal page rendering.
 
-Inbound webhooks use a high-entropy token, bounded request bodies, persisted delivery records, and idempotency keys. The token is returned only when an endpoint is created or rotated; only its hash is stored.
+### Inbound webhooks
+
+An inbound webhook uses:
+
+```text
+POST /api/webhooks/{automation_id}
+X-Aster-Webhook-Token: <secret>
+```
+
+The automation UUID is not a secret. The high-entropy token is returned only when an endpoint is created or rotated; only its SHA-256 hash is stored. Keeping the token in a header prevents normal reverse-proxy and application access logs from recording it as part of the request path.
+
+Webhook request bodies are bounded. Delivery records persist a caller-supplied `X-Aster-Delivery` or `Idempotency-Key` value when present. Repeating that value for the same automation returns a duplicate response without creating another run. Requests without a delivery identifier are accepted as independent events.
 
 ### Notifications
 
@@ -62,15 +75,18 @@ Aster stores private in-app notifications for automation success and failure acc
 ### Reliability
 
 - scheduled occurrences use unique occurrence keys;
-- webhook deliveries use persisted idempotency keys;
+- webhook deliveries use persisted idempotency keys when callers provide one;
 - queued runs are claimed with `FOR UPDATE SKIP LOCKED` where supported;
 - running work holds an expiring lease renewed by heartbeat;
+- a worker that loses its lease stops the local execution;
 - expired leases are recovered;
-- retries are delayed and bounded;
-- integrations execute only after model output is durably stored;
+- model retries are delayed and bounded;
+- retries stop before external delivery begins, avoiding repeated side effects;
+- model output is durably stored before integrations execute;
 - every delivery records its own success or failure;
 - disabling an automation prevents new scheduled runs but does not erase history;
-- cancelling a queued run never deletes its audit record.
+- cancelling a queued run never deletes its audit record;
+- the worker tolerates database maintenance and migration windows and resumes polling afterward.
 
 ## Consequences
 
