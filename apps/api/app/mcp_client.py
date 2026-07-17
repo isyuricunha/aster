@@ -54,8 +54,9 @@ class McpClient:
                             "invalid_configuration",
                             "The MCP server does not have a Streamable HTTP URL.",
                         )
+                    headers = {"User-Agent": "Aster/0.1.0", **(config.headers or {})}
                     async with httpx.AsyncClient(
-                        headers=config.headers,
+                        headers=headers,
                         timeout=config.timeout_seconds,
                         follow_redirects=False,
                     ) as http_client:
