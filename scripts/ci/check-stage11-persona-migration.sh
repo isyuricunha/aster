@@ -81,7 +81,7 @@ WHERE table_name = 'model_profiles'
 SQL
 )"
 instruction_role_result="$(printf '%s' "${instruction_role_result}" | tr -d '\r')"
-printf '%s' "${instruction_role_result}" | grep --quiet "system"
-printf '%s' "${instruction_role_result}" | grep --quiet "NO"
+printf '%s' "${instruction_role_result}" | grep --quiet 'system'
+printf '%s' "${instruction_role_result}" | grep --quiet 'NO'
 
-docker compose exec -T api alembic current | grep --quiet '0014_model_instruction_roles'
+docker compose exec -T api alembic current | grep --quiet '0015_communication_hub'
