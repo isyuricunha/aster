@@ -7,6 +7,19 @@ from app.db import Base
 from app.models import TimestampMixin
 
 
+class AgentRunContextScope(TimestampMixin, Base):
+    __tablename__ = "agent_run_context_scopes"
+
+    run_id: Mapped[UUID] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="CASCADE"), primary_key=True
+    )
+    persona_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("personas.id", ondelete="SET NULL"), nullable=True
+    )
+    memory_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    rag_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
+
+
 class AgentRunToolScope(TimestampMixin, Base):
     __tablename__ = "agent_run_tool_scopes"
     __table_args__ = (
