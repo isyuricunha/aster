@@ -76,6 +76,7 @@ async def test_email_delivery_uses_decrypted_credentials(
         recipients: list[str],
         subject: str,
         body: str,
+        headers: dict[str, str],
     ) -> None:
         captured.update(
             config=config,
@@ -83,6 +84,7 @@ async def test_email_delivery_uses_decrypted_credentials(
             recipients=recipients,
             subject=subject,
             body=body,
+            headers=headers,
         )
 
     monkeypatch.setattr("app.integration_service._send_email", fake_send)
@@ -118,6 +120,7 @@ async def test_email_delivery_uses_decrypted_credentials(
     }
     assert captured["subject"] == "Daily brief"
     assert captured["body"] == "Everything is green."
+    assert captured["headers"] == {}
 
 
 class FakeHttpClient:
