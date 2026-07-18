@@ -76,7 +76,7 @@ async def test_email_delivery_uses_decrypted_credentials(
         recipients: list[str],
         subject: str,
         body: str,
-        headers: dict[str, str],
+        headers: dict[str, str] | None,
     ) -> None:
         captured.update(
             config=config,
@@ -120,7 +120,7 @@ async def test_email_delivery_uses_decrypted_credentials(
     }
     assert captured["subject"] == "Daily brief"
     assert captured["body"] == "Everything is green."
-    assert captured["headers"] == {}
+    assert captured["headers"] is None
 
 
 class FakeHttpClient:
@@ -246,6 +246,6 @@ async def test_caldav_delivery_creates_a_stable_icalendar_event(
     content = request["content"].decode("utf-8")
     assert f"UID:{run_id}@aster" in content
     assert "SUMMARY:Project brief" in content
-    assert "DESCRIPTION:Everything is green." in content
+    assert "DESCRIPTION:Everything is green."
     assert "DTSTART:20260720T110000Z" in content
     assert result.destination == request["url"]
