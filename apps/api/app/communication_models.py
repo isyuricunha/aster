@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -17,6 +18,19 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
 from app.models import TimestampMixin
+
+
+class CommunicationDetailsMixin:
+    def __init__(self, **kwargs: Any) -> None:
+        metadata = kwargs.pop("metadata", None)
+        if metadata is not None and "details" not in kwargs:
+            kwargs["details"] = metadata
+        super().__init__(**kwargs)
+
+    def __getattribute__(self, name: str) -> Any:
+        if name == "metadata":
+            return super().__getattribute__("details")
+        return super().__getattribute__(name)
 
 
 class CommunicationAccount(TimestampMixin, Base):
@@ -59,7 +73,7 @@ class CommunicationAccount(TimestampMixin, Base):
     last_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
 
-class CommunicationSourceCursor(TimestampMixin, Base):
+class CommunicationSourceCursor(CommunicationDetailsMixin, TimestampMixin, Base):
     __tablename__ = "communication_source_cursors"
     __table_args__ = (
         UniqueConstraint(
@@ -82,7 +96,7 @@ class CommunicationSourceCursor(TimestampMixin, Base):
     )
 
 
-class CommunicationThread(TimestampMixin, Base):
+class CommunicationThread(CommunicationDetailsMixin, TimestampMixin, Base):
     __tablename__ = "communication_threads"
     __table_args__ = (
         CheckConstraint(
@@ -120,7 +134,7 @@ class CommunicationThread(TimestampMixin, Base):
     )
 
 
-class CommunicationMessage(TimestampMixin, Base):
+class CommunicationMessage(CommunicationDetailsMixin, TimestampMixin, Base):
     __tablename__ = "communication_messages"
     __table_args__ = (
         CheckConstraint(
