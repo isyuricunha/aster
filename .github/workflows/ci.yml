@@ -115,43 +115,10 @@ jobs:
         run: >-
           curl --fail --silent --show-error --retry 30 --retry-all-errors --retry-delay 2
           http://localhost:3000/setup
-      - name: Check legacy upgrade through Stage 15
+      - name: Check legacy upgrade through Stage 16
         run: sh scripts/ci/check-stage11-persona-migration.sh
       - name: Check runtime configuration
-        run: >-
-          docker compose exec -T api python -c
-          'from app.config import settings;
-          assert settings.aster_endpoint_timeout_seconds == 30;
-          assert settings.aster_stream_timeout_seconds == 120;
-          assert settings.aster_session_absolute_days == 30;
-          assert settings.aster_session_idle_hours == 168;
-          assert settings.aster_mcp_stdio_enabled is False;
-          assert settings.aster_mcp_timeout_seconds == 30;
-          assert settings.aster_tool_max_rounds == 8;
-          assert settings.aster_tool_argument_max_characters == 100000;
-          assert settings.aster_tool_result_max_characters == 100000;
-          assert settings.aster_memory_max_items == 12;
-          assert settings.aster_memory_suggestion_max_items == 8;
-          assert settings.aster_rag_max_sources == 8;
-          assert settings.aster_rag_context_max_characters == 24000;
-          assert settings.aster_document_max_bytes == 5000000;
-          assert settings.aster_document_chunk_characters == 1600;
-          assert settings.aster_document_chunk_overlap == 200;
-          assert settings.aster_embedding_batch_size == 64;
-          assert settings.aster_media_root == "/var/lib/aster/media";
-          assert settings.aster_image_timeout_seconds == 300;
-          assert settings.aster_image_upload_max_bytes == 20000000;
-          assert settings.aster_image_output_max_bytes == 25000000;
-          assert settings.aster_image_max_pixels == 40000000;
-          assert settings.aster_image_max_inputs == 8;
-          assert settings.aster_image_max_outputs == 4;
-          assert settings.aster_automation_poll_seconds == 2;
-          assert settings.aster_automation_lease_seconds == 120;
-          assert settings.aster_automation_heartbeat_seconds == 30;
-          assert settings.aster_automation_scheduler_batch_size == 25;
-          assert settings.aster_automation_output_max_characters == 100000;
-          assert settings.aster_integration_timeout_seconds == 30;
-          assert settings.aster_webhook_max_bytes == 1000000'
+        run: sh scripts/ci/check-runtime.sh
       - name: Check core application contracts
         run: sh scripts/ci/check-stack-core.sh
       - name: Check Stage 13 memory and retrieval contracts
@@ -160,6 +127,8 @@ jobs:
         run: sh scripts/ci/check-stage14-images.sh
       - name: Check Stage 15 automation contracts
         run: sh scripts/ci/check-stage15-automations.sh
+      - name: Check Stage 16 communication contracts
+        run: sh scripts/ci/check-stage16-communications.sh
       - name: Check Stage 12 tool contracts
         run: sh scripts/ci/check-stage12-tools.sh
       - name: Show service state
