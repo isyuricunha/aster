@@ -68,6 +68,7 @@ export default async function AutomationsPage() {
       title="Automations"
       description="Schedule bounded model runs, deliver results through explicit integrations, and inspect every attempt."
     >
+      {initial.error ? <div className="banner banner-error">{initial.error}</div> : null}
       <AutomationWorkspace
         initialAutomations={initial.automations}
         initialRuns={initial.runs}
@@ -75,7 +76,7 @@ export default async function AutomationsPage() {
         initialNotifications={initial.notifications}
         models={initial.models}
         personas={initial.personas}
-        initialError={initial.error}
+        initialAutomationId={null}
       />
     </AppFrame>
   );
