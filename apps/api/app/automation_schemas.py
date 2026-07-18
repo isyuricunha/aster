@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 IntegrationKind = Literal["smtp", "caldav", "webhook"]
-TriggerType = Literal["once", "interval", "daily", "weekly", "webhook"]
+TriggerType = Literal["once", "interval", "daily", "weekly", "webhook", "communication"]
 RunStatus = Literal[
     "queued",
     "running",
@@ -172,7 +172,13 @@ class AutomationRunResponse(BaseModel):
     id: UUID
     automation_id: UUID
     automation_name: str
-    trigger_source: Literal["schedule", "manual", "webhook", "retry"]
+    trigger_source: Literal[
+        "schedule",
+        "manual",
+        "webhook",
+        "communication",
+        "retry",
+    ]
     status: RunStatus
     scheduled_for: datetime
     available_at: datetime
