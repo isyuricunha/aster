@@ -56,6 +56,7 @@ def _profile_response(
         context_window=profile.context_window if profile else None,
         max_output_tokens=profile.max_output_tokens if profile else None,
         token_parameter=profile.token_parameter if profile else "max_tokens",
+        instruction_role=profile.instruction_role if profile else "system",
         temperature=profile.temperature if profile else None,
         top_p=profile.top_p if profile else None,
         reasoning_effort=profile.reasoning_effort if profile else None,
