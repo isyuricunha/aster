@@ -1,7 +1,9 @@
 .composerExtension {
+  position: relative;
   display: grid;
-  gap: 8px;
-  margin-bottom: 8px;
+  align-content: end;
+  padding: 6px 0 6px 6px;
+  border-right: 1px solid var(--border);
 }
 
 .visuallyHidden {
@@ -21,13 +23,25 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface-elevated);
+  min-height: 40px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
   color: var(--muted);
   padding: 6px 9px;
   font-size: 12px;
   cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.toggle:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-strong);
+  transform: translateY(-1px);
 }
 
 .toggle.active {
@@ -36,12 +50,20 @@
 }
 
 .panel {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  z-index: 10;
   display: grid;
+  width: min(680px, calc(100vw - 280px));
+  max-height: min(620px, calc(100dvh - 150px));
   gap: 11px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 8px;
   background: var(--surface-elevated);
   padding: 12px;
+  overflow-y: auto;
+  animation: overlay-enter 180ms var(--ease-out, ease-out) both;
 }
 
 .panelHeading,
@@ -119,7 +141,7 @@
   margin-left: auto;
   background: var(--accent);
   border-color: var(--accent);
-  color: var(--accent-contrast, #111);
+  color: var(--accent-contrast, #fff);
 }
 
 .actions button:disabled,
@@ -265,6 +287,15 @@
 }
 
 @media (max-width: 720px) {
+  .composerExtension {
+    padding-left: 4px;
+  }
+
+  .panel {
+    width: calc(100vw - 20px);
+    max-height: calc(100dvh - 150px);
+  }
+
   .messageAttachments {
     grid-template-columns: 1fr;
   }

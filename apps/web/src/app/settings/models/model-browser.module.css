@@ -32,14 +32,11 @@
 }
 
 .toggle input {
-  width: 15px;
-  min-height: 15px;
+  width: 32px;
+  min-width: 32px;
+  min-height: 18px;
   margin: 0;
   padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
   accent-color: var(--accent);
 }
 

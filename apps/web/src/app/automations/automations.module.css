@@ -2,6 +2,7 @@
   display: grid;
   min-width: 0;
   gap: 14px;
+  animation: surface-enter 180ms var(--ease-out, ease-out) both;
 }
 
 .tabs {
@@ -329,7 +330,7 @@
 .primaryButton {
   border-color: color-mix(in oklab, var(--accent) 52%, var(--border));
   background: var(--accent);
-  color: color-mix(in oklab, black 82%, var(--accent));
+  color: var(--accent-contrast);
 }
 
 .headerActions .primary:hover,
@@ -338,7 +339,7 @@
 .primaryButton:hover {
   border-color: var(--accent);
   background: color-mix(in oklab, var(--accent) 88%, white 12%);
-  color: color-mix(in oklab, black 88%, var(--accent));
+  color: var(--accent-contrast);
 }
 
 .notice,
@@ -447,8 +448,9 @@
 
 .check input,
 .checkLabel input {
-  width: 16px;
-  min-height: 16px;
+  width: 32px;
+  min-width: 32px;
+  min-height: 18px;
   flex: 0 0 auto;
   margin: 0;
   accent-color: var(--accent);
@@ -1128,9 +1130,9 @@
     border-bottom: 0;
   }
 
-  .formSection input,
+  .formSection input:not([type="checkbox"]),
   .formSection select,
-  .deliveryCard input,
+  .deliveryCard input:not([type="checkbox"]),
   .deliveryCard select,
   .check,
   .checkLabel {

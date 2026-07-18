@@ -33,7 +33,11 @@ import {
 } from "./conversation-transfer";
 import { copyText, MarkdownMessage } from "./markdown-message";
 import { AsterMark, Icon } from "./ui/icons";
-import { WorkspaceBrand, WorkspaceNavigation } from "./ui/workspace-navigation";
+import {
+  WorkspaceBrand,
+  WorkspaceChrome,
+  WorkspaceNavigation,
+} from "./ui/workspace-navigation";
 
 type StreamEvent = {
   event: string;
@@ -55,6 +59,29 @@ type TerminalEvent = { message: ChatMessage };
 type ToolExecutionEvent = { execution: ToolExecution };
 type ErrorEvent = { code: string; message: string };
 type ImageAwareMessage = ChatMessage & { attachments?: MessageAttachment[] };
+
+const CHAT_STARTERS = [
+  {
+    icon: "memory" as const,
+    label: "Explore an idea",
+    prompt: "Help me explore this idea, challenge its assumptions, and identify the strongest next step.",
+  },
+  {
+    icon: "models" as const,
+    label: "Plan a project",
+    prompt: "Turn this goal into a focused project plan with milestones, risks, and clear next actions.",
+  },
+  {
+    icon: "edit" as const,
+    label: "Draft clear copy",
+    prompt: "Help me draft concise, confident copy for this message while preserving my intent.",
+  },
+  {
+    icon: "tools" as const,
+    label: "Analyze a decision",
+    prompt: "Analyze this decision, compare the tradeoffs, and recommend a practical path forward.",
+  },
+];
 
 async function readEventStream(
   response: Response,
@@ -191,6 +218,13 @@ export function ChatShell({
       const isTyping =
         target instanceof HTMLElement &&
         (target.matches("input, textarea, select") || target.isContentEditable);
+
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        composerRef.current?.focus();
+        return;
+      }
+
       if (event.key === "/" && !isTyping) {
         event.preventDefault();
         searchRef.current?.focus();
@@ -200,6 +234,14 @@ export function ChatShell({
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
   }, []);
+
+  useEffect(() => {
+    const composer = composerRef.current;
+    if (!composer) return;
+
+    composer.style.height = "auto";
+    composer.style.height = `${Math.min(composer.scrollHeight, 180)}px`;
+  }, [draft]);
 
   useEffect(() => {
     const mobileLayout = window.matchMedia("(max-width: 780px)");
@@ -337,6 +379,14 @@ export function ChatShell({
     setRenaming(false);
     setError(null);
     requestAnimationFrame(() => composerRef.current?.focus());
+  }
+
+  function applyStarterPrompt(prompt: string) {
+    setDraft(prompt);
+    requestAnimationFrame(() => {
+      composerRef.current?.focus();
+      composerRef.current?.setSelectionRange(prompt.length, prompt.length);
+    });
   }
 
   async function createConversation(): Promise<Conversation> {
@@ -755,6 +805,10 @@ export function ChatShell({
           Skip to conversation
         </a>
       ) : null}
+      <WorkspaceChrome
+        active="chat"
+        title={conversation?.title ?? "New conversation"}
+      />
       {mobileSidebarOpen ? (
         <button
           aria-label="Close workspace navigation"
@@ -1007,16 +1061,52 @@ export function ChatShell({
             <div className="chat-welcome">
               <AsterMark size={38} />
               <p className="eyebrow">New conversation</p>
-              <h1>How can Aster help?</h1>
+              <h1 className="shimmer-text">How can Aster help?</h1>
               <p>
                 Start a private conversation using your configured persona and primary model. Messages
                 stay in this workspace and remain available after restarts.
               </p>
-              {!primaryLabel && (
-                <Link className="button" href="/settings/models">
-                  <Icon name="models" />
-                  Configure a primary model
-                </Link>
+              {primaryLabel ? (
+                <div className="chat-starter-grid" aria-label="Conversation starters">
+                  {CHAT_STARTERS.map((starter) => (
+                    <button
+                      key={starter.label}
+                      onClick={() => applyStarterPrompt(starter.prompt)}
+                      type="button"
+                    >
+                      <Icon name={starter.icon} size={15} />
+                      <span>{starter.label}</span>
+                      <Icon className="starter-arrow" name="arrow-up" size={13} />
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="chat-setup-guide" aria-label="Chat setup">
+                  <Link href="/settings/models">
+                    <Icon name="models" size={15} />
+                    <span>
+                      <strong>Connect a model</strong>
+                      <small>Required to send and receive messages</small>
+                    </span>
+                    <Icon name="chevron-right" size={14} />
+                  </Link>
+                  <Link href="/settings/persona">
+                    <Icon name="persona" size={15} />
+                    <span>
+                      <strong>Choose a persona</strong>
+                      <small>Set voice, behavior, and response style</small>
+                    </span>
+                    <Icon name="chevron-right" size={14} />
+                  </Link>
+                  <Link href="/settings/tools">
+                    <Icon name="tools" size={15} />
+                    <span>
+                      <strong>Enable tools</strong>
+                      <small>Control capabilities and approval boundaries</small>
+                    </span>
+                    <Icon name="chevron-right" size={14} />
+                  </Link>
+                </div>
               )}
             </div>
           ) : (
@@ -1170,69 +1260,72 @@ export function ChatShell({
               Review the pending tool request before continuing.
             </div>
           ) : null}
-          <ChatImageComposer
-            conversation={conversation}
-            disabled={streaming || pendingConfirmation}
-            editAsset={imageEditAsset}
-            ensureConversation={createConversation}
-            onClearEdit={() => setImageEditAsset(null)}
-            onCompleted={async (conversationId) => {
-              await refreshConversation(conversationId);
-              await refreshConversations();
-            }}
-            onError={(message) => setError(message || null)}
-            preferences={preferences}
-          />
-          <form className="chat-composer" onSubmit={sendMessage}>
-            <div className="composer-status">
-              <span className={primaryLabel ? "configured" : ""} />
-              <p>
-                {pendingConfirmation
-                  ? "Tool approval required"
-                  : primaryLabel ?? "Configure a primary model to start chatting"}
-              </p>
-            </div>
-            <div className="composer-row">
-              <textarea
-                aria-label="Message"
-                disabled={streaming || pendingConfirmation}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={handleComposerKeyDown}
-                placeholder={
-                  pendingConfirmation
-                    ? "Approve or deny the pending tool call"
-                    : primaryLabel
-                      ? "Message Aster…"
-                      : "Primary model required"
-                }
-                ref={composerRef}
-                rows={1}
-                value={draft}
-              />
-              {streaming ? (
-                <button
-                  aria-label="Stop generation"
-                  className="stop-generation"
-                  disabled={!activeAssistantId || stopping}
-                  type="button"
-                  onClick={() => void stopGeneration()}
-                >
-                  <Icon name="stop" />
-                </button>
-              ) : (
-                <button
-                  aria-label="Send message"
-                  className="send-message"
-                  disabled={!draft.trim() || !primaryLabel || pendingConfirmation}
-                  type="submit"
-                >
-                  <Icon name="arrow-up" />
-                </button>
-              )}
-            </div>
-          </form>
+          <div className="chat-composer-dock">
+            <ChatImageComposer
+              conversation={conversation}
+              disabled={streaming || pendingConfirmation}
+              editAsset={imageEditAsset}
+              ensureConversation={createConversation}
+              onClearEdit={() => setImageEditAsset(null)}
+              onCompleted={async (conversationId) => {
+                await refreshConversation(conversationId);
+                await refreshConversations();
+              }}
+              onError={(message) => setError(message || null)}
+              preferences={preferences}
+            />
+            <form className="chat-composer" onSubmit={sendMessage}>
+              <div className="composer-status">
+                <span className={primaryLabel ? "configured" : ""} />
+                <p>
+                  {pendingConfirmation
+                    ? "Tool approval required"
+                    : primaryLabel ?? "Configure a primary model to start chatting"}
+                </p>
+                <small>{draft ? `${draft.length} characters` : "Ctrl K to focus"}</small>
+              </div>
+              <div className="composer-row">
+                <textarea
+                  aria-label="Message"
+                  disabled={streaming || pendingConfirmation}
+                  onChange={(event) => setDraft(event.target.value)}
+                  onKeyDown={handleComposerKeyDown}
+                  placeholder={
+                    pendingConfirmation
+                      ? "Approve or deny the pending tool call"
+                      : primaryLabel
+                        ? "Message Aster…"
+                        : "Primary model required"
+                  }
+                  ref={composerRef}
+                  rows={1}
+                  value={draft}
+                />
+                {streaming ? (
+                  <button
+                    aria-label="Stop generation"
+                    className="stop-generation"
+                    disabled={!activeAssistantId || stopping}
+                    type="button"
+                    onClick={() => void stopGeneration()}
+                  >
+                    <Icon name="stop" />
+                  </button>
+                ) : (
+                  <button
+                    aria-label="Send message"
+                    className="send-message"
+                    disabled={!draft.trim() || !primaryLabel || pendingConfirmation}
+                    type="submit"
+                  >
+                    <Icon name="arrow-up" />
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
           <p className="composer-hint">
-            Enter to send · Shift+Enter for a new line · Press / to search history
+            Enter to send · Shift+Enter for a new line · Ctrl K to focus · / to search history
           </p>
         </footer>
       </main>

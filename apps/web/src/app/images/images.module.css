@@ -1,11 +1,12 @@
 .workspace {
   display: grid;
-  gap: 24px;
+  gap: 14px;
+  animation: surface-enter 180ms var(--ease-out, ease-out) both;
 }
 
 .error {
   border: 1px solid color-mix(in srgb, var(--danger) 42%, transparent);
-  border-radius: 12px;
+  border-radius: 7px;
   background: color-mix(in srgb, var(--danger) 8%, var(--surface));
   color: var(--danger);
   padding: 12px 14px;
@@ -14,7 +15,7 @@
 .statusCard,
 .section {
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 8px;
   background: var(--surface);
 }
 
@@ -75,7 +76,7 @@
 }
 
 .section {
-  padding: 20px;
+  padding: 16px;
 }
 
 .sectionHeader {
@@ -149,18 +150,28 @@
 
 .tile {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 7px;
   overflow: hidden;
   background: var(--surface-elevated);
   color: var(--text);
   text-align: left;
   padding: 0;
   cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 140ms ease;
 }
 
-.tile:hover,
-.tile.selected {
+.tile:hover {
   border-color: color-mix(in srgb, var(--accent) 62%, var(--border));
+  transform: translateY(-2px);
+}
+
+.tile.selected {
+  border-color: color-mix(in srgb, var(--accent) 72%, var(--border));
+  background: var(--surface-selected);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
 .tile img,
@@ -204,9 +215,10 @@
   position: sticky;
   top: 18px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 8px;
   background: var(--surface-elevated);
   padding: 14px;
+  animation: overlay-enter 180ms var(--ease-out, ease-out) both;
 }
 
 .detailHeading {
@@ -273,7 +285,7 @@
   gap: 7px;
   color: var(--muted);
   border: 1px dashed var(--border);
-  border-radius: 12px;
+  border-radius: 8px;
 }
 
 .empty strong {
@@ -287,9 +299,17 @@
 
 .profileCard {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 8px;
   background: var(--surface-elevated);
   padding: 14px;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease;
+}
+
+.profileCard:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
 }
 
 .profileCard > header {

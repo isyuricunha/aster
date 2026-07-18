@@ -1,29 +1,39 @@
 .workspace {
   display: grid;
-  gap: 18px;
+  gap: 12px;
+  animation: surface-enter 180ms var(--ease-out, ease-out) both;
 }
 
 .tabs {
   display: flex;
-  gap: 6px;
-  padding: 5px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  background: var(--surface-raised);
+  gap: 2px;
+  padding: 0 2px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .tabs button {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   min-height: 36px;
-  padding: 0 14px;
+  padding: 0 11px;
   border: 0;
-  border-radius: 8px;
   background: transparent;
   color: var(--text-muted);
   font: inherit;
   cursor: pointer;
+}
+
+.tabs button::after {
+  position: absolute;
+  right: 8px;
+  bottom: -1px;
+  left: 8px;
+  height: 1px;
+  background: transparent;
+  content: "";
 }
 
 .tabs button span {
@@ -37,15 +47,18 @@
 }
 
 .tabs .activeTab {
-  background: var(--surface-selected);
   color: var(--text-primary);
+}
+
+.tabs .activeTab::after {
+  background: var(--accent);
 }
 
 .inbox,
 .editor {
   min-width: 0;
   border: 1px solid var(--border-subtle);
-  border-radius: 14px;
+  border-radius: 8px;
   background: var(--surface-raised);
   overflow: hidden;
 }
@@ -126,11 +139,18 @@
   color: var(--text-primary);
   text-align: left;
   cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
 }
 
 .threadList > button:hover,
 .threadList .selectedThread {
   background: var(--surface-selected);
+}
+
+.threadList .selectedThread {
+  box-shadow: inset 2px 0 var(--accent);
 }
 
 .threadList header {
@@ -240,7 +260,8 @@
   max-width: 88%;
   padding: 14px;
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  border-radius: 8px;
+  animation: message-enter 180ms var(--ease-out, ease-out) both;
 }
 
 .inboundMessage {
@@ -344,7 +365,7 @@
   grid-template-columns: minmax(230px, 0.55fr) minmax(0, 1.65fr);
   min-height: 620px;
   border: 1px solid var(--border-subtle);
-  border-radius: 14px;
+  border-radius: 8px;
   background: var(--surface-raised);
   overflow: hidden;
 }
@@ -371,6 +392,7 @@
 .sideList > button:hover,
 .sideList .selectedItem {
   background: var(--surface-selected);
+  box-shadow: inset 2px 0 var(--accent);
 }
 
 .sideList button div {
@@ -487,8 +509,9 @@
 }
 
 .check input {
-  width: auto;
-  min-height: auto;
+  width: 32px;
+  min-width: 32px;
+  min-height: 18px;
 }
 
 .help {
@@ -569,10 +592,10 @@
 
 @media (max-width: 760px) {
   .tabs button,
-  .inboxToolbar input,
+  .inboxToolbar input:not([type="checkbox"]),
   .inboxToolbar select,
   .inboxToolbar button,
-  .editor input,
+  .editor input:not([type="checkbox"]),
   .editor select,
   .editor textarea,
   .editor button,

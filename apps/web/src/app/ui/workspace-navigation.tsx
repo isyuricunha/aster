@@ -82,6 +82,36 @@ export function WorkspaceBrand() {
   );
 }
 
+export function WorkspaceChrome({
+  active,
+  title,
+}: {
+  active: NavigationKey;
+  title: string;
+}) {
+  const activeItem = NAVIGATION_SECTIONS.flatMap((section) => section.items).find(
+    (item) => item.key === active,
+  );
+
+  return (
+    <header className="workspace-window-bar">
+      <div aria-hidden="true" className="window-controls">
+        <span />
+        <span />
+        <span />
+      </div>
+      <Link aria-label="Open chat" className="window-home" href="/">
+        <AsterMark size={16} />
+      </Link>
+      <div className="window-tab" title={title}>
+        <Icon name={activeItem?.icon ?? "chat"} size={14} />
+        <span>{title}</span>
+      </div>
+      <span className="window-shortcut">Ctrl K</span>
+    </header>
+  );
+}
+
 export function WorkspaceNavigation({
   active,
   className = "application-navigation",
