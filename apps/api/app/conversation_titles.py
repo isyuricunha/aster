@@ -1,5 +1,7 @@
+import json
 import logging
 import re
+from collections import deque
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from typing import Any
@@ -9,6 +11,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.conversation_title_models import ConversationTitleState
 from app.db import get_session
 from app.dependencies import get_openai_client, get_secret_cipher
 from app.model_routing import resolve_utility_target
@@ -18,8 +21,12 @@ from app.security import SecretCipher
 
 logger = logging.getLogger(__name__)
 
-_TITLE_PATH = re.compile(
-    r"^/api/conversations/(?P<conversation_id>[0-9a-fA-F-]{36})/messages/stream$"
+_GENERATE_PATH = re.compile(
+    r"^/api/conversations/(?P<conversation_id>[0-9a-fA-F-]{36})/messages/"
+    r"(?:stream|[0-9a-fA-F-]{36}/edit-and-resend)$"
+)
+_CONVERSATION_PATH = re.compile(
+    r"^/api/conversations/(?P<conversation_id>[0-9a-fA-F-]{36})$"
 )
 _TITLE_PREFIX = re.compile(r"^(?:title|t[ií]tulo)\s*[:\-]\s*", re.IGNORECASE)
 _MAX_SOURCE_CHARACTERS = 12_000
@@ -27,6 +34,8 @@ _MAX_RAW_TITLE_CHARACTERS = 500
 _MAX_TITLE_CHARACTERS = 80
 
 SessionProvider = Callable[[], AsyncIterator[AsyncSession]]
+Receive = Callable[[], Awaitable[dict[str, Any]]]
+Send = Callable[[dict[str, Any]], Awaitable[None]]
 
 
 def fallback_title(content: str) -> str:
@@ -63,7 +72,7 @@ async def _session_scope(provider: SessionProvider) -> AsyncIterator[AsyncSessio
         await generator.aclose()
 
 
-async def generate_initial_conversation_title(
+async def generate_conversation_title(
     *,
     conversation_id: UUID,
     session_provider: SessionProvider,
@@ -87,9 +96,13 @@ async def generate_initial_conversation_title(
         if len(user_messages) != 1:
             return
         content = user_messages[0].content
-        expected_title = fallback_title(content)
-        if conversation.title != expected_title:
+        local_title = fallback_title(content)
+        state = await session.get(ConversationTitleState, conversation_id)
+        if state is None and conversation.title != local_title:
             return
+        if conversation.title != local_title:
+            conversation.title = local_title
+            await session.commit()
         target = await resolve_utility_target(
             session,
             cipher,
@@ -136,7 +149,7 @@ async def generate_initial_conversation_title(
 
     async with _session_scope(session_provider) as session:
         conversation = await session.get(Conversation, conversation_id, with_for_update=True)
-        if conversation is None or conversation.title != expected_title:
+        if conversation is None or conversation.title != local_title:
             return
         current_user_count = int(
             await session.scalar(
@@ -150,6 +163,22 @@ async def generate_initial_conversation_title(
         if current_user_count != 1:
             return
         conversation.title = generated_title
+        state = await session.get(ConversationTitleState, conversation_id)
+        if state is None:
+            session.add(ConversationTitleState(conversation_id=conversation_id))
+        await session.commit()
+
+
+async def mark_title_manual(
+    *,
+    conversation_id: UUID,
+    session_provider: SessionProvider,
+) -> None:
+    async with _session_scope(session_provider) as session:
+        state = await session.get(ConversationTitleState, conversation_id)
+        if state is None:
+            return
+        await session.delete(state)
         await session.commit()
 
 
@@ -163,22 +192,53 @@ def _dependency(scope: dict[str, Any], provider: Callable[[], Any]) -> Any:
     return _provider(scope, provider)()
 
 
+async def _capture_request(receive: Receive) -> tuple[bytes, Receive]:
+    messages: deque[dict[str, Any]] = deque()
+    body = bytearray()
+    while True:
+        message = await receive()
+        messages.append(message)
+        if message.get("type") != "http.request":
+            break
+        body.extend(message.get("body", b""))
+        if not message.get("more_body", False):
+            break
+
+    async def replay() -> dict[str, Any]:
+        if messages:
+            return messages.popleft()
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    return bytes(body), replay
+
+
 class ConversationTitleMiddleware:
     def __init__(self, app: Any) -> None:
         self.app = app
 
-    async def __call__(
-        self,
-        scope: dict[str, Any],
-        receive: Callable[[], Awaitable[dict[str, Any]]],
-        send: Callable[[dict[str, Any]], Awaitable[None]],
-    ) -> None:
-        match = (
-            _TITLE_PATH.fullmatch(str(scope.get("path", "")))
-            if scope.get("type") == "http" and scope.get("method") == "POST"
+    async def __call__(self, scope: dict[str, Any], receive: Receive, send: Send) -> None:
+        path = str(scope.get("path", ""))
+        method = scope.get("method")
+        generate_match = (
+            _GENERATE_PATH.fullmatch(path)
+            if scope.get("type") == "http" and method == "POST"
             else None
         )
-        if match is None:
+        conversation_match = (
+            _CONVERSATION_PATH.fullmatch(path)
+            if scope.get("type") == "http" and method == "PATCH"
+            else None
+        )
+        manual_title = False
+        if conversation_match is not None:
+            body, receive = await _capture_request(receive)
+            try:
+                payload = json.loads(body) if body else {}
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                payload = {}
+            manual_title = isinstance(payload, dict) and "title" in payload
+
+        if generate_match is None and not manual_title:
             await self.app(scope, receive, send)
             return
 
@@ -193,16 +253,22 @@ class ConversationTitleMiddleware:
             ):
                 attempted = True
                 try:
-                    await generate_initial_conversation_title(
-                        conversation_id=UUID(match.group("conversation_id")),
-                        session_provider=_provider(scope, get_session),
-                        client=_dependency(scope, get_openai_client),
-                        cipher=_dependency(scope, get_secret_cipher),
-                    )
+                    if generate_match is not None:
+                        await generate_conversation_title(
+                            conversation_id=UUID(generate_match.group("conversation_id")),
+                            session_provider=_provider(scope, get_session),
+                            client=_dependency(scope, get_openai_client),
+                            cipher=_dependency(scope, get_secret_cipher),
+                        )
+                    elif conversation_match is not None:
+                        await mark_title_manual(
+                            conversation_id=UUID(conversation_match.group("conversation_id")),
+                            session_provider=_provider(scope, get_session),
+                        )
                 except (HTTPException, ModelEndpointError, ValueError, OSError) as error:
-                    logger.info("Conversation title generation fell back to local text: %s", error)
+                    logger.info("Conversation title handling used its safe fallback: %s", error)
                 except Exception:
-                    logger.exception("Unexpected conversation title generation failure")
+                    logger.exception("Unexpected conversation title handling failure")
             await send(message)
 
         await self.app(scope, receive, send_with_title)
