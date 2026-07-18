@@ -89,6 +89,20 @@ def _target(
     )
 
 
+async def _model_row(
+    session: AsyncSession,
+    model_id: UUID,
+) -> tuple[ModelCacheEntry, ModelEndpoint, ModelProfile | None] | None:
+    return (
+        await session.execute(
+            select(ModelCacheEntry, ModelEndpoint, ModelProfile)
+            .join(ModelEndpoint, ModelEndpoint.id == ModelCacheEntry.endpoint_id)
+            .outerjoin(ModelProfile, ModelProfile.model_id == ModelCacheEntry.id)
+            .where(ModelCacheEntry.id == model_id)
+        )
+    ).one_or_none()
+
+
 async def resolve_chat_targets(
     session: AsyncSession,
     cipher: SecretCipher,
@@ -128,6 +142,58 @@ async def resolve_chat_targets(
     )
 
 
+async def resolve_utility_target(
+    session: AsyncSession,
+    cipher: SecretCipher,
+    *,
+    purpose: str,
+    max_output_tokens: int,
+    temperature: float,
+) -> ModelTarget:
+    preferences = await session.get(ModelPreferences, 1)
+    selected_id = None
+    if preferences is not None:
+        selected_id = preferences.utility_model_id or preferences.primary_model_id
+    if selected_id is None:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Configure a Utility or Primary model before {purpose}.",
+        )
+    row = await _model_row(session, selected_id)
+    if row is None:
+        raise HTTPException(
+            status_code=409,
+            detail="The selected Utility model no longer exists.",
+        )
+    target = _target(*row, cipher)
+    if target is None:
+        raise HTTPException(
+            status_code=409,
+            detail="The selected Utility model is unavailable.",
+        )
+    configured_limit = target.parameters.max_output_tokens
+    bounded_limit = (
+        min(configured_limit, max_output_tokens)
+        if configured_limit is not None
+        else max_output_tokens
+    )
+    return ModelTarget(
+        model_id=target.model_id,
+        provider_model_id=target.provider_model_id,
+        endpoint_id=target.endpoint_id,
+        endpoint_name=target.endpoint_name,
+        base_url=target.base_url,
+        api_key=target.api_key,
+        parameters=GenerationParameters(
+            temperature=temperature,
+            top_p=target.parameters.top_p,
+            max_output_tokens=bounded_limit,
+            token_parameter=target.parameters.token_parameter,
+            reasoning_effort=target.parameters.reasoning_effort,
+        ),
+    )
+
+
 async def resolve_automation_targets(
     session: AsyncSession,
     cipher: SecretCipher,
@@ -135,14 +201,7 @@ async def resolve_automation_targets(
 ) -> list[ModelTarget]:
     if requested_model_id is None:
         return await resolve_chat_targets(session, cipher)
-    row = (
-        await session.execute(
-            select(ModelCacheEntry, ModelEndpoint, ModelProfile)
-            .join(ModelEndpoint, ModelEndpoint.id == ModelCacheEntry.endpoint_id)
-            .outerjoin(ModelProfile, ModelProfile.model_id == ModelCacheEntry.id)
-            .where(ModelCacheEntry.id == requested_model_id)
-        )
-    ).one_or_none()
+    row = await _model_row(session, requested_model_id)
     if row is None:
         raise HTTPException(status_code=409, detail="The automation model no longer exists.")
     target = _target(*row, cipher)
