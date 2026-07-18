@@ -32,7 +32,7 @@ export type AgentKnowledgeOption = {
   document_count: number;
 };
 
-type InitialAgentData = {
+export type InitialAgentData = {
   agents: Agent[];
   runs: AgentRun[];
   rules: AgentCommunicationRule[];
@@ -63,8 +63,18 @@ async function getInitialData(): Promise<InitialAgentData> {
     if (responses.some((response) => !response.ok)) {
       throw new Error("The autonomous agent API returned an error.");
     }
-    const [agents, runs, rules, notifications, control, models, personas, tools, collections, accounts] =
-      await Promise.all(responses.map((response) => response.json()));
+    const [
+      agents,
+      runs,
+      rules,
+      notifications,
+      control,
+      models,
+      personas,
+      tools,
+      collections,
+      accounts,
+    ] = await Promise.all(responses.map((response) => response.json()));
     return {
       agents: agents as Agent[],
       runs: runs as AgentRun[],
