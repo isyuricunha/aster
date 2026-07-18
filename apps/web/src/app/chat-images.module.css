@@ -4,6 +4,18 @@
   margin-bottom: 8px;
 }
 
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .toggle {
   justify-self: start;
   display: inline-flex;
@@ -205,6 +217,10 @@
   background: var(--surface-elevated);
 }
 
+.messageAttachments a {
+  display: block;
+}
+
 .messageAttachments img {
   display: block;
   width: 100%;
@@ -232,9 +248,41 @@
   cursor: pointer;
 }
 
+.toggle:focus-visible,
+.panel a:focus-visible,
+.panel button:focus-visible,
+.panel input:focus-visible,
+.panel select:focus-visible,
+.panel textarea:focus-visible,
+.messageAttachments a:focus-visible,
+.messageAttachments button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.messageAttachments a:focus-visible {
+  outline-offset: -2px;
+}
+
 @media (max-width: 720px) {
   .messageAttachments {
     grid-template-columns: 1fr;
+  }
+
+  .toggle,
+  .actions button,
+  .editAsset button,
+  .fileList button,
+  .messageAttachments button,
+  .parameters input,
+  .parameters select {
+    min-height: 44px;
+  }
+
+  .editAsset button,
+  .fileList button {
+    min-width: 44px;
+    justify-content: center;
   }
 
   .actions .submit {

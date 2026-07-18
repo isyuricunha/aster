@@ -93,6 +93,7 @@ export function ModelProfileSettings({
     .filter((model): model is CachedModel => Boolean(model));
 
   async function run(name: string, operation: () => Promise<void>) {
+    if (busy) return;
     setBusy(name);
     setNotice(null);
     setError(null);
@@ -153,6 +154,13 @@ export function ModelProfileSettings({
 
   async function resetProfile() {
     if (!selectedModelId) return;
+    if (
+      !window.confirm(
+        "Reset this model profile? Every local override will be removed and provider defaults will be restored.",
+      )
+    ) {
+      return;
+    }
     await run("reset-profile", async () => {
       await apiRequest(`/api/model-profiles/${selectedModelId}`, { method: "DELETE" });
       const defaults = await apiRequest<InstructionAwareModelProfile>(
@@ -192,10 +200,15 @@ export function ModelProfileSettings({
   }
 
   return (
-    <div className={styles.stack}>
-      {(notice || error) && (
-        <div className={`banner ${error ? "banner-error" : "banner-success"}`} role="status">
-          {error ?? notice}
+    <div aria-busy={busy !== null} className={styles.stack}>
+      {error && (
+        <div className="banner banner-error" role="alert">
+          {error}
+        </div>
+      )}
+      {!error && notice && (
+        <div className="banner banner-success" role="status">
+          {notice}
         </div>
       )}
 
@@ -212,6 +225,7 @@ export function ModelProfileSettings({
         </div>
 
         <ModelSelect
+          disabled={busy !== null}
           label="Model to configure"
           emptyLabel="Choose a model"
           models={models}
@@ -219,11 +233,22 @@ export function ModelProfileSettings({
           onChange={(value) => void selectProfile(value)}
         />
 
+        {selectedModelId && busy === "load-profile" && (
+          <div className="empty-state" role="status">
+            Loading model profile…
+          </div>
+        )}
+
         {selectedModelId && profileLoaded && (
-          <form className={`form-grid ${styles.profileForm}`} onSubmit={saveProfile}>
+          <form
+            aria-busy={busy === "save-profile" || busy === "reset-profile"}
+            className={`form-grid ${styles.profileForm}`}
+            onSubmit={saveProfile}
+          >
             <label className="form-span-two">
               <span>Display name</span>
               <input
+                disabled={busy !== null}
                 maxLength={120}
                 placeholder="Optional local label"
                 value={profile.displayName}
@@ -233,6 +258,7 @@ export function ModelProfileSettings({
             <label>
               <span>Context window</span>
               <input
+                disabled={busy !== null}
                 min={1}
                 type="number"
                 placeholder="Provider default"
@@ -243,6 +269,7 @@ export function ModelProfileSettings({
             <label>
               <span>Maximum output tokens</span>
               <input
+                disabled={busy !== null}
                 min={1}
                 type="number"
                 placeholder="Provider default"
@@ -253,6 +280,7 @@ export function ModelProfileSettings({
             <label>
               <span>Output token parameter</span>
               <select
+                disabled={busy !== null}
                 value={profile.tokenParameter}
                 onChange={(event) =>
                   setProfile({
@@ -269,6 +297,7 @@ export function ModelProfileSettings({
             <label>
               <span>Instruction role</span>
               <select
+                disabled={busy !== null}
                 value={profile.instructionRole}
                 onChange={(event) =>
                   setProfile({
@@ -284,6 +313,7 @@ export function ModelProfileSettings({
             <label>
               <span>Reasoning effort</span>
               <select
+                disabled={busy !== null}
                 value={profile.reasoningEffort}
                 onChange={(event) =>
                   setProfile({
@@ -303,6 +333,7 @@ export function ModelProfileSettings({
             <label>
               <span>Temperature</span>
               <input
+                disabled={busy !== null}
                 max={2}
                 min={0}
                 step="0.01"
@@ -315,6 +346,7 @@ export function ModelProfileSettings({
             <label>
               <span>Top P</span>
               <input
+                disabled={busy !== null}
                 max={1}
                 min={0.01}
                 step="0.01"
@@ -327,6 +359,7 @@ export function ModelProfileSettings({
             <label className="checkbox-row">
               <input
                 checked={profile.supportsChat}
+                disabled={busy !== null}
                 type="checkbox"
                 onChange={(event) =>
                   setProfile({
@@ -341,7 +374,7 @@ export function ModelProfileSettings({
             <label className="checkbox-row">
               <input
                 checked={profile.supportsStreaming}
-                disabled={!profile.supportsChat}
+                disabled={busy !== null || !profile.supportsChat}
                 type="checkbox"
                 onChange={(event) =>
                   setProfile({ ...profile, supportsStreaming: event.target.checked })
@@ -350,16 +383,16 @@ export function ModelProfileSettings({
               <span>Supports streaming</span>
             </label>
             <div className="form-actions form-span-two">
-              <button className="button" disabled={busy === "save-profile"} type="submit">
-                Save profile
+              <button className="button" disabled={busy !== null} type="submit">
+                {busy === "save-profile" ? "Saving profile" : "Save profile"}
               </button>
               <button
                 className="button button-secondary"
-                disabled={busy === "reset-profile"}
+                disabled={busy !== null}
                 onClick={() => void resetProfile()}
                 type="button"
               >
-                Reset defaults
+                {busy === "reset-profile" ? "Resetting profile" : "Reset defaults"}
               </button>
             </div>
           </form>
@@ -379,6 +412,7 @@ export function ModelProfileSettings({
 
         <div className={styles.fallbackPicker}>
           <ModelSelect
+            disabled={busy !== null}
             label="Add fallback model"
             emptyLabel="Choose a fallback"
             models={fallbackModels}
@@ -387,7 +421,9 @@ export function ModelProfileSettings({
           />
           <button
             className="button button-secondary"
-            disabled={!fallbackCandidate || fallbackIds.includes(fallbackCandidate)}
+            disabled={
+              busy !== null || !fallbackCandidate || fallbackIds.includes(fallbackCandidate)
+            }
             onClick={addFallback}
             type="button"
           >
@@ -396,9 +432,11 @@ export function ModelProfileSettings({
         </div>
 
         {fallbackEntries.length === 0 ? (
-          <div className="empty-state">No fallback models configured.</div>
+          <div className="empty-state" role="status">
+            No fallback models configured.
+          </div>
         ) : (
-          <ol className={styles.fallbackList}>
+          <ol aria-label="Fallback model priority" className={styles.fallbackList}>
             {fallbackEntries.map((model, index) => (
               <li key={model.id}>
                 <span className={styles.position}>{index + 1}</span>
@@ -408,22 +446,25 @@ export function ModelProfileSettings({
                 </div>
                 <div className={styles.fallbackActions}>
                   <button
-                    aria-label="Move fallback up"
-                    disabled={index === 0}
+                    aria-label={`Move ${model.model_id} up`}
+                    disabled={busy !== null || index === 0}
                     onClick={() => moveFallback(index, -1)}
                     type="button"
                   >
                     ↑
                   </button>
                   <button
-                    aria-label="Move fallback down"
-                    disabled={index === fallbackEntries.length - 1}
+                    aria-label={`Move ${model.model_id} down`}
+                    disabled={busy !== null || index === fallbackEntries.length - 1}
                     onClick={() => moveFallback(index, 1)}
                     type="button"
                   >
                     ↓
                   </button>
                   <button
+                    aria-label={`Remove ${model.model_id} from fallback order`}
+                    className={styles.remove}
+                    disabled={busy !== null}
                     onClick={() =>
                       setFallbackIds((current) => current.filter((id) => id !== model.id))
                     }
@@ -440,11 +481,11 @@ export function ModelProfileSettings({
         <div className="form-actions">
           <button
             className="button"
-            disabled={busy === "save-fallbacks"}
+            disabled={busy !== null}
             onClick={() => void saveFallbacks()}
             type="button"
           >
-            Save fallback order
+            {busy === "save-fallbacks" ? "Saving fallback order" : "Save fallback order"}
           </button>
         </div>
       </section>

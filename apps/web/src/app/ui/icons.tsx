@@ -13,6 +13,7 @@ export type IconName =
   | "images"
   | "lock"
   | "memory"
+  | "menu"
   | "models"
   | "more"
   | "new-chat"
@@ -89,6 +90,11 @@ export function Icon({ name, size = 16, ...props }: IconProps) {
         <path d="M9 5.5A3.5 3.5 0 0 0 5.5 9v1.2A3 3 0 0 0 4 12.8a3 3 0 0 0 2.2 2.9V17A3 3 0 0 0 9 20" />
         <path d="M15 5.5A3.5 3.5 0 0 1 18.5 9v1.2a3 3 0 0 1 1.5 2.6 3 3 0 0 1-2.2 2.9V17A3 3 0 0 1 15 20" />
         <path d="M9 4v16M15 4v16M9 8h3M12 12h3M9 16h3" />
+      </>
+    ),
+    menu: (
+      <>
+        <path d="M5 7.5h14M5 12h14M5 16.5h14" />
       </>
     ),
     models: (

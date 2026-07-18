@@ -7,11 +7,14 @@ import "./persona.css";
 import "./chat.css";
 import "./chat-controls.css";
 import "./auth.css";
-import "./interface-refinement.css";
 import "./chat-content.css";
+import "./interface-refinement.css";
 
 export const metadata: Metadata = {
-  title: "Aster",
+  title: {
+    default: "Aster",
+    template: "%s · Aster",
+  },
   description: "A self-hosted AI chat application",
 };
 

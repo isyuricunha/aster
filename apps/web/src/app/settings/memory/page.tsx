@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import type {
   CachedModel,
   ConversationSummary,
@@ -13,6 +15,8 @@ import type {
 import { requireServerAuth, serverApiFetch } from "../../../lib/server-api";
 import { AppFrame } from "../../ui/app-frame";
 import { MemorySettings } from "./memory-settings";
+
+export const metadata: Metadata = { title: "Memory settings" };
 
 export const dynamic = "force-dynamic";
 

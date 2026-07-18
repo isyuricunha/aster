@@ -75,6 +75,16 @@
   background: var(--surface-hover);
 }
 
+.compactButton:focus-visible,
+.iconButton:focus-visible,
+.personaItem:focus-visible,
+.secondaryButton:focus-visible,
+.primaryButton:focus-visible,
+.dangerButton:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
 .compactButton {
   padding: 7px 9px;
   white-space: nowrap;
@@ -334,6 +344,17 @@
   resize: vertical;
 }
 
+.previewField {
+  display: grid;
+  gap: 7px;
+}
+
+.previewField span {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-weight: 540;
+}
+
 .previewMessages {
   display: grid;
   gap: 8px;
@@ -408,5 +429,66 @@
   .formGrid,
   .previewControls {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .libraryHeader,
+  .editorHeader,
+  .assignmentHeader {
+    padding: 14px;
+  }
+
+  .editorHeader {
+    flex-direction: column;
+  }
+
+  .personaList {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(220px, 82vw);
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: inline proximity;
+  }
+
+  .personaItem {
+    min-height: 56px;
+    scroll-snap-align: start;
+  }
+
+  .compactButton,
+  .iconButton,
+  .secondaryButton,
+  .primaryButton,
+  .dangerButton,
+  .field input,
+  .field select,
+  .assignment select {
+    min-height: var(--control-touch);
+  }
+
+  .checkbox {
+    min-height: var(--control-touch);
+  }
+
+  .actions {
+    width: 100%;
+  }
+
+  .actions > button {
+    flex: 1 1 calc(50% - 4px);
+  }
+
+  .previewControls > button,
+  .assignmentBody > button {
+    width: 100%;
+    min-height: var(--control-touch);
+  }
+
+  .editorBody {
+    padding: 14px;
   }
 }

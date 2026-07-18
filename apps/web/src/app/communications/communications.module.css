@@ -568,6 +568,18 @@
 }
 
 @media (max-width: 760px) {
+  .tabs button,
+  .inboxToolbar input,
+  .inboxToolbar select,
+  .inboxToolbar button,
+  .editor input,
+  .editor select,
+  .editor textarea,
+  .editor button,
+  .replyBox button {
+    min-height: var(--control-touch);
+  }
+
   .tabs {
     overflow-x: auto;
   }

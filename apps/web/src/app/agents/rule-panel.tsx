@@ -25,6 +25,8 @@ type Draft = {
   requireMention: boolean;
 };
 
+type WorkingAction = "save" | "delete";
+
 function blankDraft(agents: Agent[], accounts: CommunicationAccount[]): Draft {
   return {
     name: "",
@@ -83,7 +85,7 @@ export function RulePanel({
   const [draft, setDraft] = useState<Draft>(
     rules[0] ? draftFromRule(rules[0]) : blankDraft(agents, accounts),
   );
-  const [working, setWorking] = useState(false);
+  const [workingAction, setWorkingAction] = useState<WorkingAction | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const selected = rules.find((item) => item.id === selectedId) ?? null;
@@ -116,8 +118,8 @@ export function RulePanel({
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (working) return;
-    setWorking(true);
+    if (workingAction) return;
+    setWorkingAction("save");
     setError(null);
     setMessage(null);
     try {
@@ -129,31 +131,43 @@ export function RulePanel({
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not save the rule.");
     } finally {
-      setWorking(false);
+      setWorkingAction(null);
     }
   }
 
   async function remove() {
-    if (!selected || working || !window.confirm(`Delete ${selected.name}?`)) return;
-    setWorking(true);
+    if (
+      !selected ||
+      workingAction ||
+      !window.confirm(`Delete event rule "${selected.name}"? This cannot be undone.`)
+    ) {
+      return;
+    }
+    setWorkingAction("delete");
     setError(null);
+    setMessage(null);
     try {
       await deleteAgentCommunicationRule(selected.id);
       await refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not delete the rule.");
     } finally {
-      setWorking(false);
+      setWorkingAction(null);
     }
   }
 
   return (
     <div className={styles.layout}>
-      <aside className={styles.sideList}>
-        <button onClick={createNew} type="button">New rule</button>
+      <aside aria-label="Communication event rules" className={styles.sideList}>
+        <button aria-pressed={creating} disabled={Boolean(workingAction)} onClick={createNew} type="button">New rule</button>
+        {rules.length === 0 ? (
+          <p className={styles.sideListEmpty} role="status">No event rules yet.</p>
+        ) : null}
         {rules.map((rule) => (
           <button
+            aria-pressed={!creating && selected?.id === rule.id}
             data-selected={!creating && selected?.id === rule.id}
+            disabled={Boolean(workingAction)}
             key={rule.id}
             onClick={() => choose(rule)}
             type="button"
@@ -164,22 +178,30 @@ export function RulePanel({
         ))}
       </aside>
 
-      <form className={`${styles.editor} ${styles.form}`} onSubmit={(event) => void save(event)}>
+      <form
+        aria-busy={Boolean(workingAction)}
+        aria-labelledby="event-rule-editor-title"
+        className={`${styles.editor} ${styles.form}`}
+        onSubmit={(event) => void save(event)}
+      >
         <header className={styles.editorHeader}>
           <div>
             <p>{creating ? "New dispatch rule" : "Communication dispatch"}</p>
-            <h2>{draft.name || "Untitled rule"}</h2>
+            <h2 id="event-rule-editor-title">{draft.name || "Untitled rule"}</h2>
             <span className={styles.muted}>A communication-triggered agent remains idle until an explicit rule matches.</span>
           </div>
           <div className={styles.headerActions}>
-            {!creating ? <button className={styles.danger} disabled={working} onClick={() => void remove()} type="button">Delete</button> : null}
-            <button className={styles.primary} disabled={working} type="submit">{working ? "Saving…" : "Save"}</button>
+            {!creating ? <button className={styles.danger} disabled={Boolean(workingAction)} onClick={() => void remove()} type="button">{workingAction === "delete" ? "Deleting rule…" : "Delete rule"}</button> : null}
+            <button className={styles.primary} disabled={Boolean(workingAction) || !communicationAgents.length || !accounts.length} type="submit">{workingAction === "save" ? "Saving rule…" : "Save rule"}</button>
           </div>
         </header>
 
-        {error ? <div className={styles.error}>{error}</div> : null}
-        {message ? <div className={styles.success}>{message}</div> : null}
-        {!communicationAgents.length ? <div className={styles.warning}>Create an agent with the Communication event trigger before adding a rule.</div> : null}
+        {error ? <div className={styles.error} role="alert">{error}</div> : null}
+        {message ? <div className={styles.success} role="status">{message}</div> : null}
+        {!communicationAgents.length ? <div className={styles.warning} role="status">Create an agent with the Communication event trigger before adding a rule.</div> : null}
+        {!accounts.length ? <div className={styles.warning} role="status">Connect a communication account before adding a rule.</div> : null}
+
+        <fieldset className={styles.editorFields} disabled={Boolean(workingAction)}>
 
         <section className={styles.section}>
           <div className={styles.gridTwo}>
@@ -199,6 +221,7 @@ export function RulePanel({
           <label>Source IDs<textarea rows={5} value={draft.sourceIds} onChange={(event) => setDraft({ ...draft, sourceIds: event.target.value })} placeholder="One folder, channel, address, or user ID per line" /></label>
           <label className={styles.check}><input checked={draft.requireMention} onChange={(event) => setDraft({ ...draft, requireMention: event.target.checked })} type="checkbox" /> Require a Discord bot mention</label>
         </section>
+        </fieldset>
       </form>
     </div>
   );

@@ -9,6 +9,7 @@ import {
   type ModelPreferences,
 } from "../../../lib/api";
 import { EndpointModelList, ModelSelect } from "./model-browser";
+import styles from "./model-settings.module.css";
 
 type EndpointDraft = {
   id: string | null;
@@ -100,6 +101,7 @@ export function ModelSettings({
   }, [models]);
 
   async function run(name: string, operation: () => Promise<void>) {
+    if (busy) return;
     setBusy(name);
     setNotice(null);
     setError(null);
@@ -188,10 +190,15 @@ export function ModelSettings({
   }
 
   return (
-    <div className="settings-stack">
-      {(notice || error) && (
-        <div className={`banner ${error ? "banner-error" : "banner-success"}`} role="status">
-          {error ?? notice}
+    <div aria-busy={busy !== null} className={`settings-stack ${styles.root}`}>
+      {error && (
+        <div className="banner banner-error" role="alert">
+          {error}
+        </div>
+      )}
+      {!error && notice && (
+        <div className="banner banner-success" role="status">
+          {notice}
         </div>
       )}
 
@@ -202,14 +209,24 @@ export function ModelSettings({
             <h2>{endpoint.id ? "Edit endpoint" : "Add endpoint"}</h2>
           </div>
           {endpoint.id && (
-            <button className="button button-secondary" onClick={() => setEndpoint(emptyEndpoint)}>
+            <button
+              className="button button-secondary"
+              disabled={busy !== null}
+              onClick={() => setEndpoint(emptyEndpoint)}
+              type="button"
+            >
               Cancel edit
             </button>
           )}
         </div>
-        <form className="form-grid" onSubmit={saveEndpoint}>
+        <form
+          aria-busy={busy === "save-endpoint"}
+          className="form-grid"
+          onSubmit={saveEndpoint}
+        >
           <Field label="Name">
             <input
+              disabled={busy !== null}
               required
               value={endpoint.name}
               onChange={(event) => setEndpoint({ ...endpoint, name: event.target.value })}
@@ -218,6 +235,7 @@ export function ModelSettings({
           </Field>
           <Field label="Base URL">
             <input
+              disabled={busy !== null}
               required
               type="url"
               value={endpoint.baseUrl}
@@ -229,6 +247,7 @@ export function ModelSettings({
             <input
               type="password"
               autoComplete="new-password"
+              disabled={busy !== null}
               value={endpoint.apiKey}
               onChange={(event) => setEndpoint({ ...endpoint, apiKey: event.target.value })}
               placeholder={endpoint.id ? "Leave blank to keep the current key" : "Optional"}
@@ -238,13 +257,20 @@ export function ModelSettings({
             <input
               type="checkbox"
               checked={endpoint.enabled}
+              disabled={busy !== null}
               onChange={(event) => setEndpoint({ ...endpoint, enabled: event.target.checked })}
             />
             <span>Endpoint enabled</span>
           </label>
           <div className="form-actions form-span-two">
-            <button className="button" disabled={busy === "save-endpoint"} type="submit">
-              {endpoint.id ? "Save endpoint" : "Add endpoint"}
+            <button className="button" disabled={busy !== null} type="submit">
+              {busy === "save-endpoint"
+                ? endpoint.id
+                  ? "Saving endpoint"
+                  : "Adding endpoint"
+                : endpoint.id
+                  ? "Save endpoint"
+                  : "Add endpoint"}
             </button>
           </div>
         </form>
@@ -256,20 +282,31 @@ export function ModelSettings({
             <p className="eyebrow">Connections</p>
             <h2>Configured endpoints</h2>
           </div>
-          <span className="count">{endpoints.length}</span>
+          <span aria-label={`${endpoints.length} configured endpoints`} className="count">
+            {endpoints.length}
+          </span>
         </div>
         {endpoints.length === 0 ? (
-          <div className="empty-state">Add an OpenAI-compatible endpoint to continue.</div>
+          <div className="empty-state" role="status">
+            Add an OpenAI-compatible endpoint to continue.
+          </div>
         ) : (
           <div className="endpoint-list">
             {endpoints.map((item) => {
               const cached = modelsByEndpoint.get(item.id) ?? [];
+              const endpointHeadingId = `endpoint-${item.id}-heading`;
+              const endpointBusy = busy?.endsWith(`-${item.id}`) ?? false;
               return (
-                <article className="endpoint-card" key={item.id}>
+                <article
+                  aria-busy={endpointBusy}
+                  aria-labelledby={endpointHeadingId}
+                  className="endpoint-card"
+                  key={item.id}
+                >
                   <div className="endpoint-header">
                     <div>
                       <div className="title-row">
-                        <h3>{item.name}</h3>
+                        <h3 id={endpointHeadingId}>{item.name}</h3>
                         <span className={`pill ${item.enabled ? "pill-success" : ""}`}>
                           {item.enabled ? "Enabled" : "Disabled"}
                         </span>
@@ -278,7 +315,9 @@ export function ModelSettings({
                     </div>
                     <div className="button-row">
                       <button
+                        aria-label={`Edit endpoint ${item.name}`}
                         className="button button-secondary"
+                        disabled={busy !== null}
                         onClick={() =>
                           setEndpoint({
                             id: item.id,
@@ -288,15 +327,18 @@ export function ModelSettings({
                             enabled: item.enabled,
                           })
                         }
+                        type="button"
                       >
                         Edit
                       </button>
                       <button
+                        aria-label={`Delete endpoint ${item.name} and its cached models`}
                         className="button button-danger"
-                        disabled={busy === `delete-${item.id}`}
+                        disabled={busy !== null}
                         onClick={() => void endpointAction(item, "delete")}
+                        type="button"
                       >
-                        Delete
+                        {busy === `delete-${item.id}` ? "Deleting" : "Delete"}
                       </button>
                     </div>
                   </div>
@@ -309,16 +351,24 @@ export function ModelSettings({
                     />
                     <Meta label="Status" value={item.last_sync_status ?? "Not synchronized"} />
                   </dl>
-                  {item.last_sync_error && <p className="inline-error">{item.last_sync_error}</p>}
+                  {item.last_sync_error && (
+                    <p className="inline-error" role="alert">
+                      {item.last_sync_error}
+                    </p>
+                  )}
                   <div className="button-row endpoint-actions">
                     <ActionButton
                       busy={busy === `test-${item.id}`}
+                      busyLabel="Testing connection"
+                      disabled={busy !== null}
                       onClick={() => endpointAction(item, "test")}
                     >
                       Test connection
                     </ActionButton>
                     <ActionButton
                       busy={busy === `sync-${item.id}`}
+                      busyLabel="Refreshing models"
+                      disabled={busy !== null}
                       primary
                       onClick={() => endpointAction(item, "sync")}
                     >
@@ -327,6 +377,8 @@ export function ModelSettings({
                   </div>
                   <div className="manual-model-row">
                     <input
+                      aria-label={`Model ID to add to ${item.name}`}
+                      disabled={busy !== null}
                       value={manualIds[item.id] ?? ""}
                       onChange={(event) =>
                         setManualIds((current) => ({ ...current, [item.id]: event.target.value }))
@@ -335,6 +387,8 @@ export function ModelSettings({
                     />
                     <ActionButton
                       busy={busy === `manual-${item.id}`}
+                      busyLabel="Adding model"
+                      disabled={busy !== null}
                       onClick={() => addManualModel(item)}
                     >
                       Add model
@@ -358,8 +412,9 @@ export function ModelSettings({
             </p>
           </div>
         </div>
-        <form className="form-grid" onSubmit={saveRoles}>
+        <form aria-busy={busy === "save-roles"} className="form-grid" onSubmit={saveRoles}>
           <ModelSelect
+            disabled={busy !== null}
             label="Primary model"
             emptyLabel="Not configured"
             models={selectableModels}
@@ -367,6 +422,7 @@ export function ModelSettings({
             onChange={(value) => setRoles({ ...roles, primaryModelId: value })}
           />
           <ModelSelect
+            disabled={busy !== null}
             label="Utility model"
             emptyLabel="Use primary model"
             models={selectableModels}
@@ -374,13 +430,14 @@ export function ModelSettings({
             onChange={(value) => setRoles({ ...roles, utilityModelId: value })}
           />
           <ModelSelect
+            disabled={busy !== null}
             label="Image model"
             emptyLabel="Disabled"
             models={selectableModels}
             value={roles.imageModelId}
             onChange={(value) => setRoles({ ...roles, imageModelId: value })}
           />
-          <div className="preference-summary">
+          <div aria-live="polite" className="preference-summary">
             <span>Resolved utility</span>
             <strong>
               {preferences?.resolved_utility
@@ -389,8 +446,8 @@ export function ModelSettings({
             </strong>
           </div>
           <div className="form-actions form-span-two">
-            <button className="button" disabled={busy === "save-roles"} type="submit">
-              Save model roles
+            <button className="button" disabled={busy !== null} type="submit">
+              {busy === "save-roles" ? "Saving model roles" : "Save model roles"}
             </button>
           </div>
         </form>
@@ -427,22 +484,28 @@ function Meta({ label, value }: { label: string; value: string }) {
 
 function ActionButton({
   busy,
+  busyLabel,
+  disabled,
   primary = false,
   onClick,
   children,
 }: {
   busy: boolean;
+  busyLabel: string;
+  disabled: boolean;
   primary?: boolean;
   onClick: () => Promise<void>;
   children: React.ReactNode;
 }) {
   return (
     <button
+      aria-busy={busy}
       className={`button ${primary ? "" : "button-secondary"}`}
-      disabled={busy}
+      disabled={disabled}
       onClick={() => void onClick()}
+      type="button"
     >
-      {children}
+      {busy ? busyLabel : children}
     </button>
   );
 }

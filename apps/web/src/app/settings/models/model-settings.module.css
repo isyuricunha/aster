@@ -1,0 +1,13 @@
+@media (max-width: 640px) {
+  .root input:not([type="checkbox"]):not([type="radio"]),
+  .root select,
+  .root :global(.button),
+  .root :global(.checkbox-row) {
+    min-height: var(--control-touch);
+  }
+
+  .root :global(.form-actions) :global(.button),
+  .root :global(.manual-model-row) :global(.button) {
+    width: 100%;
+  }
+}

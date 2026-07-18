@@ -1,6 +1,10 @@
+import type { Metadata } from "next";
+
 import type { Conversation, ConversationSummary, ModelPreferences } from "../lib/api";
 import { requireServerAuth, serverApiFetch } from "../lib/server-api";
 import { ChatShell } from "./chat-shell";
+
+export const metadata: Metadata = { title: { absolute: "Chat · Aster" } };
 
 export const dynamic = "force-dynamic";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 import type { CachedModel } from "../../../lib/api";
 import styles from "./model-browser.module.css";
@@ -58,7 +58,7 @@ export function EndpointModelList({ models }: { models: CachedModel[] }) {
         </label>
       </div>
 
-      <div className={styles.summary}>
+      <div aria-atomic="true" aria-live="polite" className={styles.summary}>
         <span>
           Showing {visibleModels.length} of {filteredModels.length} matching models
         </span>
@@ -66,11 +66,13 @@ export function EndpointModelList({ models }: { models: CachedModel[] }) {
       </div>
 
       {filteredModels.length === 0 ? (
-        <div className={styles.empty}>No cached models match these filters.</div>
+        <div className={styles.empty} role="status">
+          No cached models match these filters.
+        </div>
       ) : (
-        <div className={styles.list}>
+        <div className={styles.list} role="list">
           {visibleModels.map((model) => (
-            <div className="model-row" key={model.id}>
+            <div className="model-row" key={model.id} role="listitem">
               <code>{model.model_id}</code>
               <div className="model-badges">
                 {model.is_manual && <span className="pill">Manual</span>}
@@ -104,14 +106,19 @@ export function ModelSelect({
   models,
   value,
   onChange,
+  disabled = false,
 }: {
   label: string;
   emptyLabel: string;
   models: CachedModel[];
   value: string;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
   const [query, setQuery] = useState("");
+  const fieldId = useId();
+  const labelId = `${fieldId}-label`;
+  const hintId = `${fieldId}-hint`;
 
   const matchingModels = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -127,17 +134,26 @@ export function ModelSelect({
       : visibleModels;
 
   return (
-    <label>
-      <span>{label}</span>
+    <div className={styles.selectField}>
+      <span className={styles.fieldLabel} id={labelId}>
+        {label}
+      </span>
       <div className={styles.selectStack}>
         <input
-          aria-label={`Filter ${label.toLocaleLowerCase()}`}
+          aria-label={`Filter options for ${label.toLocaleLowerCase()}`}
+          disabled={disabled}
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Filter by endpoint or model ID"
         />
-        <select value={value} onChange={(event) => onChange(event.target.value)}>
+        <select
+          aria-describedby={hintId}
+          aria-labelledby={labelId}
+          disabled={disabled}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        >
           <option value="">{emptyLabel}</option>
           {optionModels.map((model) => (
             <option key={model.id} value={model.id}>
@@ -146,11 +162,11 @@ export function ModelSelect({
             </option>
           ))}
         </select>
-        <span className={styles.hint}>
+        <span className={styles.hint} id={hintId}>
           Showing {visibleModels.length} of {matchingModels.length} matching models. Type to narrow the
           list.
         </span>
       </div>
-    </label>
+    </div>
   );
 }

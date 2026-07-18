@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 
 import { apiRequest, type AuthUser, type SessionRevocation } from "../../../lib/api";
+import styles from "./account-settings.module.css";
 
 export function AccountSettings({ username }: { username: string }) {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -13,6 +14,7 @@ export function AccountSettings({ username }: { username: string }) {
   const [error, setError] = useState<string | null>(null);
 
   async function run(name: string, operation: () => Promise<void>) {
+    if (busy) return;
     setBusy(name);
     setNotice(null);
     setError(null);
@@ -28,6 +30,7 @@ export function AccountSettings({ username }: { username: string }) {
   async function changePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (newPassword !== confirmation) {
+      setNotice(null);
       setError("New passwords do not match.");
       return;
     }
@@ -67,10 +70,15 @@ export function AccountSettings({ username }: { username: string }) {
   }
 
   return (
-    <div className="settings-stack">
-      {(notice || error) && (
-        <div className={`banner ${error ? "banner-error" : "banner-success"}`} role="status">
-          {error ?? notice}
+    <div aria-busy={busy !== null} className={`settings-stack ${styles.root}`}>
+      {error && (
+        <div className="banner banner-error" role="alert">
+          {error}
+        </div>
+      )}
+      {!error && notice && (
+        <div className="banner banner-success" role="status">
+          {notice}
         </div>
       )}
 
@@ -84,7 +92,7 @@ export function AccountSettings({ username }: { username: string }) {
         </div>
         <button
           className="button button-secondary"
-          disabled={busy === "logout"}
+          disabled={busy !== null}
           onClick={() => void logout()}
           type="button"
         >
@@ -102,11 +110,13 @@ export function AccountSettings({ username }: { username: string }) {
             </p>
           </div>
         </div>
-        <form className="form-grid" onSubmit={changePassword}>
+        <form aria-busy={busy === "password"} className="form-grid" onSubmit={changePassword}>
           <label className="form-span-two">
             <span>Current password</span>
             <input
               autoComplete="current-password"
+              disabled={busy !== null}
+              maxLength={256}
               onChange={(event) => setCurrentPassword(event.target.value)}
               required
               type="password"
@@ -116,7 +126,9 @@ export function AccountSettings({ username }: { username: string }) {
           <label>
             <span>New password</span>
             <input
+              aria-describedby="new-password-requirements"
               autoComplete="new-password"
+              disabled={busy !== null}
               minLength={12}
               maxLength={256}
               onChange={(event) => setNewPassword(event.target.value)}
@@ -128,7 +140,9 @@ export function AccountSettings({ username }: { username: string }) {
           <label>
             <span>Confirm new password</span>
             <input
+              aria-describedby="new-password-requirements"
               autoComplete="new-password"
+              disabled={busy !== null}
               minLength={12}
               maxLength={256}
               onChange={(event) => setConfirmation(event.target.value)}
@@ -137,8 +151,11 @@ export function AccountSettings({ username }: { username: string }) {
               value={confirmation}
             />
           </label>
+          <p className="form-help form-span-two" id="new-password-requirements">
+            Use 12 to 256 characters.
+          </p>
           <div className="form-actions form-span-two">
-            <button className="button" disabled={busy === "password"} type="submit">
+            <button className="button" disabled={busy !== null} type="submit">
               {busy === "password" ? "Updating password" : "Update password"}
             </button>
           </div>
@@ -155,7 +172,7 @@ export function AccountSettings({ username }: { username: string }) {
         </div>
         <button
           className="button button-secondary"
-          disabled={busy === "sessions"}
+          disabled={busy !== null}
           onClick={() => void revokeSessions()}
           type="button"
         >

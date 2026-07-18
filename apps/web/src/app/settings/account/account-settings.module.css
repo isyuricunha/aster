@@ -1,0 +1,10 @@
+@media (max-width: 640px) {
+  .root input,
+  .root :global(.button) {
+    min-height: var(--control-touch);
+  }
+
+  .root :global(.form-actions) :global(.button) {
+    width: 100%;
+  }
+}

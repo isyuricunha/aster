@@ -73,7 +73,7 @@ export function AuthForm({
           </div>
         </aside>
 
-        <section className="auth-card">
+        <section aria-busy={busy} className="auth-card">
           <div className="auth-card-mark">
             <AsterMark size={32} />
           </div>
@@ -87,7 +87,11 @@ export function AuthForm({
             </p>
           </div>
 
-          {error && <div className="banner banner-error">{error}</div>}
+          {error && (
+            <div className="banner banner-error" role="alert">
+              {error}
+            </div>
+          )}
 
           <form className="auth-form" onSubmit={submit}>
             <label>

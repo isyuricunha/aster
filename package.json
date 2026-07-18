@@ -5,6 +5,7 @@
     "dev": "pnpm --filter @aster/web dev",
     "build": "pnpm --filter @aster/web build",
     "lint": "pnpm --filter @aster/web lint",
+    "test:ui": "node scripts/ci/check-ui-contracts.mjs",
     "typecheck": "pnpm --filter @aster/web typecheck"
   },
   "engines": {

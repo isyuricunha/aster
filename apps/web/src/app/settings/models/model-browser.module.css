@@ -81,6 +81,18 @@
   gap: 7px;
 }
 
+.selectField {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.fieldLabel {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-weight: 540;
+}
+
 .hint {
   color: var(--text-faint) !important;
   font-size: 0.67rem !important;
@@ -96,5 +108,17 @@
   .summary {
     flex-direction: column;
     gap: 3px;
+  }
+
+  .controls input:not([type="checkbox"]),
+  .toggle,
+  .selectStack input,
+  .selectStack select,
+  .actions :global(.button) {
+    min-height: var(--control-touch);
+  }
+
+  .actions :global(.button) {
+    width: 100%;
   }
 }

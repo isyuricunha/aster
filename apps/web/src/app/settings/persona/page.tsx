@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import type {
   ConversationSummary,
   Persona,
@@ -6,6 +8,8 @@ import type {
 import { requireServerAuth, serverApiFetch } from "../../../lib/server-api";
 import { AppFrame } from "../../ui/app-frame";
 import { PersonaSettingsForm } from "./persona-settings";
+
+export const metadata: Metadata = { title: "Persona settings" };
 
 export const dynamic = "force-dynamic";
 

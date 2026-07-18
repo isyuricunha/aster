@@ -1,8 +1,12 @@
+import type { Metadata } from "next";
+
 import type { ConversationSummary, ModelPreferences } from "../../lib/api";
 import type { ImageGallery, ImageModelProfile } from "../../lib/image-api";
 import { requireServerAuth, serverApiFetch } from "../../lib/server-api";
 import { AppFrame } from "../ui/app-frame";
 import { ImageWorkspace } from "./image-workspace";
+
+export const metadata: Metadata = { title: "Images" };
 
 export const dynamic = "force-dynamic";
 

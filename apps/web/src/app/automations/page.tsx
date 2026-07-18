@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import type { CachedModel, Persona } from "../../lib/api";
 import type {
   Automation,
@@ -8,6 +10,8 @@ import type {
 import { requireServerAuth, serverApiFetch } from "../../lib/server-api";
 import { AppFrame } from "../ui/app-frame";
 import { AutomationWorkspace } from "./automation-workspace";
+
+export const metadata: Metadata = { title: "Automations" };
 
 export const dynamic = "force-dynamic";
 
@@ -68,7 +72,11 @@ export default async function AutomationsPage() {
       title="Automations"
       description="Schedule bounded model runs, deliver results through explicit integrations, and inspect every attempt."
     >
-      {initial.error ? <div className="banner banner-error">{initial.error}</div> : null}
+      {initial.error ? (
+        <div className="banner banner-error" role="alert">
+          {initial.error}
+        </div>
+      ) : null}
       <AutomationWorkspace
         initialAutomations={initial.automations}
         initialRuns={initial.runs}

@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import type { CachedModel, Persona } from "../../lib/api";
 import type {
   Agent,
@@ -10,6 +12,8 @@ import type { CommunicationAccount } from "../../lib/communication-api";
 import { requireServerAuth, serverApiFetch } from "../../lib/server-api";
 import { AppFrame } from "../ui/app-frame";
 import { AgentWorkspace } from "./agent-workspace";
+
+export const metadata: Metadata = { title: "Agents" };
 
 export const dynamic = "force-dynamic";
 
