@@ -2,7 +2,7 @@ from datetime import UTC, datetime, time, timedelta
 from math import floor
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-TRIGGER_TYPES = {"once", "interval", "daily", "weekly", "webhook"}
+TRIGGER_TYPES = {"once", "interval", "daily", "weekly", "webhook", "communication"}
 
 
 class ScheduleValidationError(ValueError):
@@ -48,7 +48,7 @@ def validate_schedule(
     if trigger_type not in TRIGGER_TYPES:
         raise ScheduleValidationError("Unsupported automation trigger")
     zone = timezone_info(timezone_name)
-    if trigger_type == "webhook":
+    if trigger_type in {"webhook", "communication"}:
         return {}
     if trigger_type == "once":
         instant = _parse_instant(schedule.get("run_at"), timezone=zone)
@@ -97,7 +97,7 @@ def next_run_at(
     current = (now or datetime.now(UTC)).astimezone(UTC)
     reference = (after or current).astimezone(UTC)
     zone = timezone_info(timezone_name)
-    if trigger_type == "webhook":
+    if trigger_type in {"webhook", "communication"}:
         return None
     if trigger_type == "once":
         instant = _parse_instant(schedule.get("run_at"), timezone=zone)

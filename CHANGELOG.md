@@ -6,6 +6,14 @@ All notable changes to Aster are documented in this file.
 
 ### Added
 
+- Private IMAP and Discord communication accounts with encrypted credentials, explicit connection tests, and bounded background synchronization.
+- Durable per-source cursors, expiring worker leases, inbound-message deduplication, and restart-safe polling.
+- Persistent communication threads, messages, participants, unread state, searchable text, metadata, and private attachments.
+- Manual email replies through an explicitly linked SMTP integration with threaded reply headers.
+- Manual Discord replies with mention parsing permanently disabled.
+- Communication-triggered automations with explicit sender, source, body, and optional Discord-mention allowlist rules.
+- Private Communications workspace with Inbox, Accounts, and Rules interfaces.
+- Migration `0015_communication_hub` and bounded runtime configuration for communication leases, message content, attachments, and attachment counts.
 - PostgreSQL-backed one-time, interval, daily, weekly, and inbound-webhook automations.
 - A dedicated worker service with transactional claiming, expiring leases, heartbeat renewal, interrupted-run recovery, and bounded retries.
 - Frozen automation persona snapshots and optional explicit model selection with Primary fallback routing when no model is pinned.
@@ -69,7 +77,7 @@ All notable changes to Aster are documented in this file.
 - Versioned JSON conversation export and authenticated import.
 - Human-readable Markdown conversation export.
 - Inline conversation renaming and keyboard access to history search.
-- Shared application frame for chat, image, automation, model, persona, and account navigation.
+- Shared application frame for chat, communication, image, automation, model, persona, and account navigation.
 - Internal interface icon set and dedicated Aster brand mark.
 - Responsive workspace navigation for desktop and mobile layouts.
 - Single-owner authentication with first-access setup.
@@ -87,6 +95,9 @@ All notable changes to Aster are documented in this file.
 
 ### Changed
 
+- The automation worker now also claims and synchronizes due communication accounts without adding another broker or worker service.
+- Receiving a communication message persists it before any matching automation is queued.
+- Communication automations require a separate enabled allowlist rule and receive bounded message snapshots as untrusted trigger data.
 - The default application stack now includes a continuously running automation worker built from the API image.
 - Automation model output is committed before SMTP, CalDAV, or outbound-webhook side effects begin.
 - Automatic retries stop before external delivery begins so a failed delivery is recorded instead of repeated silently.
@@ -95,7 +106,7 @@ All notable changes to Aster are documented in this file.
 - The same-origin proxy forwards only the explicit webhook control headers required by Stage 15.
 - The Image role is active and falls back to Primary only when that exact model explicitly declares the required image capability.
 - Provider image URLs are downloaded immediately and never stored as durable history.
-- Image media is stored outside PostgreSQL in a private persistent volume instead of inside chat text or database binary columns.
+- Image media and communication attachments are stored outside PostgreSQL in a private persistent volume.
 - Image turns cannot use the text edit or regeneration flows; a new image operation preserves clear lineage and parameters.
 - Portable conversation exports omit private image bytes and add an explicit omission note to affected turns.
 - Deleting a conversation removes its generated output files instead of leaving private media behind.
@@ -121,13 +132,17 @@ All notable changes to Aster are documented in this file.
 - Chat now uses a compact workspace layout with clearer conversation selection, message hierarchy, contextual actions, and a focused composer.
 - Model, persona, account, setup, and sign-in screens now share one dense interface system.
 - Forms, endpoint metadata, model browsing, empty states, notices, and responsive behavior use consistent tokens and interaction states.
-- Every chat, image, automation, model, persona, and account route requires an authenticated owner session.
+- Every chat, communication, image, automation, model, persona, and account route requires an authenticated owner session.
 - The bundled PostgreSQL service no longer publishes port 5432 to the host.
 - Endpoint discovery now allows 30 seconds by default.
 - The API, web package, and release documentation use version `0.1.0` consistently.
 
 ### Fixed
 
+- Repeated IMAP or Discord polling no longer duplicates persisted messages or communication-triggered automation runs.
+- Discord replies cannot create user, role, `@everyone`, or `@here` mentions through API configuration.
+- Communication attachments written before a failed database transaction are removed instead of becoming orphaned files.
+- The worker and API share the same private media volume so background attachment ingestion remains available after deployment.
 - Webhook delivery identifiers no longer roll back unrelated scheduler state when a duplicate is received.
 - Expired automation leases are recovered, and a worker that loses ownership stops its local execution.
 - The worker survives temporary database and schema unavailability during migrations instead of crashing permanently.

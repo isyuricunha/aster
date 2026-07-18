@@ -70,6 +70,14 @@ class Settings(BaseSettings):
     )
     aster_integration_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
     aster_webhook_max_bytes: int = Field(default=1_000_000, ge=1_000, le=20_000_000)
+    aster_communication_lease_seconds: int = Field(default=180, ge=30, le=3_600)
+    aster_communication_message_max_characters: int = Field(
+        default=200_000, ge=1_000, le=2_000_000
+    )
+    aster_communication_attachment_max_bytes: int = Field(
+        default=15_000_000, ge=10_000, le=200_000_000
+    )
+    aster_communication_max_attachments: int = Field(default=16, ge=0, le=100)
 
     @field_validator("aster_encryption_key")
     @classmethod

@@ -129,11 +129,15 @@ def _send_email(
     recipients: list[str],
     subject: str,
     body: str,
+    headers: dict[str, str] | None = None,
 ) -> None:
     message = EmailMessage()
     message["From"] = str(config["from_address"])
     message["To"] = ", ".join(recipients)
     message["Subject"] = subject
+    for key, value in (headers or {}).items():
+        if key.casefold() in {"in-reply-to", "references", "reply-to"}:
+            message[key] = value[:998]
     message.set_content(body)
     client = _smtp_connect(config, credentials)
     try:
@@ -262,6 +266,7 @@ async def deliver_email(
     recipients: list[str],
     subject: str,
     body: str,
+    headers: dict[str, str] | None = None,
 ) -> DeliveryResult:
     if not recipients or any("@" not in item for item in recipients):
         raise IntegrationError("invalid_delivery", "Email recipients are invalid.")
@@ -275,6 +280,7 @@ async def deliver_email(
             recipients=recipients,
             subject=subject,
             body=body,
+            headers=headers,
         )
     except (OSError, smtplib.SMTPException) as error:
         raise IntegrationError("delivery_failed", "Email delivery failed.") from error

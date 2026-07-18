@@ -15,9 +15,14 @@ from app.automation_queue import (
     recover_expired_automation_runs,
     renew_run_lease,
 )
+from app.communication_worker import sync_due_communication_account
 from app.config import settings
 from app.db import AsyncSessionFactory, engine
-from app.dependencies import get_openai_client, get_secret_cipher
+from app.dependencies import (
+    get_communication_store,
+    get_openai_client,
+    get_secret_cipher,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +89,8 @@ async def run_worker() -> None:
     worker_id = f"{socket.gethostname()}:{os.getpid()}:{uuid4().hex[:8]}"
     ready_path = Path("/tmp/aster-worker-ready")
     ready = False
+    cipher = get_secret_cipher()
+    communication_store = get_communication_store()
     try:
         while True:
             try:
@@ -93,6 +100,13 @@ async def run_worker() -> None:
                         session,
                         limit=settings.aster_automation_scheduler_batch_size,
                     )
+                await sync_due_communication_account(
+                    AsyncSessionFactory,
+                    worker_id=worker_id,
+                    cipher=cipher,
+                    store=communication_store,
+                    settings=settings,
+                )
                 if not ready:
                     await _set_ready(ready_path, True)
                     ready = True
