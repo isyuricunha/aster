@@ -77,7 +77,9 @@ class CommunicationSourceCursor(TimestampMixin, Base):
     )
     source_key: Mapped[str] = mapped_column(String(512), nullable=False)
     cursor_value: Mapped[str | None] = mapped_column(String(512), nullable=True)
-    metadata: Mapped[dict[str, object]] = mapped_column(JSON, default=dict, nullable=False)
+    details: Mapped[dict[str, object]] = mapped_column(
+        "metadata", JSON, default=dict, nullable=False
+    )
 
 
 class CommunicationThread(TimestampMixin, Base):
@@ -107,7 +109,9 @@ class CommunicationThread(TimestampMixin, Base):
     participants: Mapped[list[dict[str, str]]] = mapped_column(
         JSON, default=list, nullable=False
     )
-    metadata: Mapped[dict[str, object]] = mapped_column(JSON, default=dict, nullable=False)
+    details: Mapped[dict[str, object]] = mapped_column(
+        "metadata", JSON, default=dict, nullable=False
+    )
     unread_count: Mapped[int] = mapped_column(
         Integer, default=0, server_default="0", nullable=False
     )
@@ -152,7 +156,9 @@ class CommunicationMessage(TimestampMixin, Base):
     subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
     content_text: Mapped[str] = mapped_column(Text, default="", server_default="", nullable=False)
     content_html: Mapped[str | None] = mapped_column(Text, nullable=True)
-    metadata: Mapped[dict[str, object]] = mapped_column(JSON, default=dict, nullable=False)
+    details: Mapped[dict[str, object]] = mapped_column(
+        "metadata", JSON, default=dict, nullable=False
+    )
     is_read: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false", nullable=False
     )
