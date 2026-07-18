@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 TokenParameter = Literal["none", "max_tokens", "max_completion_tokens"]
 ReasoningEffort = Literal["minimal", "low", "medium", "high", "xhigh"]
+InstructionRole = Literal["system", "developer"]
 
 
 class ModelProfileUpdate(BaseModel):
@@ -15,6 +16,7 @@ class ModelProfileUpdate(BaseModel):
     context_window: Annotated[int | None, Field(default=None, ge=1, le=10_000_000)] = None
     max_output_tokens: Annotated[int | None, Field(default=None, ge=1, le=1_000_000)] = None
     token_parameter: TokenParameter = "max_tokens"
+    instruction_role: InstructionRole = "system"
     temperature: Annotated[float | None, Field(default=None, ge=0, le=2)] = None
     top_p: Annotated[float | None, Field(default=None, gt=0, le=1)] = None
     reasoning_effort: ReasoningEffort | None = None
@@ -47,6 +49,7 @@ class ModelProfileResponse(BaseModel):
     context_window: int | None
     max_output_tokens: int | None
     token_parameter: TokenParameter
+    instruction_role: InstructionRole
     temperature: float | None
     top_p: float | None
     reasoning_effort: ReasoningEffort | None
