@@ -129,6 +129,7 @@ async def dispatch_agent_communication_events(
                 Agent.paused.is_(False),
                 Agent.trigger_type == "communication",
                 CommunicationMessage.direction == "inbound",
+                CommunicationMessage.received_at >= AgentCommunicationRule.created_at,
                 AgentMessageDispatch.id.is_(None),
             )
             .order_by(CommunicationMessage.received_at, AgentCommunicationRule.created_at)
@@ -161,6 +162,7 @@ async def dispatch_agent_communication_events(
                 maximum=settings.aster_communication_message_max_characters,
             ),
         )
+        newly_created = run is not None
         if run is None:
             run = await session.scalar(
                 select(AgentRun).where(AgentRun.occurrence_key == occurrence_key)
@@ -176,7 +178,7 @@ async def dispatch_agent_communication_events(
                 await session.flush()
         except IntegrityError:
             continue
-        if run is not None and run.trigger_source == "communication":
+        if newly_created:
             created += 1
     await session.commit()
     return created
