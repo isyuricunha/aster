@@ -31,6 +31,7 @@ from app.agent_step_service import (
     fail_run,
     record_model_usage,
 )
+from app.agent_time import aware_datetime
 from app.config import Settings
 from app.mcp_client import McpClient
 from app.model_routing import can_fallback, resolve_automation_targets
@@ -108,7 +109,10 @@ async def run_model_round(
         buffers: dict[int, ToolCallBuffer] = {}
         try:
             remaining = (
-                max(1.0, (run.deadline_at - datetime.now(UTC)).total_seconds())
+                max(
+                    1.0,
+                    (aware_datetime(run.deadline_at) - datetime.now(UTC)).total_seconds(),
+                )
                 if run.deadline_at
                 else float(run.max_runtime_seconds)
             )

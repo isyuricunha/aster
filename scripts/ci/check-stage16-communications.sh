@@ -1,13 +1,10 @@
 #!/bin/sh
 set -eu
 
-api_url="${1:-http://localhost:8000}"
-web_url="${2:-http://localhost:3000}"
-username="owner"
-password="correct horse battery staple"
-cookie_jar="$(mktemp)"
-response_file="$(mktemp)"
-trap 'rm -f "${cookie_jar}" "${response_file}"' EXIT
+api_url="${ASTER_CI_API_URL:-http://localhost:8000}"
+web_url="${ASTER_CI_WEB_URL:-http://localhost:3000}"
+cookie_jar="${ASTER_CI_COOKIE_JAR:-/tmp/aster.cookies}"
+origin="${ASTER_CI_ORIGIN:-http://localhost:3000}"
 
 json_field() {
   field="$1"
@@ -19,26 +16,7 @@ json_contains_secret() {
   python -c 'import json,sys; data=json.load(sys.stdin); print(sys.argv[1] in json.dumps(data))' "${secret}"
 }
 
-status="$({
-  curl -sS -o "${response_file}" -w '%{http_code}' \
-    -H 'Content-Type: application/json' \
-    -d "{\"username\":\"${username}\",\"password\":\"${password}\"}" \
-    "${web_url}/api/auth/setup"
-} || true)"
-
-if [ "${status}" = "409" ]; then
-  curl -fsS -c "${cookie_jar}" \
-    -H 'Content-Type: application/json' \
-    -d "{\"username\":\"${username}\",\"password\":\"${password}\"}" \
-    "${web_url}/api/auth/login" >/dev/null
-else
-  test "${status}" = "201"
-  curl -fsS -c "${cookie_jar}" \
-    -H 'Content-Type: application/json' \
-    -d "{\"username\":\"${username}\",\"password\":\"${password}\"}" \
-    "${web_url}/api/auth/login" >/dev/null
-fi
-
+test -s "${cookie_jar}"
 test "$(curl -sS -o /dev/null -w '%{http_code}' "${api_url}/api/communication-accounts")" = "401"
 test "$(curl -sS -o /dev/null -w '%{http_code}' "${web_url}/communications")" = "307"
 
@@ -46,6 +24,7 @@ account_secret="stage16-imap-secret"
 account_json="$({
   curl -fsS -b "${cookie_jar}" \
     -H 'Content-Type: application/json' \
+    -H "Origin: ${origin}" \
     -d "{
       \"name\": \"Stage 16 inbox\",
       \"kind\": \"imap\",
@@ -75,6 +54,7 @@ printf '%s' "${account_json}" | grep --quiet '"username"'
 automation_json="$({
   curl -fsS -b "${cookie_jar}" \
     -H 'Content-Type: application/json' \
+    -H "Origin: ${origin}" \
     -d '{
       "name": "Stage 16 communication triage",
       "description": "Validate communication event routing.",
@@ -103,6 +83,7 @@ printf '%s' "${automation_json}" | grep --quiet '"next_run_at":null'
 rule_json="$({
   curl -fsS -b "${cookie_jar}" \
     -H 'Content-Type: application/json' \
+    -H "Origin: ${origin}" \
     -d "{
       \"name\": \"Stage 16 trusted sender\",
       \"account_id\": \"${account_id}\",
@@ -125,7 +106,7 @@ curl -fsS -b "${cookie_jar}" "${web_url}/api/communication-rules" \
 curl -fsS -b "${cookie_jar}" "${web_url}/communications" \
   | grep --quiet 'Communications'
 
-docker compose exec -T api alembic current | grep --quiet '0015_communication_hub'
+docker compose exec -T api alembic history | grep --quiet '0015_communication_hub'
 docker compose config | grep --quiet 'ASTER_COMMUNICATION_LEASE_SECONDS'
 docker compose config | grep --quiet 'source: aster-media'
 docker compose config | grep --quiet 'target: /var/lib/aster/media'
