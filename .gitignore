@@ -8,6 +8,7 @@ node_modules/
 .pnpm-store/
 .next/
 out/
+*.tsbuildinfo
 
 # Python
 .venv/

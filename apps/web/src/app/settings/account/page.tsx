@@ -1,6 +1,10 @@
+import type { Metadata } from "next";
+
 import { requireServerAuth } from "../../../lib/server-api";
 import { AppFrame } from "../../ui/app-frame";
 import { AccountSettings } from "./account-settings";
+
+export const metadata: Metadata = { title: "Account settings" };
 
 export const dynamic = "force-dynamic";
 

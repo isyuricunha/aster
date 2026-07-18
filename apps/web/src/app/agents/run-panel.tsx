@@ -36,6 +36,7 @@ export function RunPanel({
   const [selectedId, setSelectedId] = useState<string | null>(runs[0]?.id ?? null);
   const [working, setWorking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const selected = useMemo(
     () => runs.find((item) => item.id === selectedId) ?? runs[0] ?? null,
     [runs, selectedId],
@@ -49,10 +50,32 @@ export function RunPanel({
     else setSelectedId(next[0]?.id ?? null);
   }
 
+  async function refreshRuns() {
+    if (working) return;
+    setWorking("refresh");
+    setError(null);
+    setMessage(null);
+    try {
+      await refresh();
+      setMessage("Agent runs refreshed.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not refresh agent runs.");
+    } finally {
+      setWorking(null);
+    }
+  }
+
   async function act(action: "pause" | "resume" | "cancel" | "retry") {
     if (!selected || working) return;
+    if (
+      action === "cancel" &&
+      !window.confirm(`Cancel the run for "${selected.agent_name}"? The current run cannot be resumed.`)
+    ) {
+      return;
+    }
     setWorking(action);
     setError(null);
+    setMessage(null);
     try {
       if (action === "pause") await pauseAgentRun(selected.id);
       else if (action === "resume") await resumeAgentRun(selected.id);
@@ -60,9 +83,17 @@ export function RunPanel({
       else {
         const retry = await retryAgentRun(selected.id);
         await refresh(retry.id);
+        setMessage("A retry was queued from the saved run snapshot.");
         return;
       }
       await refresh(selected.id);
+      setMessage(
+        action === "pause"
+          ? "Run paused."
+          : action === "resume"
+            ? "Run resumed."
+            : "Run cancelled.",
+      );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : `Could not ${action} the run.`);
     } finally {
@@ -74,12 +105,14 @@ export function RunPanel({
     if (working) return;
     setWorking(`${decision}-${approvalId}`);
     setError(null);
+    setMessage(null);
     try {
       const updated =
         decision === "approve"
           ? await approveAgentAction(approvalId)
           : await denyAgentAction(approvalId);
       await refresh(updated.id);
+      setMessage(decision === "approve" ? "Action approved." : "Action denied.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not decide the action.");
     } finally {
@@ -89,11 +122,18 @@ export function RunPanel({
 
   return (
     <div className={styles.layout}>
-      <aside className={styles.sideList}>
-        <button onClick={() => void refresh()} type="button">Refresh runs</button>
+      <aside aria-label="Agent runs" className={styles.sideList}>
+        <button disabled={Boolean(working)} onClick={() => void refreshRuns()} type="button">
+          {working === "refresh" ? "Refreshing runs…" : "Refresh runs"}
+        </button>
+        {runs.length === 0 ? (
+          <p className={styles.sideListEmpty} role="status">No autonomous agent runs yet.</p>
+        ) : null}
         {runs.map((run) => (
           <button
+            aria-pressed={selected?.id === run.id}
             data-selected={selected?.id === run.id}
+            disabled={Boolean(working)}
             key={run.id}
             onClick={() => setSelectedId(run.id)}
             type="button"
@@ -104,27 +144,27 @@ export function RunPanel({
         ))}
       </aside>
 
-      <section className={styles.panel}>
+      <section aria-busy={Boolean(working)} aria-label="Run details" className={styles.panel}>
+        {error ? <div className={styles.error} role="alert">{error}</div> : null}
+        {message ? <div className={styles.success} role="status">{message}</div> : null}
         {!selected ? (
-          <div className={styles.empty}>No autonomous agent runs yet.</div>
+          <div className={styles.empty} role="status">No autonomous agent runs yet.</div>
         ) : (
           <>
             <header className={styles.panelHeader}>
               <div>
                 <p>Run detail</p>
                 <h2>{selected.agent_name}</h2>
-                <span className={styles.status} data-status={selected.status}>{selected.status}</span>
+                <span className={styles.status} data-status={selected.status} role="status">{selected.status}</span>
               </div>
               <div className={styles.headerActions}>
-                {selected.status === "queued" || selected.status === "running" ? <button disabled={Boolean(working)} onClick={() => void act("pause")} type="button">Pause</button> : null}
-                {selected.status === "paused" ? <button disabled={Boolean(working)} onClick={() => void act("resume")} type="button">Resume</button> : null}
-                {!(["completed", "failed", "cancelled"] as string[]).includes(selected.status) ? <button className={styles.danger} disabled={Boolean(working)} onClick={() => void act("cancel")} type="button">Cancel</button> : null}
-                {selected.status === "failed" || selected.status === "cancelled" ? <button disabled={Boolean(working)} onClick={() => void act("retry")} type="button">Retry</button> : null}
-                <button onClick={() => void refresh(selected.id)} type="button">Refresh</button>
+                {selected.status === "queued" || selected.status === "running" ? <button disabled={Boolean(working)} onClick={() => void act("pause")} type="button">{working === "pause" ? "Pausing run…" : "Pause run"}</button> : null}
+                {selected.status === "paused" ? <button disabled={Boolean(working)} onClick={() => void act("resume")} type="button">{working === "resume" ? "Resuming run…" : "Resume run"}</button> : null}
+                {!(["completed", "failed", "cancelled"] as string[]).includes(selected.status) ? <button className={styles.danger} disabled={Boolean(working)} onClick={() => void act("cancel")} type="button">{working === "cancel" ? "Cancelling run…" : "Cancel run"}</button> : null}
+                {selected.status === "failed" || selected.status === "cancelled" ? <button disabled={Boolean(working)} onClick={() => void act("retry")} type="button">{working === "retry" ? "Queueing retry…" : "Retry run"}</button> : null}
+                <button disabled={Boolean(working)} onClick={() => void refreshRuns()} type="button">{working === "refresh" ? "Refreshing run…" : "Refresh run"}</button>
               </div>
             </header>
-
-            {error ? <div className={styles.error}>{error}</div> : null}
 
             <div className={styles.metrics}>
               <Metric label="Trigger" value={selected.trigger_source} />
@@ -150,8 +190,8 @@ export function RunPanel({
                       </div>
                       <pre className={styles.pre}>{approval.details}</pre>
                       <div className={styles.approvalActions}>
-                        <button className={styles.primary} disabled={Boolean(working)} onClick={() => void decide(approval.id, "approve")} type="button">Approve</button>
-                        <button className={styles.danger} disabled={Boolean(working)} onClick={() => void decide(approval.id, "deny")} type="button">Deny</button>
+                        <button aria-label={`Approve ${approval.title}`} className={styles.primary} disabled={Boolean(working)} onClick={() => void decide(approval.id, "approve")} type="button">{working === `approve-${approval.id}` ? "Approving…" : "Approve action"}</button>
+                        <button aria-label={`Deny ${approval.title}`} className={styles.danger} disabled={Boolean(working)} onClick={() => void decide(approval.id, "deny")} type="button">{working === `deny-${approval.id}` ? "Denying…" : "Deny action"}</button>
                       </div>
                     </article>
                   ))}
@@ -174,7 +214,7 @@ export function RunPanel({
             <section className={styles.section}>
               <div className={styles.sectionTitle}><p>Timeline</p><h3>Every model decision and action</h3></div>
               <div className={styles.timeline}>
-                {selected.steps.length === 0 ? <div className={styles.empty}>The worker has not started this run.</div> : selected.steps.map((step) => (
+                {selected.steps.length === 0 ? <div className={styles.empty} role="status">The worker has not started this run.</div> : selected.steps.map((step) => (
                   <article key={step.id}>
                     <div className={styles.timelineHeader}>
                       <div><strong>#{step.position} · {step.summary}</strong><div className={styles.itemMeta}>{step.kind} · {formatDate(step.started_at)}</div></div>

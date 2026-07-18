@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type KeyboardEvent } from "react";
 
 import type { CachedModel, Persona } from "../../lib/api";
 import {
@@ -55,22 +55,50 @@ export function AutomationWorkspace({
   personas: Persona[];
   initialAutomationId: string | null;
 }) {
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("automations");
+  const [automationToOpen, setAutomationToOpen] = useState(initialAutomationId);
   const [automations, setAutomations] = useState(initialAutomations);
   const [runs, setRuns] = useState(initialRuns);
   const [integrations, setIntegrations] = useState(initialIntegrations);
   const [notifications, setNotifications] = useState(initialNotifications.items);
   const [unreadCount, setUnreadCount] = useState(initialNotifications.unread_count);
 
+  function selectTab(tab: WorkspaceTab, focus = false) {
+    setActiveTab(tab);
+    if (focus) {
+      tabRefs.current[TABS.findIndex((item) => item.id === tab)]?.focus();
+    }
+  }
+
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") nextIndex = (index + 1) % TABS.length;
+    if (event.key === "ArrowLeft") nextIndex = (index - 1 + TABS.length) % TABS.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = TABS.length - 1;
+    if (nextIndex === null) return;
+    event.preventDefault();
+    selectTab(TABS[nextIndex].id, true);
+  }
+
   return (
     <div className={styles.workspace}>
-      <nav className={styles.tabs} aria-label="Automation sections">
-        {TABS.map((tab) => (
+      <div className={styles.tabs} aria-label="Automation sections" role="tablist">
+        {TABS.map((tab, index) => (
           <button
-            aria-current={activeTab === tab.id ? "page" : undefined}
+            aria-controls={`automation-panel-${tab.id}`}
+            aria-selected={activeTab === tab.id}
             className={activeTab === tab.id ? styles.activeTab : ""}
+            id={`automation-tab-${tab.id}`}
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => selectTab(tab.id)}
+            onKeyDown={(event) => handleTabKeyDown(event, index)}
+            ref={(element) => {
+              tabRefs.current[index] = element;
+            }}
+            role="tab"
+            tabIndex={activeTab === tab.id ? 0 : -1}
             type="button"
           >
             {tab.label}
@@ -79,47 +107,80 @@ export function AutomationWorkspace({
             ) : null}
           </button>
         ))}
-      </nav>
+      </div>
 
       {activeTab === "automations" ? (
-        <AutomationPanel
-          automations={automations}
-          initialAutomationId={initialAutomationId}
-          integrations={integrations}
-          models={models}
-          onAutomationsChange={setAutomations}
-          onRunsChange={setRuns}
-          personas={personas}
-          runs={runs}
-        />
+        <section
+          aria-labelledby="automation-tab-automations"
+          className={styles.tabPanel}
+          id="automation-panel-automations"
+          role="tabpanel"
+          tabIndex={0}
+        >
+          <AutomationPanel
+            automations={automations}
+            initialAutomationId={automationToOpen}
+            integrations={integrations}
+            models={models}
+            onAutomationsChange={setAutomations}
+            onRunsChange={setRuns}
+            personas={personas}
+            runs={runs}
+          />
+        </section>
       ) : null}
 
       {activeTab === "runs" ? (
-        <RunsPanel
-          runs={runs}
-          onRunsChange={setRuns}
-          onOpenAutomation={(automationId) => {
-            setActiveTab("automations");
-            window.history.replaceState(null, "", `/automations?automation=${automationId}`);
-          }}
-        />
+        <section
+          aria-labelledby="automation-tab-runs"
+          className={styles.tabPanel}
+          id="automation-panel-runs"
+          role="tabpanel"
+          tabIndex={0}
+        >
+          <RunsPanel
+            runs={runs}
+            onRunsChange={setRuns}
+            onOpenAutomation={(automationId) => {
+              setAutomationToOpen(automationId);
+              selectTab("automations", true);
+              window.history.replaceState(null, "", `/automations?automation=${automationId}`);
+            }}
+          />
+        </section>
       ) : null}
 
       {activeTab === "integrations" ? (
-        <IntegrationPanel
-          integrations={integrations}
-          onIntegrationsChange={setIntegrations}
-        />
+        <section
+          aria-labelledby="automation-tab-integrations"
+          className={styles.tabPanel}
+          id="automation-panel-integrations"
+          role="tabpanel"
+          tabIndex={0}
+        >
+          <IntegrationPanel
+            integrations={integrations}
+            onIntegrationsChange={setIntegrations}
+          />
+        </section>
       ) : null}
 
       {activeTab === "notifications" ? (
-        <NotificationsPanel
-          notifications={notifications}
-          onNotificationsChange={(items, count) => {
-            setNotifications(items);
-            setUnreadCount(count);
-          }}
-        />
+        <section
+          aria-labelledby="automation-tab-notifications"
+          className={styles.tabPanel}
+          id="automation-panel-notifications"
+          role="tabpanel"
+          tabIndex={0}
+        >
+          <NotificationsPanel
+            notifications={notifications}
+            onNotificationsChange={(items, count) => {
+              setNotifications(items);
+              setUnreadCount(count);
+            }}
+          />
+        </section>
       ) : null}
     </div>
   );
@@ -164,18 +225,22 @@ function RunsPanel({
 
   return (
     <div className={styles.twoPanel}>
-      <aside className={styles.sideList}>
+      <aside aria-label="Automation run history" className={styles.sideList}>
         <button className={styles.refreshButton} onClick={() => void refresh()} type="button">
           Refresh history
         </button>
         {runs.map((run) => (
           <button
+            aria-pressed={selected?.id === run.id}
             className={selected?.id === run.id ? styles.selectedItem : ""}
             key={run.id}
             onClick={() => setSelectedId(run.id)}
             type="button"
           >
-            <span className={`${styles.statusDot} ${styles[`status_${run.status}`]}`} />
+            <span
+              aria-hidden="true"
+              className={`${styles.statusDot} ${styles[`status_${run.status}`]}`}
+            />
             <div>
               <strong>{run.automation_name}</strong>
               <span>
@@ -215,7 +280,11 @@ function RunsPanel({
                 ) : null}
               </div>
             </header>
-            {error ? <div className={styles.error}>{error}</div> : null}
+            {error ? (
+              <div className={styles.error} role="alert">
+                {error}
+              </div>
+            ) : null}
             <div className={styles.summaryGrid}>
               <Metric label="Status" value={selected.status} />
               <Metric label="Attempt" value={`${selected.attempt}/${selected.max_attempts}`} />
@@ -307,14 +376,21 @@ function NotificationsPanel({
           </button>
         </div>
       </header>
-      {error ? <div className={styles.error}>{error}</div> : null}
+      {error ? (
+        <div className={styles.error} role="alert">
+          {error}
+        </div>
+      ) : null}
       <div className={styles.notificationList}>
         {notifications.length === 0 ? (
           <div className={styles.emptyState}>No notifications.</div>
         ) : (
           notifications.map((notification) => (
             <article className={notification.read_at ? styles.readNotification : ""} key={notification.id}>
-              <span className={`${styles.notificationLevel} ${styles[notification.level]}`} />
+              <span
+                aria-hidden="true"
+                className={`${styles.notificationLevel} ${styles[notification.level]}`}
+              />
               <div>
                 <header>
                   <strong>{notification.title}</strong>

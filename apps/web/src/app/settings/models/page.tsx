@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import type {
   CachedModel,
   ModelEndpoint,
@@ -8,6 +10,8 @@ import { requireServerAuth, serverApiFetch } from "../../../lib/server-api";
 import { AppFrame } from "../../ui/app-frame";
 import { ModelProfileSettings } from "./model-profile-settings";
 import { ModelSettings } from "./model-settings";
+
+export const metadata: Metadata = { title: "Model settings" };
 
 export const dynamic = "force-dynamic";
 

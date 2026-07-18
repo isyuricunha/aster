@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import type { Automation, IntegrationConnection } from "../../lib/automation-api";
 import type {
   CommunicationAccount,
@@ -7,6 +9,8 @@ import type {
 import { requireServerAuth, serverApiFetch } from "../../lib/server-api";
 import { AppFrame } from "../ui/app-frame";
 import { CommunicationWorkspace } from "./communication-workspace";
+
+export const metadata: Metadata = { title: "Communications" };
 
 export const dynamic = "force-dynamic";
 

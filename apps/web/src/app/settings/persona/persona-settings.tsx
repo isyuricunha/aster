@@ -21,7 +21,8 @@ type PersonaDraft = Pick<
 
 type BusyAction =
   | "save"
-  | "default"
+  | "make-default"
+  | "clear-default"
   | "duplicate"
   | "delete"
   | "preview"
@@ -153,7 +154,7 @@ export function PersonaSettingsForm({
 
   async function makeDefault() {
     if (!selectedPersona || !selectedPersona.enabled) return;
-    setBusy("default");
+    setBusy("make-default");
     clearStatus();
     try {
       const result = await apiRequest<PersonaPreferences>("/api/persona-preferences", {
@@ -174,7 +175,7 @@ export function PersonaSettingsForm({
   }
 
   async function clearDefault() {
-    setBusy("default");
+    setBusy("clear-default");
     clearStatus();
     try {
       await apiRequest<PersonaPreferences>("/api/persona-preferences", {
@@ -301,6 +302,7 @@ export function PersonaSettingsForm({
     input.value = "";
     if (!file) return;
     if (file.size > 1_000_000) {
+      setNotice(null);
       setError("Persona exports must be smaller than 1 MB.");
       return;
     }
@@ -372,33 +374,43 @@ export function PersonaSettingsForm({
   }
 
   return (
-    <div className={styles.layout}>
-      <aside className={styles.library}>
+    <div aria-busy={busy !== null} className={styles.layout}>
+      <aside aria-labelledby="persona-library-heading" className={styles.library}>
         <div className={styles.libraryHeader}>
           <div>
             <p className="eyebrow">Library</p>
-            <h2>Personas</h2>
+            <h2 id="persona-library-heading">Personas</h2>
           </div>
-          <button className={styles.compactButton} onClick={startNewPersona} type="button">
+          <button
+            aria-label="Create a new persona"
+            className={styles.compactButton}
+            disabled={busy !== null}
+            onClick={startNewPersona}
+            type="button"
+          >
             New
           </button>
         </div>
-        <div className={styles.personaList}>
+        <div aria-label="Persona library" className={styles.personaList} role="group">
           {personas.length === 0 ? (
-            <div className={styles.emptyLibrary}>
+            <div className={styles.emptyLibrary} role="status">
               Create a persona to define a reusable identity and instruction layer.
             </div>
           ) : (
             personas.map((persona) => (
               <button
+                aria-pressed={selectedPersonaId === persona.id}
                 className={`${styles.personaItem} ${
                   selectedPersonaId === persona.id ? styles.personaItemSelected : ""
                 }`}
+                disabled={busy !== null}
                 key={persona.id}
                 onClick={() => selectPersona(persona)}
                 type="button"
               >
-                <span className={styles.avatar}>{persona.name.slice(0, 2)}</span>
+                <span aria-hidden="true" className={styles.avatar}>
+                  {persona.name.slice(0, 2)}
+                </span>
                 <span className={styles.personaCopy}>
                   <strong>{persona.name || "Unnamed persona"}</strong>
                   <small>
@@ -412,17 +424,20 @@ export function PersonaSettingsForm({
         </div>
       </aside>
 
-      <section className={styles.editor}>
+      <section aria-labelledby="persona-editor-heading" className={styles.editor}>
         <div className={styles.editorHeader}>
           <div>
             <p className="eyebrow">Identity</p>
-            <h2>{selectedPersona ? selectedPersona.name : "New persona"}</h2>
+            <h2 id="persona-editor-heading">
+              {selectedPersona ? selectedPersona.name : "New persona"}
+            </h2>
             <p>
               Library changes never rewrite persona snapshots already stored in conversations.
             </p>
           </div>
           <div className={styles.actions}>
             <button
+              aria-label={selectedPersona ? `Export ${selectedPersona.name}` : "Export persona"}
               className={styles.secondaryButton}
               disabled={!selectedPersona || busy !== null}
               onClick={exportPersona}
@@ -436,10 +451,11 @@ export function PersonaSettingsForm({
               onClick={() => importRef.current?.click()}
               type="button"
             >
-              Import
+              {busy === "import" ? "Importing" : "Import"}
             </button>
             <input
               accept=".json,application/json"
+              aria-label="Import persona JSON file"
               className={styles.hiddenInput}
               onChange={(event) => void importPersona(event)}
               ref={importRef}
@@ -449,26 +465,34 @@ export function PersonaSettingsForm({
         </div>
 
         <div className={styles.editorBody}>
-          {(notice || error) && (
-            <div className={error ? styles.error : styles.notice} role="status">
-              {error ?? notice}
+          {error && (
+            <div className={styles.error} role="alert">
+              {error}
+            </div>
+          )}
+          {!error && notice && (
+            <div className={styles.notice} role="status">
+              {notice}
             </div>
           )}
 
-          <form onSubmit={(event) => void savePersona(event)}>
+          <form aria-busy={busy === "save"} onSubmit={(event) => void savePersona(event)}>
             <div className={styles.formGrid}>
               <label className={styles.field}>
                 <span>Name</span>
                 <input
+                  disabled={busy !== null}
                   maxLength={120}
                   onChange={(event) => setDraft({ ...draft, name: event.target.value })}
                   placeholder="Research assistant"
+                  required
                   value={draft.name}
                 />
               </label>
               <label className={styles.field}>
                 <span>Instruction role</span>
                 <select
+                  disabled={busy !== null}
                   onChange={(event) =>
                     setDraft({
                       ...draft,
@@ -484,6 +508,7 @@ export function PersonaSettingsForm({
               <label className={styles.fieldWide}>
                 <span>Description</span>
                 <textarea
+                  disabled={busy !== null}
                   maxLength={500}
                   onChange={(event) => setDraft({ ...draft, description: event.target.value })}
                   placeholder="A short note to identify when this persona should be used."
@@ -494,6 +519,7 @@ export function PersonaSettingsForm({
               <label className={styles.fieldWide}>
                 <span>Instructions</span>
                 <textarea
+                  disabled={busy !== null}
                   maxLength={100_000}
                   onChange={(event) => setDraft({ ...draft, instructions: event.target.value })}
                   placeholder="Describe the identity, tone, behavior, and boundaries."
@@ -503,6 +529,7 @@ export function PersonaSettingsForm({
               <label className={styles.checkbox}>
                 <input
                   checked={draft.enabled}
+                  disabled={busy !== null}
                   onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })}
                   type="checkbox"
                 />
@@ -516,7 +543,13 @@ export function PersonaSettingsForm({
                 disabled={busy !== null || !draft.name.trim()}
                 type="submit"
               >
-                {selectedPersona ? "Save persona" : "Create persona"}
+                {busy === "save"
+                  ? selectedPersona
+                    ? "Saving persona"
+                    : "Creating persona"
+                  : selectedPersona
+                    ? "Save persona"
+                    : "Create persona"}
               </button>
               <button
                 className={styles.secondaryButton}
@@ -524,7 +557,7 @@ export function PersonaSettingsForm({
                 onClick={() => void makeDefault()}
                 type="button"
               >
-                Make default
+                {busy === "make-default" ? "Updating default" : "Make default"}
               </button>
               <button
                 className={styles.secondaryButton}
@@ -532,7 +565,7 @@ export function PersonaSettingsForm({
                 onClick={() => void clearDefault()}
                 type="button"
               >
-                Clear default
+                {busy === "clear-default" ? "Clearing default" : "Clear default"}
               </button>
               <button
                 className={styles.secondaryButton}
@@ -540,15 +573,16 @@ export function PersonaSettingsForm({
                 onClick={() => void duplicatePersona()}
                 type="button"
               >
-                Duplicate
+                {busy === "duplicate" ? "Duplicating" : "Duplicate"}
               </button>
               <button
+                aria-label={selectedPersona ? `Delete ${selectedPersona.name}` : "Delete persona"}
                 className={styles.dangerButton}
                 disabled={!selectedPersona || busy !== null}
                 onClick={() => void deletePersona()}
                 type="button"
               >
-                Delete
+                {busy === "delete" ? "Deleting" : "Delete"}
               </button>
             </div>
           </form>
@@ -561,21 +595,30 @@ export function PersonaSettingsForm({
               </p>
             </div>
             <div className={styles.previewControls}>
-              <textarea
-                onChange={(event) => setPreviewMessage(event.target.value)}
-                value={previewMessage}
-              />
+              <label className={styles.previewField}>
+                <span>Sample user message</span>
+                <textarea
+                  disabled={busy !== null}
+                  onChange={(event) => setPreviewMessage(event.target.value)}
+                  value={previewMessage}
+                />
+              </label>
               <button
                 className={styles.secondaryButton}
                 disabled={!selectedPersona || busy !== null}
                 onClick={() => void previewComposition()}
                 type="button"
               >
-                Preview
+                {busy === "preview" ? "Building preview" : "Preview"}
               </button>
             </div>
             {preview.length > 0 && (
-              <div className={styles.previewMessages}>
+              <div
+                aria-label="Composition preview"
+                aria-live="polite"
+                className={styles.previewMessages}
+                role="region"
+              >
                 {preview.map((message, index) => (
                   <article className={styles.previewMessage} key={`${message.role}-${index}`}>
                     <header>
@@ -591,12 +634,16 @@ export function PersonaSettingsForm({
         </div>
       </section>
 
-      <section className={styles.assignment}>
+      <section
+        aria-describedby="persona-assignment-description"
+        aria-labelledby="persona-assignment-heading"
+        className={styles.assignment}
+      >
         <div className={styles.assignmentHeader}>
           <div>
             <p className="eyebrow">Conversation scope</p>
-            <h2>Assign a persona snapshot</h2>
-            <p>
+            <h2 id="persona-assignment-heading">Assign a persona snapshot</h2>
+            <p id="persona-assignment-description">
               New chats inherit the default. Existing chats keep their frozen snapshot until you
               explicitly replace it here.
             </p>
@@ -606,6 +653,7 @@ export function PersonaSettingsForm({
           <label className={styles.assignmentField}>
             <span>Conversation</span>
             <select
+              disabled={busy !== null || conversations.length === 0}
               onChange={(event) => {
                 setSelectedConversationId(event.target.value);
                 setAssignmentPersonaId("__unchanged");
@@ -623,7 +671,7 @@ export function PersonaSettingsForm({
           <label className={styles.assignmentField}>
             <span>Future responses use</span>
             <select
-              disabled={!selectedConversation}
+              disabled={busy !== null || !selectedConversation}
               onChange={(event) => setAssignmentPersonaId(event.target.value)}
               value={assignmentPersonaId}
             >
@@ -646,7 +694,7 @@ export function PersonaSettingsForm({
             onClick={() => void assignConversationPersona()}
             type="button"
           >
-            Apply snapshot
+            {busy === "assign" ? "Applying snapshot" : "Apply snapshot"}
           </button>
         </div>
       </section>

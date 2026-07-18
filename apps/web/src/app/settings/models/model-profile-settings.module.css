@@ -111,8 +111,19 @@
 }
 
 @media (max-width: 760px) {
+  .stack :global(.button),
+  .profileForm input,
+  .profileForm select {
+    min-height: var(--control-touch);
+  }
+
   .fallbackPicker {
     grid-template-columns: 1fr;
+  }
+
+  .fallbackPicker > button {
+    width: 100%;
+    min-height: var(--control-touch);
   }
 
   .fallbackList li {
@@ -122,5 +133,10 @@
   .fallbackActions {
     grid-column: 1 / -1;
     justify-content: flex-end;
+  }
+
+  .fallbackActions button {
+    min-width: var(--control-touch);
+    height: var(--control-touch);
   }
 }

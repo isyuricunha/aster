@@ -3,6 +3,14 @@
   gap: 18px;
 }
 
+.tabPanel {
+  min-width: 0;
+}
+
+.tabPanel[hidden] {
+  display: none;
+}
+
 .controlBar,
 .panel,
 .editor,
@@ -62,16 +70,25 @@
   background: var(--surface-raised);
   color: var(--text-primary);
   border-radius: 9px;
-  min-height: 34px;
+  min-height: 40px;
   padding: 0 12px;
   cursor: pointer;
 }
 
-.tabs button[aria-current="page"],
+.tabs button[aria-selected="true"],
 .primary {
   background: var(--accent-solid);
   border-color: var(--accent-solid);
   color: var(--accent-contrast);
+}
+
+.tabs button:disabled,
+.headerActions button:disabled,
+.sideList > button:disabled,
+.card button:disabled,
+.approvalActions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .danger {
@@ -103,6 +120,13 @@
 .sideList > button[data-selected="true"] {
   border-color: var(--accent-solid);
   background: color-mix(in srgb, var(--accent-solid) 9%, var(--surface-raised));
+}
+
+.sideListEmpty {
+  margin: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .sideList strong,
@@ -152,6 +176,15 @@
 .form,
 .sections {
   display: grid;
+  gap: 18px;
+}
+
+.editorFields {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
   gap: 18px;
 }
 
@@ -221,10 +254,18 @@
   display: flex !important;
   align-items: center;
   gap: 8px !important;
+  min-height: 40px;
 }
 
 .check input {
   width: auto;
+}
+
+.check input[type="checkbox"],
+.option input[type="checkbox"] {
+  min-width: 18px;
+  min-height: 18px;
+  accent-color: var(--accent-solid);
 }
 
 .optionList,
@@ -248,9 +289,32 @@
 
 .option {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) minmax(120px, auto);
   align-items: center;
   gap: 10px;
+}
+
+label.option {
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 44px;
+  cursor: pointer;
+}
+
+div.option {
+  grid-template-columns: minmax(0, 1fr) minmax(140px, auto);
+}
+
+.optionToggle {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  min-height: 44px;
+  gap: 10px !important;
+  cursor: pointer;
+}
+
+.option > div {
+  display: grid;
+  gap: 8px;
 }
 
 .option input[type="checkbox"] {
@@ -333,6 +397,7 @@
 .success,
 .warning {
   border-radius: 9px;
+  margin-bottom: 12px;
   padding: 10px 12px;
   font-size: 12px;
 }
@@ -352,6 +417,11 @@
   background: color-mix(in srgb, var(--warning) 9%, transparent);
 }
 
+.notificationList article[data-unread="true"] {
+  border-color: color-mix(in srgb, var(--accent-solid) 45%, var(--border-subtle));
+  box-shadow: inset 3px 0 0 var(--accent-solid);
+}
+
 @media (max-width: 900px) {
   .layout,
   .gridTwo,
@@ -367,11 +437,100 @@
     flex-direction: column;
   }
 
-  .option {
+  .tabs {
+    flex-wrap: nowrap;
+    max-width: 100%;
+    padding-bottom: 3px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .tabs button {
+    flex: 0 0 auto;
+    min-height: 44px;
+    white-space: nowrap;
+  }
+
+  .sideList {
+    grid-auto-columns: minmax(170px, 72vw);
+    grid-auto-flow: column;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: inline proximity;
+  }
+
+  .sideList > button {
+    min-height: 56px;
+    scroll-snap-align: start;
+  }
+
+  .sideListEmpty {
+    align-self: center;
+    min-width: 170px;
+  }
+
+  .headerActions button,
+  .approvalActions button,
+  .controlBar > button,
+  .form input,
+  .form select {
+    min-height: 44px;
+  }
+
+  .headerActions > button,
+  .approvalActions > button {
+    flex: 1 1 150px;
+  }
+
+  .check {
+    min-height: 44px;
+  }
+
+  label.option {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .option select {
-    grid-column: 1 / -1;
+  div.option {
+    grid-template-columns: 1fr;
+  }
+
+  div.option > select,
+  .option > div {
+    grid-column: 1;
+  }
+
+  .option > div {
+    grid-template-columns: minmax(0, 1fr) minmax(160px, auto);
+  }
+}
+
+@media (max-width: 520px) {
+  .editor,
+  .panel {
+    padding: 16px;
+  }
+
+  .controlBar {
+    padding: 14px;
+  }
+
+  .headerActions,
+  .approvalActions {
+    width: 100%;
+  }
+
+  .cardHeader,
+  .timelineHeader,
+  .notificationHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .option {
+    padding: 11px;
+  }
+
+  .option > div {
+    grid-template-columns: 1fr;
   }
 }

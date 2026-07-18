@@ -360,18 +360,22 @@ export function AutomationPanel({
 
   return (
     <div className={styles.twoPanel}>
-      <aside className={styles.sideList}>
+      <aside aria-label="Automations" className={styles.sideList}>
         <button className={styles.newButton} onClick={beginCreate} type="button">
           New automation
         </button>
         {automations.map((automation) => (
           <button
+            aria-pressed={selectedId === automation.id && !creating}
             className={selectedId === automation.id && !creating ? styles.selectedItem : ""}
             key={automation.id}
             onClick={() => choose(automation)}
             type="button"
           >
-            <span className={automation.enabled ? styles.enabledDot : styles.disabledDot} />
+            <span
+              aria-hidden="true"
+              className={automation.enabled ? styles.enabledDot : styles.disabledDot}
+            />
             <div>
               <strong>{automation.name}</strong>
               <span>
@@ -415,8 +419,16 @@ export function AutomationPanel({
           </div>
         </header>
 
-        {notice ? <div className={styles.notice}>{notice}</div> : null}
-        {error ? <div className={styles.error}>{error}</div> : null}
+        {notice ? (
+          <div className={styles.notice} role="status">
+            {notice}
+          </div>
+        ) : null}
+        {error ? (
+          <div className={styles.error} role="alert">
+            {error}
+          </div>
+        ) : null}
 
         <section className={styles.formSection}>
           <div className={styles.gridTwo}>

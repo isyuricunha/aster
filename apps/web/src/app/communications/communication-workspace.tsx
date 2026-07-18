@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 
 import type { Automation, IntegrationConnection } from "../../lib/automation-api";
 import {
@@ -20,6 +27,8 @@ import { RulePanel } from "./rule-panel";
 import styles from "./communications.module.css";
 
 type Tab = "inbox" | "accounts" | "rules";
+
+const TABS: Tab[] = ["inbox", "accounts", "rules"];
 
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -47,6 +56,7 @@ export function CommunicationWorkspace({
   integrations: IntegrationConnection[];
   initialError: string | null;
 }) {
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [tab, setTab] = useState<Tab>("inbox");
   const [accounts, setAccounts] = useState(initialAccounts);
   const [threads, setThreads] = useState(initialThreads);
@@ -55,6 +65,8 @@ export function CommunicationWorkspace({
     initialThreads[0]?.id ?? null,
   );
   const [thread, setThread] = useState<CommunicationThreadDetail | null>(null);
+  const [threadLoading, setThreadLoading] = useState(Boolean(initialThreads[0]));
+  const [threadRefreshKey, setThreadRefreshKey] = useState(0);
   const [accountFilter, setAccountFilter] = useState("");
   const [kindFilter, setKindFilter] = useState<CommunicationThreadKind | "">("");
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -70,6 +82,24 @@ export function CommunicationWorkspace({
   );
   const selectedAccount = accounts.find((account) => account.id === accountFilter) ?? null;
 
+  function selectTab(nextTab: Tab, focus = false) {
+    setTab(nextTab);
+    if (focus) {
+      tabRefs.current[TABS.indexOf(nextTab)]?.focus();
+    }
+  }
+
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") nextIndex = (index + 1) % TABS.length;
+    if (event.key === "ArrowLeft") nextIndex = (index - 1 + TABS.length) % TABS.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = TABS.length - 1;
+    if (nextIndex === null) return;
+    event.preventDefault();
+    selectTab(TABS[nextIndex], true);
+  }
+
   useEffect(() => {
     if (!selectedThreadId) return;
     let active = true;
@@ -81,11 +111,14 @@ export function CommunicationWorkspace({
         if (active) {
           setError(caught instanceof Error ? caught.message : "Could not load the thread.");
         }
+      })
+      .finally(() => {
+        if (active) setThreadLoading(false);
       });
     return () => {
       active = false;
     };
-  }, [selectedThreadId]);
+  }, [selectedThreadId, threadRefreshKey]);
 
   async function refreshInbox(nextQuery = query) {
     const next = await listCommunicationThreads({
@@ -95,19 +128,30 @@ export function CommunicationWorkspace({
       query: nextQuery,
     });
     setThreads(next);
-    if (selectedThreadId && !next.some((item) => item.id === selectedThreadId)) {
-      setSelectedThreadId(next[0]?.id ?? null);
-    } else if (!selectedThreadId && next[0]) {
-      setSelectedThreadId(next[0].id);
+    const nextSelectedThreadId =
+      selectedThreadId && next.some((item) => item.id === selectedThreadId)
+        ? selectedThreadId
+        : next[0]?.id ?? null;
+    setThread(null);
+    setThreadLoading(Boolean(nextSelectedThreadId));
+    setSelectedThreadId(nextSelectedThreadId);
+    setThreadRefreshKey((current) => current + 1);
+  }
+
+  function selectThread(threadId: string) {
+    setThread(null);
+    setThreadLoading(true);
+    setError(null);
+    if (threadId === selectedThreadId) {
+      setThreadRefreshKey((current) => current + 1);
+      return;
     }
-    if (selectedThreadId) {
-      const detail = await readCommunicationThread(selectedThreadId);
-      setThread(detail);
-    }
+    setSelectedThreadId(threadId);
   }
 
   async function applyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy) return;
     setBusy("filter");
     setError(null);
     try {
@@ -173,35 +217,71 @@ export function CommunicationWorkspace({
   }
 
   return (
-    <div className={styles.workspace}>
-      <nav className={styles.tabs} aria-label="Communication sections">
+    <div className={styles.workspace} aria-busy={Boolean(busy) || threadLoading}>
+      <div className={styles.tabs} aria-label="Communication sections" role="tablist">
         <button
+          aria-controls="communication-panel-inbox"
+          aria-selected={tab === "inbox"}
           className={tab === "inbox" ? styles.activeTab : ""}
-          onClick={() => setTab("inbox")}
+          id="communication-tab-inbox"
+          onClick={() => selectTab("inbox")}
+          onKeyDown={(event) => handleTabKeyDown(event, 0)}
+          ref={(element) => {
+            tabRefs.current[0] = element;
+          }}
+          role="tab"
+          tabIndex={tab === "inbox" ? 0 : -1}
           type="button"
         >
           Inbox <span>{unreadCount}</span>
         </button>
         <button
+          aria-controls="communication-panel-accounts"
+          aria-selected={tab === "accounts"}
           className={tab === "accounts" ? styles.activeTab : ""}
-          onClick={() => setTab("accounts")}
+          id="communication-tab-accounts"
+          onClick={() => selectTab("accounts")}
+          onKeyDown={(event) => handleTabKeyDown(event, 1)}
+          ref={(element) => {
+            tabRefs.current[1] = element;
+          }}
+          role="tab"
+          tabIndex={tab === "accounts" ? 0 : -1}
           type="button"
         >
           Accounts <span>{accounts.length}</span>
         </button>
         <button
+          aria-controls="communication-panel-rules"
+          aria-selected={tab === "rules"}
           className={tab === "rules" ? styles.activeTab : ""}
-          onClick={() => setTab("rules")}
+          id="communication-tab-rules"
+          onClick={() => selectTab("rules")}
+          onKeyDown={(event) => handleTabKeyDown(event, 2)}
+          ref={(element) => {
+            tabRefs.current[2] = element;
+          }}
+          role="tab"
+          tabIndex={tab === "rules" ? 0 : -1}
           type="button"
         >
           Rules <span>{rules.length}</span>
         </button>
-      </nav>
+      </div>
 
       {tab === "inbox" ? (
-        <section className={styles.inbox}>
+        <section
+          aria-labelledby="communication-tab-inbox"
+          className={styles.inbox}
+          id="communication-panel-inbox"
+          role="tabpanel"
+        >
           <form className={styles.inboxToolbar} onSubmit={(event) => void applyFilters(event)}>
-            <select onChange={(event) => setAccountFilter(event.target.value)} value={accountFilter}>
+            <select
+              aria-label="Filter by account"
+              onChange={(event) => setAccountFilter(event.target.value)}
+              value={accountFilter}
+            >
               <option value="">All accounts</option>
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>
@@ -210,6 +290,7 @@ export function CommunicationWorkspace({
               ))}
             </select>
             <select
+              aria-label="Filter by communication type"
               onChange={(event) =>
                 setKindFilter(event.target.value as CommunicationThreadKind | "")
               }
@@ -220,6 +301,7 @@ export function CommunicationWorkspace({
               <option value="discord">Discord</option>
             </select>
             <input
+              aria-label="Search messages"
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search subject, sender, or message"
               value={query}
@@ -232,7 +314,7 @@ export function CommunicationWorkspace({
               />
               Unread only
             </label>
-            <button disabled={busy === "filter"} type="submit">
+            <button disabled={Boolean(busy)} type="submit">
               Apply
             </button>
             <button
@@ -246,11 +328,11 @@ export function CommunicationWorkspace({
             </button>
           </form>
 
-          {notice ? <div className={styles.notice}>{notice}</div> : null}
-          {error ? <div className={styles.error}>{error}</div> : null}
+          {notice ? <div className={styles.notice} role="status">{notice}</div> : null}
+          {error ? <div className={styles.error} role="alert">{error}</div> : null}
 
           <div className={styles.inboxLayout}>
-            <aside className={styles.threadList}>
+            <aside aria-label="Message threads" className={styles.threadList}>
               {threads.length === 0 ? (
                 <div className={styles.emptyState}>
                   <strong>No messages yet.</strong>
@@ -259,9 +341,10 @@ export function CommunicationWorkspace({
               ) : null}
               {threads.map((item) => (
                 <button
+                  aria-pressed={selectedThreadId === item.id}
                   className={selectedThreadId === item.id ? styles.selectedThread : ""}
                   key={item.id}
-                  onClick={() => setSelectedThreadId(item.id)}
+                  onClick={() => selectThread(item.id)}
                   type="button"
                 >
                   <header>
@@ -276,10 +359,20 @@ export function CommunicationWorkspace({
             </aside>
 
             <article className={styles.threadDetail}>
-              {!selectedThreadId || !thread ? (
+              {threadLoading ? (
+                <div className={styles.emptyState} role="status">
+                  <strong>Loading thread…</strong>
+                  <span>Messages and reply controls will appear when it is ready.</span>
+                </div>
+              ) : !selectedThreadId ? (
                 <div className={styles.emptyState}>
                   <strong>Select a thread.</strong>
                   <span>Messages and manual reply controls appear here.</span>
+                </div>
+              ) : !thread ? (
+                <div className={styles.emptyState}>
+                  <strong>Thread unavailable.</strong>
+                  <span>Select the thread again to retry loading it.</span>
                 </div>
               ) : (
                 <>
@@ -361,21 +454,33 @@ export function CommunicationWorkspace({
       ) : null}
 
       {tab === "accounts" ? (
-        <AccountPanel
-          initialAccounts={accounts}
-          integrations={integrations}
-          onAccountsChange={setAccounts}
-          onInboxChange={refreshInbox}
-        />
+        <div
+          aria-labelledby="communication-tab-accounts"
+          id="communication-panel-accounts"
+          role="tabpanel"
+        >
+          <AccountPanel
+            initialAccounts={accounts}
+            integrations={integrations}
+            onAccountsChange={setAccounts}
+            onInboxChange={refreshInbox}
+          />
+        </div>
       ) : null}
 
       {tab === "rules" ? (
-        <RulePanel
-          initialRules={rules}
-          accounts={accounts}
-          automations={automations}
-          onRulesChange={setRules}
-        />
+        <div
+          aria-labelledby="communication-tab-rules"
+          id="communication-panel-rules"
+          role="tabpanel"
+        >
+          <RulePanel
+            initialRules={rules}
+            accounts={accounts}
+            automations={automations}
+            onRulesChange={setRules}
+          />
+        </div>
       ) : null}
     </div>
   );

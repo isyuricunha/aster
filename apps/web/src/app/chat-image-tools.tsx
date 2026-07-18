@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -34,26 +35,41 @@ export function MessageAttachments({
   if (!attachments.length) return null;
   return (
     <div className={styles.messageAttachments}>
-      {attachments.map((attachment) => (
-        <figure key={attachment.id}>
-          <a href={attachment.content_url} rel="noreferrer" target="_blank">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              alt={attachment.attachment_type === "output" ? "Generated image" : "Image input"}
-              src={attachment.content_url}
-            />
-          </a>
-          <figcaption>
-            <span>
-              {attachment.width}×{attachment.height}
-            </span>
-            <button disabled={disabled} onClick={() => onEdit(attachment)} type="button">
-              <Icon name="edit" size={12} />
-              Edit
-            </button>
-          </figcaption>
-        </figure>
-      ))}
+      {attachments.map((attachment, index) => {
+        const attachmentLabel =
+          attachment.attachment_type === "output" ? "generated image" : "image input";
+
+        return (
+          <figure key={attachment.id}>
+            <a
+              aria-label={`Open ${attachmentLabel} ${index + 1} in a new tab`}
+              href={attachment.content_url}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                alt={`${attachmentLabel}, ${attachment.width} by ${attachment.height} pixels`}
+                src={attachment.content_url}
+              />
+            </a>
+            <figcaption>
+              <span>
+                {attachment.width}×{attachment.height}
+              </span>
+              <button
+                aria-label={`Edit ${attachmentLabel} ${index + 1}`}
+                disabled={disabled}
+                onClick={() => onEdit(attachment)}
+                type="button"
+              >
+                <Icon name="edit" size={12} />
+                Edit
+              </button>
+            </figcaption>
+          </figure>
+        );
+      })}
     </div>
   );
 }
@@ -93,6 +109,13 @@ export function ChatImageComposer({
   const [working, setWorking] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const maskRef = useRef<HTMLInputElement>(null);
+  const idPrefix = useId();
+  const panelId = `${idPrefix}-panel`;
+  const panelHeadingId = `${idPrefix}-heading`;
+  const promptId = `${idPrefix}-prompt`;
+  const fileInputId = `${idPrefix}-images`;
+  const maskInputId = `${idPrefix}-mask`;
+  const parametersId = `${idPrefix}-parameters`;
 
   useEffect(() => {
     void listImageProfiles().then(setProfiles).catch(() => setProfiles([]));
@@ -161,6 +184,8 @@ export function ChatImageComposer({
   return (
     <div className={styles.composerExtension}>
       <button
+        aria-controls={panelId}
+        aria-expanded={panelOpen}
         className={`${styles.toggle} ${panelOpen ? styles.active : ""}`}
         disabled={disabled}
         onClick={() => setOpen((value) => !value)}
@@ -170,10 +195,16 @@ export function ChatImageComposer({
         Image
       </button>
       {panelOpen ? (
-        <form className={styles.panel} onSubmit={(event) => void submit(event)}>
+        <form
+          aria-busy={working}
+          aria-labelledby={panelHeadingId}
+          className={styles.panel}
+          id={panelId}
+          onSubmit={(event) => void submit(event)}
+        >
           <div className={styles.panelHeading}>
             <div>
-              <strong>{editing ? "Edit images" : "Generate images"}</strong>
+              <strong id={panelHeadingId}>{editing ? "Edit images" : "Generate images"}</strong>
               <span>
                 {selectedModel
                   ? `${selectedModel.endpoint_name} / ${selectedModel.model_id}`
@@ -193,7 +224,11 @@ export function ChatImageComposer({
                   {editAsset.width}×{editAsset.height}
                 </span>
               </div>
-              <button onClick={onClearEdit} type="button">
+              <button
+                aria-label="Stop editing the selected image"
+                onClick={onClearEdit}
+                type="button"
+              >
                 <Icon name="close" size={13} />
               </button>
             </div>
@@ -205,6 +240,7 @@ export function ChatImageComposer({
                 <span key={`${file.name}-${file.size}-${index}`}>
                   {file.name}
                   <button
+                    aria-label={`Remove ${file.name}`}
                     onClick={() =>
                       setFiles((current) => current.filter((_, item) => item !== index))
                     }
@@ -217,8 +253,12 @@ export function ChatImageComposer({
             </div>
           ) : null}
 
+          <label className={styles.visuallyHidden} htmlFor={promptId}>
+            {editing ? "Image editing instructions" : "Image generation prompt"}
+          </label>
           <textarea
             disabled={disabled || working}
+            id={promptId}
             onChange={(event) => setPrompt(event.target.value)}
             placeholder={editing ? "Describe the changes to make…" : "Describe the image to generate…"}
             rows={3}
@@ -226,12 +266,18 @@ export function ChatImageComposer({
           />
 
           <div className={styles.actions}>
-            <button onClick={() => fileRef.current?.click()} type="button">
+            <button
+              aria-controls={fileInputId}
+              onClick={() => fileRef.current?.click()}
+              type="button"
+            >
               <Icon name="upload" size={13} />
               Add images
             </button>
             <input
               accept="image/png,image/jpeg,image/webp"
+              aria-label="Choose image inputs"
+              id={fileInputId}
               multiple
               onChange={addFiles}
               ref={fileRef}
@@ -239,12 +285,19 @@ export function ChatImageComposer({
             />
             {profile?.supports_masks ? (
               <>
-                <button onClick={() => maskRef.current?.click()} type="button">
+                <button
+                  aria-controls={maskInputId}
+                  aria-label={mask ? `Replace image mask ${mask.name}` : "Add an image mask"}
+                  onClick={() => maskRef.current?.click()}
+                  type="button"
+                >
                   <Icon name="edit" size={13} />
                   {mask ? mask.name : "Add mask"}
                 </button>
                 <input
                   accept="image/png,image/jpeg,image/webp"
+                  aria-label="Choose an image mask"
+                  id={maskInputId}
                   onChange={(event) => {
                     setMask(event.target.files?.[0] ?? null);
                     event.target.value = "";
@@ -254,7 +307,12 @@ export function ChatImageComposer({
                 />
               </>
             ) : null}
-            <button onClick={() => setAdvanced((value) => !value)} type="button">
+            <button
+              aria-controls={parametersId}
+              aria-expanded={advanced}
+              onClick={() => setAdvanced((value) => !value)}
+              type="button"
+            >
               <Icon name="settings" size={13} />
               Parameters
             </button>
@@ -267,8 +325,17 @@ export function ChatImageComposer({
             </button>
           </div>
 
+          <span aria-atomic="true" className={styles.visuallyHidden} role="status">
+            {working ? `Image ${editing ? "editing" : "generation"} in progress.` : ""}
+          </span>
+
           {advanced ? (
-            <div className={styles.parameters}>
+            <div
+              aria-label="Image parameters"
+              className={styles.parameters}
+              id={parametersId}
+              role="group"
+            >
               <label>
                 Size
                 <input

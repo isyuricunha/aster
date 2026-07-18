@@ -51,6 +51,8 @@ type Draft = {
   collections: string[];
 };
 
+type WorkingAction = "save" | "run" | "delete";
+
 function blankDraft(): Draft {
   return {
     name: "",
@@ -213,7 +215,7 @@ export function AgentEditor({
   const selected = agents.find((item) => item.id === selectedId) ?? null;
   const [creating, setCreating] = useState(agents.length === 0);
   const [draft, setDraft] = useState<Draft>(selected ? draftFromAgent(selected) : blankDraft());
-  const [working, setWorking] = useState(false);
+  const [workingAction, setWorkingAction] = useState<WorkingAction | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -251,8 +253,8 @@ export function AgentEditor({
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (working || disabled) return;
-    setWorking(true);
+    if (workingAction || disabled) return;
+    setWorkingAction("save");
     setError(null);
     setMessage(null);
     try {
@@ -266,28 +268,37 @@ export function AgentEditor({
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not save the agent.");
     } finally {
-      setWorking(false);
+      setWorkingAction(null);
     }
   }
 
   async function runNow() {
-    if (!selected || working || disabled) return;
-    setWorking(true);
+    if (!selected || workingAction || disabled) return;
+    setWorkingAction("run");
     setError(null);
+    setMessage(null);
     try {
       onRunsChange(await runAgent(selected.id));
       setMessage("Agent run queued.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not queue the agent.");
     } finally {
-      setWorking(false);
+      setWorkingAction(null);
     }
   }
 
   async function remove() {
-    if (!selected || working || !window.confirm(`Delete ${selected.name}?`)) return;
-    setWorking(true);
+    if (
+      !selected ||
+      workingAction ||
+      disabled ||
+      !window.confirm(`Delete agent "${selected.name}"? This cannot be undone.`)
+    ) {
+      return;
+    }
+    setWorkingAction("delete");
     setError(null);
+    setMessage(null);
     try {
       await deleteAgent(selected.id);
       const next = agents.filter((item) => item.id !== selected.id);
@@ -297,17 +308,29 @@ export function AgentEditor({
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not delete the agent.");
     } finally {
-      setWorking(false);
+      setWorkingAction(null);
     }
   }
 
   return (
     <div className={styles.layout}>
-      <aside className={styles.sideList}>
-        <button onClick={createNew} type="button">New agent</button>
+      <aside aria-label="Agent definitions" className={styles.sideList}>
+        <button
+          aria-pressed={creating}
+          disabled={Boolean(workingAction)}
+          onClick={createNew}
+          type="button"
+        >
+          New agent
+        </button>
+        {agents.length === 0 ? (
+          <p className={styles.sideListEmpty} role="status">No saved agents yet.</p>
+        ) : null}
         {agents.map((agent) => (
           <button
+            aria-pressed={!creating && selected?.id === agent.id}
             data-selected={!creating && selected?.id === agent.id}
+            disabled={Boolean(workingAction)}
             key={agent.id}
             onClick={() => choose(agent)}
             type="button"
@@ -320,23 +343,45 @@ export function AgentEditor({
         ))}
       </aside>
 
-      <form className={`${styles.editor} ${styles.form}`} onSubmit={(event) => void save(event)}>
+      <form
+        aria-busy={Boolean(workingAction)}
+        aria-labelledby="agent-editor-title"
+        className={`${styles.editor} ${styles.form}`}
+        onSubmit={(event) => void save(event)}
+      >
         <header className={styles.editorHeader}>
           <div>
             <p>{creating ? "New agent" : "Agent definition"}</p>
-            <h2>{draft.name || "Untitled agent"}</h2>
+            <h2 id="agent-editor-title">{draft.name || "Untitled agent"}</h2>
             <span className={styles.muted}>Permissions and budgets are frozen when each run is queued.</span>
           </div>
           <div className={styles.headerActions}>
-            {!creating ? <button disabled={working || disabled} onClick={() => void runNow()} type="button">Run now</button> : null}
-            {!creating ? <button className={styles.danger} disabled={working} onClick={() => void remove()} type="button">Delete</button> : null}
-            <button className={styles.primary} disabled={working || disabled} type="submit">{working ? "Saving…" : "Save"}</button>
+            {!creating ? (
+              <button disabled={Boolean(workingAction) || disabled} onClick={() => void runNow()} type="button">
+                {workingAction === "run" ? "Queueing run…" : "Run now"}
+              </button>
+            ) : null}
+            {!creating ? (
+              <button
+                className={styles.danger}
+                disabled={Boolean(workingAction) || disabled}
+                onClick={() => void remove()}
+                type="button"
+              >
+                {workingAction === "delete" ? "Deleting agent…" : "Delete agent"}
+              </button>
+            ) : null}
+            <button className={styles.primary} disabled={Boolean(workingAction) || disabled} type="submit">
+              {workingAction === "save" ? "Saving agent…" : "Save agent"}
+            </button>
           </div>
         </header>
 
-        {error ? <div className={styles.error}>{error}</div> : null}
-        {message ? <div className={styles.success}>{message}</div> : null}
-        {disabled ? <div className={styles.warning}>The emergency stop is active. New runs and agent changes are blocked in this interface.</div> : null}
+        {error ? <div className={styles.error} role="alert">{error}</div> : null}
+        {message ? <div className={styles.success} role="status">{message}</div> : null}
+        {disabled ? <div className={styles.warning} role="status">The emergency stop is active. New runs and agent changes are blocked in this interface.</div> : null}
+
+        <fieldset className={styles.editorFields} disabled={Boolean(workingAction) || disabled}>
 
         <section className={styles.section}>
           <div className={styles.sectionTitle}><p>Identity</p><h3>Goal and execution state</h3></div>
@@ -369,6 +414,9 @@ export function AgentEditor({
             <label className={styles.check}><input checked={draft.ragEnabled} onChange={(event) => setDraft({ ...draft, ragEnabled: event.target.checked })} type="checkbox" /> Use selected knowledge collections</label>
           </div>
           <div className={styles.optionList}>
+            {collections.length === 0 ? (
+              <div className={styles.empty} role="status">No knowledge collections are available.</div>
+            ) : null}
             {collections.map((collection) => (
               <label className={styles.option} key={collection.id}>
                 <input checked={draft.collections.includes(collection.id)} disabled={!collection.enabled} onChange={(event) => setDraft({ ...draft, collections: event.target.checked ? [...draft.collections, collection.id] : draft.collections.filter((id) => id !== collection.id) })} type="checkbox" />
@@ -395,13 +443,25 @@ export function AgentEditor({
         <section className={styles.section}>
           <div className={styles.sectionTitle}><p>Tools</p><h3>Explicit MCP capabilities</h3></div>
           <div className={styles.optionList}>
+            {tools.length === 0 ? (
+              <div className={styles.empty} role="status">No tools are available.</div>
+            ) : null}
             {tools.map((tool) => {
               const policy = draft.tools[tool.id];
+              const toolLabel = `${tool.server_name} ${tool.name}`;
               return (
                 <div className={styles.option} key={tool.id}>
-                  <input checked={Boolean(policy)} disabled={!tool.enabled || !tool.is_available} onChange={(event) => { const next = { ...draft.tools }; if (event.target.checked) next[tool.id] = "always"; else delete next[tool.id]; setDraft({ ...draft, tools: next }); }} type="checkbox" />
-                  <span><strong>{tool.server_name} · {tool.name}</strong><span className={styles.itemMeta}>{tool.description || tool.public_name}</span></span>
-                  <select disabled={!policy} value={policy ?? "always"} onChange={(event) => setDraft({ ...draft, tools: { ...draft.tools, [tool.id]: event.target.value as AgentApprovalPolicy } })}><option value="always">Always approve</option><option value="tool_default">Tool default</option><option value="never">No approval</option></select>
+                  <label className={styles.optionToggle}>
+                    <input
+                      aria-label={`Enable ${toolLabel}`}
+                      checked={Boolean(policy)}
+                      disabled={!tool.enabled || !tool.is_available}
+                      onChange={(event) => { const next = { ...draft.tools }; if (event.target.checked) next[tool.id] = "always"; else delete next[tool.id]; setDraft({ ...draft, tools: next }); }}
+                      type="checkbox"
+                    />
+                    <span><strong>{tool.server_name} · {tool.name}</strong><span className={styles.itemMeta}>{tool.description || tool.public_name}</span></span>
+                  </label>
+                  <select aria-label={`Approval policy for ${toolLabel}`} disabled={!policy} value={policy ?? "always"} onChange={(event) => setDraft({ ...draft, tools: { ...draft.tools, [tool.id]: event.target.value as AgentApprovalPolicy } })}><option value="always">Always approve</option><option value="tool_default">Tool default</option><option value="never">No approval</option></select>
                 </div>
               );
             })}
@@ -411,13 +471,18 @@ export function AgentEditor({
         <section className={styles.section}>
           <div className={styles.sectionTitle}><p>Communications</p><h3>Readable and writable accounts</h3></div>
           <div className={styles.optionList}>
+            {accounts.length === 0 ? (
+              <div className={styles.empty} role="status">No communication accounts are available.</div>
+            ) : null}
             {accounts.map((account) => {
               const scope = draft.accounts[account.id];
               return (
                 <div className={styles.option} key={account.id}>
-                  <input checked={Boolean(scope)} onChange={(event) => { const next = { ...draft.accounts }; if (event.target.checked) next[account.id] = { allowRead: true, allowReply: false, replyApprovalPolicy: "always" }; else delete next[account.id]; setDraft({ ...draft, accounts: next }); }} type="checkbox" />
-                  <span><strong>{account.name}</strong><span className={styles.itemMeta}>{account.kind} · {account.enabled ? "enabled" : "disabled"}</span></span>
-                  {scope ? <div><label className={styles.check}><input checked={scope.allowReply} onChange={(event) => setDraft({ ...draft, accounts: { ...draft.accounts, [account.id]: { ...scope, allowReply: event.target.checked } } })} type="checkbox" /> Allow replies</label><select disabled={!scope.allowReply} value={scope.replyApprovalPolicy} onChange={(event) => setDraft({ ...draft, accounts: { ...draft.accounts, [account.id]: { ...scope, replyApprovalPolicy: event.target.value as "always" | "never" } } })}><option value="always">Always approve replies</option><option value="never">No approval</option></select></div> : null}
+                  <label className={styles.optionToggle}>
+                    <input aria-label={`Allow access to ${account.name}`} checked={Boolean(scope)} onChange={(event) => { const next = { ...draft.accounts }; if (event.target.checked) next[account.id] = { allowRead: true, allowReply: false, replyApprovalPolicy: "always" }; else delete next[account.id]; setDraft({ ...draft, accounts: next }); }} type="checkbox" />
+                    <span><strong>{account.name}</strong><span className={styles.itemMeta}>{account.kind} · {account.enabled ? "enabled" : "disabled"}</span></span>
+                  </label>
+                  {scope ? <div><label className={styles.check}><input aria-label={`Allow replies from ${account.name}`} checked={scope.allowReply} onChange={(event) => setDraft({ ...draft, accounts: { ...draft.accounts, [account.id]: { ...scope, allowReply: event.target.checked } } })} type="checkbox" /> Allow replies</label><select aria-label={`Reply approval policy for ${account.name}`} disabled={!scope.allowReply} value={scope.replyApprovalPolicy} onChange={(event) => setDraft({ ...draft, accounts: { ...draft.accounts, [account.id]: { ...scope, replyApprovalPolicy: event.target.value as "always" | "never" } } })}><option value="always">Always approve replies</option><option value="never">No approval</option></select></div> : null}
                 </div>
               );
             })}
@@ -431,6 +496,7 @@ export function AgentEditor({
             <label className={styles.check}><input checked={draft.notifyOnFailure} onChange={(event) => setDraft({ ...draft, notifyOnFailure: event.target.checked })} type="checkbox" /> Notify on failure</label>
           </div>
         </section>
+        </fieldset>
       </form>
     </div>
   );

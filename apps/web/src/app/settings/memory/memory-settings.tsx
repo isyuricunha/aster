@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   apiRequest,
@@ -102,6 +102,7 @@ export function MemorySettings({
   initialConversations,
   initialError,
 }: Props) {
+  const initialScopeConversationId = initialConversations[0]?.id ?? "";
   const [memories, setMemories] = useState(initialMemories);
   const [suggestions, setSuggestions] = useState(initialSuggestions);
   const [collections, setCollections] = useState(initialCollections);
@@ -112,18 +113,39 @@ export function MemorySettings({
   const [suggestionConversationId, setSuggestionConversationId] = useState(
     initialConversations[0]?.id ?? "",
   );
-  const [scopeConversationId, setScopeConversationId] = useState(
-    initialConversations[0]?.id ?? "",
-  );
+  const [scopeConversationId, setScopeConversationId] = useState(initialScopeConversationId);
   const [scope, setScope] = useState<ConversationRetrievalSettings | null>(null);
   const [uploadCollectionId, setUploadCollectionId] = useState(
     initialCollections[0]?.id ?? "",
   );
   const [busy, setBusy] = useState<string | null>(null);
+  const [scopeLoading, setScopeLoading] = useState(Boolean(initialScopeConversationId));
   const [error, setError] = useState(initialError);
   const [notice, setNotice] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!initialScopeConversationId) return;
+    let active = true;
+    void apiRequest<ConversationRetrievalSettings>(
+      `/api/conversations/${initialScopeConversationId}/retrieval-settings`,
+    )
+      .then((nextScope) => {
+        if (active) setScope(nextScope);
+      })
+      .catch((caught) => {
+        if (active) {
+          setError(caught instanceof Error ? caught.message : "Could not load conversation scope.");
+        }
+      })
+      .finally(() => {
+        if (active) setScopeLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [initialScopeConversationId]);
 
   async function run(key: string, action: () => Promise<void>) {
     setBusy(key);
@@ -313,8 +335,8 @@ export function MemorySettings({
 
   async function loadScope(conversationId: string) {
     setScopeConversationId(conversationId);
+    setScope(null);
     if (!conversationId) {
-      setScope(null);
       return;
     }
     await run("scope-load", async () => {
@@ -357,9 +379,12 @@ export function MemorySettings({
   }
 
   return (
-    <div className={styles.stack}>
+    <div className={styles.stack} aria-busy={busy !== null || scopeLoading}>
       {(error || notice) && (
-        <div className={`${styles.banner} ${error ? styles.error : styles.notice}`}>
+        <div
+          className={`${styles.banner} ${error ? styles.error : styles.notice}`}
+          role={error ? "alert" : "status"}
+        >
           {error ?? notice}
         </div>
       )}
@@ -563,6 +588,7 @@ export function MemorySettings({
           </div>
           <div className={styles.inlineControl}>
             <select
+              aria-label="Conversation for memory suggestions"
               onChange={(event) => setSuggestionConversationId(event.target.value)}
               value={suggestionConversationId}
             >
@@ -599,6 +625,7 @@ export function MemorySettings({
                 <div className={styles.actions}>
                   <button
                     className={styles.secondaryButton}
+                    disabled={busy !== null}
                     onClick={() => rejectSuggestion(suggestion)}
                     type="button"
                   >
@@ -606,6 +633,7 @@ export function MemorySettings({
                   </button>
                   <button
                     className={styles.primaryButton}
+                    disabled={busy !== null}
                     onClick={() => acceptSuggestion(suggestion)}
                     type="button"
                   >
@@ -693,50 +721,57 @@ export function MemorySettings({
         </div>
 
         <div className={styles.collectionGrid}>
-          {collections.map((collection) => (
-            <article className={styles.collectionCard} key={collection.id}>
-              <div>
-                <div className={styles.badges}>
-                  <span>{collection.enabled ? "Enabled" : "Disabled"}</span>
-                  {collection.default_enabled && <span>New chat default</span>}
+          {collections.length === 0 ? (
+            <div className={styles.empty}>No knowledge collections yet.</div>
+          ) : (
+            collections.map((collection) => (
+              <article className={styles.collectionCard} key={collection.id}>
+                <div>
+                  <div className={styles.badges}>
+                    <span>{collection.enabled ? "Enabled" : "Disabled"}</span>
+                    {collection.default_enabled && <span>New chat default</span>}
+                  </div>
+                  <h3>{collection.name}</h3>
+                  <p>{collection.description || "No description."}</p>
+                  <small>
+                    {collection.ready_document_count}/{collection.document_count} ready ·{" "}
+                    {collection.chunk_count} chunks
+                  </small>
                 </div>
-                <h3>{collection.name}</h3>
-                <p>{collection.description || "No description."}</p>
-                <small>
-                  {collection.ready_document_count}/{collection.document_count} ready ·{" "}
-                  {collection.chunk_count} chunks
-                </small>
-              </div>
-              <div className={styles.actions}>
-                <button
-                  className={styles.secondaryButton}
-                  onClick={() =>
-                    setCollectionDraft({
-                      id: collection.id,
-                      name: collection.name,
-                      description: collection.description,
-                      enabled: collection.enabled,
-                      default_enabled: collection.default_enabled,
-                    })
-                  }
-                  type="button"
-                >
-                  Edit
-                </button>
-                <button
-                  className={styles.iconButton}
-                  onClick={() => removeCollection(collection)}
-                  type="button"
-                >
-                  <Icon name="trash" />
-                </button>
-              </div>
-            </article>
-          ))}
+                <div className={styles.actions}>
+                  <button
+                    className={styles.secondaryButton}
+                    onClick={() =>
+                      setCollectionDraft({
+                        id: collection.id,
+                        name: collection.name,
+                        description: collection.description,
+                        enabled: collection.enabled,
+                        default_enabled: collection.default_enabled,
+                      })
+                    }
+                    type="button"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    aria-label={`Delete collection ${collection.name}`}
+                    className={styles.iconButton}
+                    disabled={busy !== null}
+                    onClick={() => removeCollection(collection)}
+                    type="button"
+                  >
+                    <Icon name="trash" />
+                  </button>
+                </div>
+              </article>
+            ))
+          )}
         </div>
 
         <div className={styles.uploadBar}>
           <select
+            aria-label="Knowledge collection for document upload"
             onChange={(event) => setUploadCollectionId(event.target.value)}
             value={uploadCollectionId}
           >
@@ -791,13 +826,16 @@ export function MemorySettings({
                 <div className={styles.actions}>
                   <button
                     className={styles.secondaryButton}
+                    disabled={busy !== null}
                     onClick={() => reindexDocument(document)}
                     type="button"
                   >
                     Reindex
                   </button>
                   <button
+                    aria-label={`Delete document ${document.filename}`}
                     className={styles.iconButton}
+                    disabled={busy !== null}
                     onClick={() => removeDocument(document)}
                     type="button"
                   >
@@ -822,6 +860,7 @@ export function MemorySettings({
           <label className={styles.field}>
             <span>Conversation</span>
             <select
+              disabled={busy !== null || scopeLoading}
               onChange={(event) => loadScope(event.target.value)}
               value={scopeConversationId}
             >
@@ -833,7 +872,11 @@ export function MemorySettings({
               ))}
             </select>
           </label>
-          {scope && (
+          {scopeLoading || busy === "scope-load" ? (
+            <div className={styles.empty} role="status">
+              Loading conversation scope…
+            </div>
+          ) : scope ? (
             <>
               <label className={styles.checkboxField}>
                 <input
@@ -878,7 +921,19 @@ export function MemorySettings({
                 Save conversation scope
               </button>
             </>
-          )}
+          ) : scopeConversationId ? (
+            <div className={styles.empty}>
+              <span>Conversation scope is unavailable.</span>
+              <button
+                className={styles.secondaryButton}
+                disabled={busy !== null}
+                onClick={() => loadScope(scopeConversationId)}
+                type="button"
+              >
+                Retry
+              </button>
+            </div>
+          ) : null}
         </div>
       </section>
     </div>

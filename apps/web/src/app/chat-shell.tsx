@@ -33,6 +33,7 @@ import {
 } from "./conversation-transfer";
 import { copyText, MarkdownMessage } from "./markdown-message";
 import { AsterMark, Icon } from "./ui/icons";
+import { WorkspaceBrand, WorkspaceNavigation } from "./ui/workspace-navigation";
 
 type StreamEvent = {
   event: string;
@@ -149,7 +150,11 @@ export function ChatShell({
   const [searchError, setSearchError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(initialError);
   const [imageEditAsset, setImageEditAsset] = useState<MediaAsset | null>(null);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const mobileCloseButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileSidebarRef = useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const renameRef = useRef<HTMLInputElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
@@ -172,6 +177,14 @@ export function ChatShell({
     [conversation],
   );
 
+  function closeMobileSidebar(restoreFocus = true) {
+    const wasOpen = mobileSidebarOpen;
+    setMobileSidebarOpen(false);
+    if (restoreFocus && wasOpen) {
+      requestAnimationFrame(() => mobileMenuButtonRef.current?.focus());
+    }
+  }
+
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
       const target = event.target;
@@ -188,6 +201,16 @@ export function ChatShell({
     return () => window.removeEventListener("keydown", handleShortcut);
   }, []);
 
+  useEffect(() => {
+    const mobileLayout = window.matchMedia("(max-width: 780px)");
+    function handleLayoutChange(event: MediaQueryListEvent) {
+      if (!event.matches) setMobileSidebarOpen(false);
+    }
+
+    mobileLayout.addEventListener("change", handleLayoutChange);
+    return () => mobileLayout.removeEventListener("change", handleLayoutChange);
+  }, []);
+
   useEffect(
     () => () => {
       if (copiedTimerRef.current !== null) window.clearTimeout(copiedTimerRef.current);
@@ -196,6 +219,50 @@ export function ChatShell({
     },
     [],
   );
+
+  useEffect(() => {
+    if (!mobileSidebarOpen) return;
+
+    function handleNavigationKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setMobileSidebarOpen(false);
+        requestAnimationFrame(() => mobileMenuButtonRef.current?.focus());
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const sidebar = mobileSidebarRef.current;
+      if (!sidebar) return;
+      const focusable = Array.from(
+        sidebar.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [contenteditable="true"], [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => element.getClientRects().length > 0);
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || !sidebar.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !sidebar.contains(active))) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.body.classList.add("mobile-navigation-open");
+    window.addEventListener("keydown", handleNavigationKeyDown);
+    requestAnimationFrame(() => mobileCloseButtonRef.current?.focus());
+    return () => {
+      document.body.classList.remove("mobile-navigation-open");
+      window.removeEventListener("keydown", handleNavigationKeyDown);
+    };
+  }, [mobileSidebarOpen]);
 
   function scheduleConversationSearch(value: string) {
     setSearchQuery(value);
@@ -248,6 +315,7 @@ export function ChatShell({
 
   async function selectConversation(id: string) {
     if (streaming) return;
+    closeMobileSidebar();
     setError(null);
     setEditingMessageId(null);
     setImageEditAsset(null);
@@ -261,6 +329,7 @@ export function ChatShell({
 
   function startNewChat() {
     if (streaming) return;
+    setMobileSidebarOpen(false);
     setConversation(null);
     setDraft("");
     setEditingMessageId(null);
@@ -389,6 +458,7 @@ export function ChatShell({
       setImageEditAsset(null);
       setRenaming(false);
       setError(null);
+      setMobileSidebarOpen(false);
       await refreshConversations();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not import the conversation.");
@@ -680,12 +750,39 @@ export function ChatShell({
 
   return (
     <div className="chat-app">
-      <aside className="chat-sidebar">
+      {!mobileSidebarOpen ? (
+        <a className="skip-link" href="#main-content">
+          Skip to conversation
+        </a>
+      ) : null}
+      {mobileSidebarOpen ? (
+        <button
+          aria-label="Close workspace navigation"
+          className="chat-sidebar-backdrop"
+          onClick={() => closeMobileSidebar()}
+          tabIndex={-1}
+          type="button"
+        />
+      ) : null}
+      <aside
+        aria-label="Workspace and conversations"
+        aria-modal={mobileSidebarOpen ? true : undefined}
+        className={`chat-sidebar ${mobileSidebarOpen ? "mobile-open" : ""}`}
+        id="chat-sidebar"
+        ref={mobileSidebarRef}
+        role={mobileSidebarOpen ? "dialog" : undefined}
+      >
         <div className="sidebar-header">
-          <Link className="workspace-brand" href="/">
-            <AsterMark />
-            <span>Aster</span>
-          </Link>
+          <WorkspaceBrand />
+          <button
+            aria-label="Close workspace navigation"
+            className="close-mobile-sidebar"
+            onClick={() => closeMobileSidebar()}
+            ref={mobileCloseButtonRef}
+            type="button"
+          >
+            <Icon name="close" />
+          </button>
           <button
             aria-label="Start a new conversation"
             className="new-chat-button"
@@ -697,14 +794,11 @@ export function ChatShell({
           </button>
         </div>
 
-        <div className="chat-navigation-item active">
-          <Icon name="chat" />
-          <span>Chat</span>
-        </div>
-        <Link className="chat-navigation-item" href="/images">
-          <Icon name="images" />
-          <span>Images</span>
-        </Link>
+        <WorkspaceNavigation
+          active="chat"
+          className="chat-global-navigation"
+          sections={["workspace"]}
+        />
 
         <div className="conversation-search">
           <Icon name="search" size={14} />
@@ -764,6 +858,7 @@ export function ChatShell({
           ) : (
             visibleConversations.map((item) => (
               <button
+                aria-pressed={conversation?.id === item.id}
                 className={`conversation-item ${conversation?.id === item.id ? "active" : ""}`}
                 disabled={streaming}
                 key={item.id}
@@ -781,29 +876,12 @@ export function ChatShell({
           )}
         </div>
 
-        <nav className="sidebar-settings" aria-label="Configuration">
-          <p>Configuration</p>
-          <Link href="/settings/models">
-            <Icon name="models" />
-            <span>Models</span>
-          </Link>
-          <Link href="/settings/persona">
-            <Icon name="persona" />
-            <span>Personas</span>
-          </Link>
-          <Link href="/settings/tools">
-            <Icon name="tools" />
-            <span>Tools</span>
-          </Link>
-          <Link href="/settings/memory">
-            <Icon name="memory" />
-            <span>Memory & Knowledge</span>
-          </Link>
-          <Link href="/settings/account">
-            <Icon name="account" />
-            <span>Account</span>
-          </Link>
-        </nav>
+        <WorkspaceNavigation
+          active="chat"
+          className="sidebar-settings"
+          label="Settings navigation"
+          sections={["configuration", "security"]}
+        />
 
         <div className="chat-sidebar-footer">
           <span className="workspace-state-dot" />
@@ -814,8 +892,23 @@ export function ChatShell({
         </div>
       </aside>
 
-      <section className="chat-workspace">
+      <main
+        aria-hidden={mobileSidebarOpen ? true : undefined}
+        className="chat-workspace"
+        inert={mobileSidebarOpen ? true : undefined}
+      >
         <header className="chat-header">
+          <button
+            aria-controls="chat-sidebar"
+            aria-expanded={mobileSidebarOpen}
+            aria-label="Open workspace navigation"
+            className="open-mobile-sidebar"
+            onClick={() => setMobileSidebarOpen(true)}
+            ref={mobileMenuButtonRef}
+            type="button"
+          >
+            <Icon name="menu" />
+          </button>
           <div className="chat-header-context">
             <span className="chat-header-section">Chat</span>
             <Icon name="chevron-right" size={13} />
@@ -847,7 +940,11 @@ export function ChatShell({
               </form>
             ) : (
               <div>
-                <p className="chat-title">{conversation?.title ?? "New conversation"}</p>
+                {conversation ? (
+                  <h1 className="chat-title">{conversation.title}</h1>
+                ) : (
+                  <p className="chat-title">New conversation</p>
+                )}
                 <p className="chat-model">{primaryLabel ?? "Primary model not configured"}</p>
               </div>
             )}
@@ -891,7 +988,21 @@ export function ChatShell({
           )}
         </header>
 
-        <section className="chat-transcript" aria-live="polite">
+        <p aria-live="polite" className="sr-only" role="status">
+          {stopping
+            ? "Stopping the current response."
+            : streaming
+              ? "Aster is generating a response."
+              : "Conversation ready."}
+        </p>
+
+        <section
+          aria-busy={streaming}
+          aria-label="Conversation"
+          className="chat-transcript"
+          id="main-content"
+          tabIndex={-1}
+        >
           {!conversation || conversation.messages.length === 0 ? (
             <div className="chat-welcome">
               <AsterMark size={38} />
@@ -946,6 +1057,7 @@ export function ChatShell({
                           onSubmit={(event) => void editAndResend(event, message)}
                         >
                           <textarea
+                            aria-label="Edit message"
                             autoFocus
                             onChange={(event) => setEditingDraft(event.target.value)}
                             rows={4}
@@ -994,7 +1106,9 @@ export function ChatShell({
                             />
                           ))}
                           {message.error_message && (
-                            <p className="message-error">{message.error_message}</p>
+                            <p className="message-error" role="alert">
+                              {message.error_message}
+                            </p>
                           )}
                           {!streaming && (
                             <div className="message-actions">
@@ -1046,9 +1160,15 @@ export function ChatShell({
         </section>
 
         <footer className="chat-composer-wrap">
-          {error && <div className="chat-error">{error}</div>}
+          {error && (
+            <div className="chat-error" role="alert">
+              {error}
+            </div>
+          )}
           {pendingConfirmation ? (
-            <div className="chat-error">Review the pending tool request before continuing.</div>
+            <div className="chat-error" role="status">
+              Review the pending tool request before continuing.
+            </div>
           ) : null}
           <ChatImageComposer
             conversation={conversation}
@@ -1115,7 +1235,7 @@ export function ChatShell({
             Enter to send · Shift+Enter for a new line · Press / to search history
           </p>
         </footer>
-      </section>
+      </main>
     </div>
   );
 }

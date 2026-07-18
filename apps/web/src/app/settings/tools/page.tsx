@@ -1,7 +1,11 @@
+import type { Metadata } from "next";
+
 import type { ConversationSummary, McpServer, McpTool } from "../../../lib/api";
 import { requireServerAuth, serverApiFetch } from "../../../lib/server-api";
 import { AppFrame } from "../../ui/app-frame";
 import { ToolSettings } from "./tool-settings";
+
+export const metadata: Metadata = { title: "Tool settings" };
 
 export const dynamic = "force-dynamic";
 

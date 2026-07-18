@@ -56,8 +56,9 @@ export function ToolSettings({
   const [draft, setDraft] = useState<ServerDraft>(emptyDraft);
   const [selectedConversationId, setSelectedConversationId] = useState("");
   const [conversationToolIds, setConversationToolIds] = useState<string[]>([]);
-  const [notice, setNotice] = useState<string | null>(initialError);
-  const [error, setError] = useState<string | null>(null);
+  const [conversationScopeLoaded, setConversationScopeLoaded] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
   const selectedServer = useMemo(
@@ -107,6 +108,7 @@ export function ToolSettings({
   }
 
   async function saveServer() {
+    if (busyKey) return;
     setBusyKey("server-save");
     setError(null);
     setNotice(null);
@@ -208,19 +210,24 @@ export function ToolSettings({
 
   async function selectConversation(conversationId: string) {
     setSelectedConversationId(conversationId);
+    setConversationToolIds([]);
+    setConversationScopeLoaded(false);
     setError(null);
     setNotice(null);
     if (!conversationId) {
-      setConversationToolIds([]);
       return;
     }
+    setBusyKey("scope-load");
     try {
       const scope = await apiRequest<ConversationToolSettings>(
         `/api/conversations/${conversationId}/tools`,
       );
       setConversationToolIds(scope.tools.map((tool) => tool.id));
+      setConversationScopeLoaded(true);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load conversation tools.");
+    } finally {
+      setBusyKey(null);
     }
   }
 
@@ -237,6 +244,7 @@ export function ToolSettings({
         },
       );
       setConversationToolIds(result.tools.map((tool) => tool.id));
+      setConversationScopeLoaded(true);
       setNotice("Conversation tool scope saved.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not save conversation tools.");
@@ -252,11 +260,17 @@ export function ToolSettings({
   }
 
   return (
-    <div className={styles.stack}>
-      {notice ? <div className="notice success">{notice}</div> : null}
-      {error ? <div className="notice error">{error}</div> : null}
+    <div className={styles.stack} aria-busy={busyKey !== null}>
+      {notice ? <div className="notice success" role="status">{notice}</div> : null}
+      {error ? <div className="notice error" role="alert">{error}</div> : null}
 
-      <section className={`panel ${styles.serverPanel}`}>
+      <form
+        className={`panel ${styles.serverPanel}`}
+        onSubmit={(event) => {
+          event.preventDefault();
+          void saveServer();
+        }}
+      >
         <div className="section-heading">
           <div>
             <p className="eyebrow">MCP servers</p>
@@ -389,16 +403,20 @@ export function ToolSettings({
           <button
             className="button primary"
             disabled={busyKey !== null}
-            onClick={() => void saveServer()}
-            type="button"
+            type="submit"
           >
             {busyKey === "server-save" ? "Saving..." : selectedServer ? "Save server" : "Add server"}
           </button>
-          <button className="button secondary" onClick={resetDraft} type="button">
+          <button
+            className="button secondary"
+            disabled={busyKey !== null}
+            onClick={resetDraft}
+            type="button"
+          >
             Reset
           </button>
         </div>
-      </section>
+      </form>
 
       <section className="panel">
         <div className="section-heading">
@@ -528,6 +546,7 @@ export function ToolSettings({
         <label>
           <span>Conversation</span>
           <select
+            disabled={busyKey !== null}
             value={selectedConversationId}
             onChange={(event) => void selectConversation(event.target.value)}
           >
@@ -540,32 +559,51 @@ export function ToolSettings({
           </select>
         </label>
         {selectedConversationId ? (
-          <div className={styles.scopeList}>
-            {enabledTools.length ? (
-              enabledTools.map((tool) => (
-                <label className={styles.scopeItem} key={tool.id}>
-                  <input
-                    checked={conversationToolIds.includes(tool.id)}
-                    onChange={() => toggleConversationTool(tool.id)}
-                    type="checkbox"
-                  />
-                  <span>
-                    <strong>{tool.name}</strong>
-                    <small>{tool.server_name}</small>
-                  </span>
-                </label>
-              ))
+          <div className={styles.scopeList} aria-busy={busyKey === "scope-load"}>
+            {busyKey === "scope-load" ? (
+              <div className="empty-state" role="status">
+                Loading conversation tools...
+              </div>
+            ) : !conversationScopeLoaded ? (
+              <div className="empty-state">
+                <span>Conversation tools are unavailable.</span>
+                <button
+                  className="button secondary"
+                  onClick={() => void selectConversation(selectedConversationId)}
+                  type="button"
+                >
+                  Retry
+                </button>
+              </div>
             ) : (
-              <div className="empty-state">No enabled tools are available.</div>
+              <>
+                {enabledTools.length ? (
+                  enabledTools.map((tool) => (
+                    <label className={styles.scopeItem} key={tool.id}>
+                      <input
+                        checked={conversationToolIds.includes(tool.id)}
+                        onChange={() => toggleConversationTool(tool.id)}
+                        type="checkbox"
+                      />
+                      <span>
+                        <strong>{tool.name}</strong>
+                        <small>{tool.server_name}</small>
+                      </span>
+                    </label>
+                  ))
+                ) : (
+                  <div className="empty-state">No enabled tools are available.</div>
+                )}
+                <button
+                  className="button primary"
+                  disabled={busyKey !== null}
+                  onClick={() => void saveConversationScope()}
+                  type="button"
+                >
+                  {busyKey === "scope-save" ? "Saving..." : "Save conversation tools"}
+                </button>
+              </>
             )}
-            <button
-              className="button primary"
-              disabled={busyKey !== null}
-              onClick={() => void saveConversationScope()}
-              type="button"
-            >
-              {busyKey === "scope-save" ? "Saving..." : "Save conversation tools"}
-            </button>
           </div>
         ) : null}
       </section>
