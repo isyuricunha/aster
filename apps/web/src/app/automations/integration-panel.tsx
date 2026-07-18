@@ -114,10 +114,10 @@ function payload(draft: Draft, preserveCredentials: boolean): IntegrationWrite {
 
 export function IntegrationPanel({
   integrations,
-  onChange,
+  onIntegrationsChange: onChange,
 }: {
   integrations: IntegrationConnection[];
-  onChange: (items: IntegrationConnection[]) => void;
+  onIntegrationsChange: (items: IntegrationConnection[]) => void;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(integrations[0]?.id ?? null);
   const [creating, setCreating] = useState(integrations.length === 0);
