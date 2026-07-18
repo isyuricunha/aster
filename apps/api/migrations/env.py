@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app import (
     automation_models,  # noqa: F401
+    communication_models,  # noqa: F401
     image_models,  # noqa: F401
     models,  # noqa: F401
     retrieval_models,  # noqa: F401
