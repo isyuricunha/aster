@@ -13,6 +13,7 @@ from app.agent_runtime import (
     estimated_cost,
     estimated_tokens,
 )
+from app.agent_time import aware_datetime
 
 
 async def next_step_position(session: AsyncSession, run_id: UUID) -> int:
@@ -120,7 +121,7 @@ async def check_run_controls(session: AsyncSession, run: AgentRun) -> None:
     if run.pause_requested:
         await release_agent_run(session, run, status="paused")
         raise AgentExecutionError("paused", "The agent run was paused by the owner.")
-    if run.deadline_at and datetime.now(UTC) >= run.deadline_at:
+    if run.deadline_at and datetime.now(UTC) >= aware_datetime(run.deadline_at):
         raise AgentExecutionError(
             "runtime_budget_exceeded",
             "The agent exceeded its runtime budget.",
