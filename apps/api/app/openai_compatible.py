@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import httpx
 
-from app.provider_instruction_roles import InstructionRole, normalize_provider_messages
+from app.provider_instruction_roles import normalize_provider_messages
 
 
 class ModelEndpointError(Exception):
@@ -185,7 +185,6 @@ class OpenAICompatibleClient:
         api_key: str | None,
         model_id: str,
         messages: Sequence[dict[str, object]],
-        instruction_role: InstructionRole = "system",
         temperature: float | None = None,
         top_p: float | None = None,
         max_output_tokens: int | None = None,
@@ -197,7 +196,6 @@ class OpenAICompatibleClient:
             api_key=api_key,
             model_id=model_id,
             messages=messages,
-            instruction_role=instruction_role,
             temperature=temperature,
             top_p=top_p,
             max_output_tokens=max_output_tokens,
@@ -215,7 +213,6 @@ class OpenAICompatibleClient:
         model_id: str,
         messages: Sequence[dict[str, object]],
         tools: Sequence[dict[str, object]] = (),
-        instruction_role: InstructionRole = "system",
         temperature: float | None = None,
         top_p: float | None = None,
         max_output_tokens: int | None = None,
@@ -225,7 +222,8 @@ class OpenAICompatibleClient:
         payload: dict[str, object] = {
             "model": model_id,
             "messages": normalize_provider_messages(
-                instruction_role=instruction_role,
+                base_url=base_url,
+                model_id=model_id,
                 messages=messages,
             ),
             "stream": True,
