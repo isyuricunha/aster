@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from app.communication_storage import CommunicationAttachmentStore
 from app.config import settings
 from app.image_provider import OpenAICompatibleImageClient
 from app.image_storage import PrivateMediaStore
@@ -31,6 +32,11 @@ def get_image_client() -> OpenAICompatibleImageClient:
 @lru_cache
 def get_media_store() -> PrivateMediaStore:
     return PrivateMediaStore(settings.aster_media_root)
+
+
+@lru_cache
+def get_communication_store() -> CommunicationAttachmentStore:
+    return CommunicationAttachmentStore(settings.aster_media_root)
 
 
 def get_mcp_client() -> McpClient:
