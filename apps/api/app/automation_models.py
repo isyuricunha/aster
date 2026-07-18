@@ -46,7 +46,8 @@ class Automation(TimestampMixin, Base):
     __tablename__ = "automations"
     __table_args__ = (
         CheckConstraint(
-            "trigger_type IN ('once', 'interval', 'daily', 'weekly', 'webhook')",
+            "trigger_type IN ('once', 'interval', 'daily', 'weekly', 'webhook', "
+            "'communication')",
             name="ck_automations_trigger_type",
         ),
         CheckConstraint("max_attempts >= 1 AND max_attempts <= 10", name="ck_automations_attempts"),
@@ -141,7 +142,7 @@ class AutomationRun(TimestampMixin, Base):
     __tablename__ = "automation_runs"
     __table_args__ = (
         CheckConstraint(
-            "trigger_source IN ('schedule', 'manual', 'webhook', 'retry')",
+            "trigger_source IN ('schedule', 'manual', 'webhook', 'communication', 'retry')",
             name="ck_automation_runs_trigger_source",
         ),
         CheckConstraint(
