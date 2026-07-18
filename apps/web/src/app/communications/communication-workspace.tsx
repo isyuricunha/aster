@@ -71,10 +71,7 @@ export function CommunicationWorkspace({
   const selectedAccount = accounts.find((account) => account.id === accountFilter) ?? null;
 
   useEffect(() => {
-    if (!selectedThreadId) {
-      setThread(null);
-      return;
-    }
+    if (!selectedThreadId) return;
     let active = true;
     void readCommunicationThread(selectedThreadId)
       .then((detail) => {
@@ -238,8 +235,14 @@ export function CommunicationWorkspace({
             <button disabled={busy === "filter"} type="submit">
               Apply
             </button>
-            <button disabled={!accounts.length || Boolean(busy)} onClick={() => void syncAccount()} type="button">
-              {busy === "sync" ? "Syncing…" : `Sync ${selectedAccount?.name ?? accounts[0]?.name ?? "account"}`}
+            <button
+              disabled={!accounts.length || Boolean(busy)}
+              onClick={() => void syncAccount()}
+              type="button"
+            >
+              {busy === "sync"
+                ? "Syncing…"
+                : `Sync ${selectedAccount?.name ?? accounts[0]?.name ?? "account"}`}
             </button>
           </form>
 
@@ -273,7 +276,7 @@ export function CommunicationWorkspace({
             </aside>
 
             <article className={styles.threadDetail}>
-              {!thread ? (
+              {!selectedThreadId || !thread ? (
                 <div className={styles.emptyState}>
                   <strong>Select a thread.</strong>
                   <span>Messages and manual reply controls appear here.</span>
@@ -287,7 +290,11 @@ export function CommunicationWorkspace({
                       <span>{thread.message_count} message(s)</span>
                     </div>
                     {thread.unread_count ? (
-                      <button disabled={Boolean(busy)} onClick={() => void markRead()} type="button">
+                      <button
+                        disabled={Boolean(busy)}
+                        onClick={() => void markRead()}
+                        type="button"
+                      >
                         Mark read
                       </button>
                     ) : null}
