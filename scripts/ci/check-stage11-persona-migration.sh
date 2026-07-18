@@ -71,4 +71,4 @@ SQL
 retrieval_result="$(printf '%s' "${retrieval_result}" | tr -d '\r')"
 test "${retrieval_result}" = "true|true" || test "${retrieval_result}" = "t|t"
 
-docker compose exec -T api alembic current | grep --quiet '0011_images'
+docker compose exec -T api alembic current | grep --quiet '0012_automations'

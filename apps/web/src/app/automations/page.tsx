@@ -1,0 +1,82 @@
+import type { CachedModel, Persona } from "../../lib/api";
+import type {
+  Automation,
+  AutomationRun,
+  IntegrationConnection,
+  NotificationList,
+} from "../../lib/automation-api";
+import { requireServerAuth, serverApiFetch } from "../../lib/server-api";
+import { AppFrame } from "../ui/app-frame";
+import { AutomationWorkspace } from "./automation-workspace";
+
+export const dynamic = "force-dynamic";
+
+type InitialAutomationData = {
+  automations: Automation[];
+  runs: AutomationRun[];
+  integrations: IntegrationConnection[];
+  notifications: NotificationList;
+  models: CachedModel[];
+  personas: Persona[];
+  error: string | null;
+};
+
+async function getInitialData(): Promise<InitialAutomationData> {
+  try {
+    const responses = await Promise.all([
+      serverApiFetch("/api/automations"),
+      serverApiFetch("/api/automation-runs?limit=100"),
+      serverApiFetch("/api/integrations"),
+      serverApiFetch("/api/notifications?limit=100"),
+      serverApiFetch("/api/models"),
+      serverApiFetch("/api/personas"),
+    ]);
+    if (responses.some((response) => !response.ok)) {
+      throw new Error("The automation API returned an error.");
+    }
+    const [automations, runs, integrations, notifications, models, personas] =
+      await Promise.all(responses.map((response) => response.json()));
+    return {
+      automations: automations as Automation[],
+      runs: runs as AutomationRun[],
+      integrations: integrations as IntegrationConnection[],
+      notifications: notifications as NotificationList,
+      models: models as CachedModel[],
+      personas: personas as Persona[],
+      error: null,
+    };
+  } catch (error) {
+    return {
+      automations: [],
+      runs: [],
+      integrations: [],
+      notifications: { items: [], unread_count: 0, total: 0 },
+      models: [],
+      personas: [],
+      error: error instanceof Error ? error.message : "Could not load automations.",
+    };
+  }
+}
+
+export default async function AutomationsPage() {
+  await requireServerAuth();
+  const initial = await getInitialData();
+  return (
+    <AppFrame
+      active="automations"
+      kicker="Background work"
+      title="Automations"
+      description="Schedule bounded model runs, deliver results through explicit integrations, and inspect every attempt."
+    >
+      <AutomationWorkspace
+        initialAutomations={initial.automations}
+        initialRuns={initial.runs}
+        initialIntegrations={initial.integrations}
+        initialNotifications={initial.notifications}
+        models={initial.models}
+        personas={initial.personas}
+        initialError={initial.error}
+      />
+    </AppFrame>
+  );
+}

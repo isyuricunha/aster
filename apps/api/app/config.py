@@ -61,6 +61,15 @@ class Settings(BaseSettings):
     aster_image_max_pixels: int = Field(default=40_000_000, ge=1_000_000, le=200_000_000)
     aster_image_max_inputs: int = Field(default=8, ge=1, le=16)
     aster_image_max_outputs: int = Field(default=4, ge=1, le=8)
+    aster_automation_poll_seconds: float = Field(default=2.0, ge=0.5, le=60)
+    aster_automation_lease_seconds: int = Field(default=120, ge=30, le=3_600)
+    aster_automation_heartbeat_seconds: int = Field(default=30, ge=5, le=1_200)
+    aster_automation_scheduler_batch_size: int = Field(default=25, ge=1, le=500)
+    aster_automation_output_max_characters: int = Field(
+        default=100_000, ge=1_000, le=1_000_000
+    )
+    aster_integration_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
+    aster_webhook_max_bytes: int = Field(default=1_000_000, ge=1_000, le=20_000_000)
 
     @field_validator("aster_encryption_key")
     @classmethod
@@ -86,11 +95,16 @@ class Settings(BaseSettings):
         return normalized
 
     @model_validator(mode="after")
-    def validate_retrieval_limits(self) -> "Settings":
+    def validate_runtime_limits(self) -> "Settings":
         if self.aster_document_chunk_overlap >= self.aster_document_chunk_characters:
             raise ValueError(
                 "ASTER_DOCUMENT_CHUNK_OVERLAP must be smaller than "
                 "ASTER_DOCUMENT_CHUNK_CHARACTERS"
+            )
+        if self.aster_automation_heartbeat_seconds * 2 >= self.aster_automation_lease_seconds:
+            raise ValueError(
+                "ASTER_AUTOMATION_HEARTBEAT_SECONDS must be less than half of "
+                "ASTER_AUTOMATION_LEASE_SECONDS"
             )
         return self
 
@@ -98,7 +112,6 @@ class Settings(BaseSettings):
     def resolve_database_url(self) -> "Settings":
         if self.database_url.strip():
             return self
-
         user = quote(self.postgres_user, safe="")
         password = quote(self.postgres_password.get_secret_value(), safe="")
         database = quote(self.postgres_db, safe="")

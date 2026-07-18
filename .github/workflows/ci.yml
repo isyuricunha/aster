@@ -104,7 +104,7 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://aster:aster@database.invalid:5432/aster
         run: docker compose config --quiet
       - name: Build images
-        run: docker compose build --progress=plain api web
+        run: docker compose build --progress=plain api worker web
       - name: Start application stack
         run: docker compose up --detach
       - name: Check API readiness
@@ -115,7 +115,7 @@ jobs:
         run: >-
           curl --fail --silent --show-error --retry 30 --retry-all-errors --retry-delay 2
           http://localhost:3000/setup
-      - name: Check legacy upgrade through Stage 14
+      - name: Check legacy upgrade through Stage 15
         run: sh scripts/ci/check-stage11-persona-migration.sh
       - name: Check runtime configuration
         run: >-
@@ -144,13 +144,22 @@ jobs:
           assert settings.aster_image_output_max_bytes == 25000000;
           assert settings.aster_image_max_pixels == 40000000;
           assert settings.aster_image_max_inputs == 8;
-          assert settings.aster_image_max_outputs == 4'
+          assert settings.aster_image_max_outputs == 4;
+          assert settings.aster_automation_poll_seconds == 2;
+          assert settings.aster_automation_lease_seconds == 120;
+          assert settings.aster_automation_heartbeat_seconds == 30;
+          assert settings.aster_automation_scheduler_batch_size == 25;
+          assert settings.aster_automation_output_max_characters == 100000;
+          assert settings.aster_integration_timeout_seconds == 30;
+          assert settings.aster_webhook_max_bytes == 1000000'
       - name: Check core application contracts
         run: sh scripts/ci/check-stack-core.sh
       - name: Check Stage 13 memory and retrieval contracts
         run: sh scripts/ci/check-stage13-memory-rag.sh
       - name: Check Stage 14 image contracts
         run: sh scripts/ci/check-stage14-images.sh
+      - name: Check Stage 15 automation contracts
+        run: sh scripts/ci/check-stage15-automations.sh
       - name: Check Stage 12 tool contracts
         run: sh scripts/ci/check-stage12-tools.sh
       - name: Show service state

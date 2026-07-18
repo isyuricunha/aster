@@ -6,6 +6,19 @@ All notable changes to Aster are documented in this file.
 
 ### Added
 
+- PostgreSQL-backed one-time, interval, daily, weekly, and inbound-webhook automations.
+- A dedicated worker service with transactional claiming, expiring leases, heartbeat renewal, interrupted-run recovery, and bounded retries.
+- Frozen automation persona snapshots and optional explicit model selection with Primary fallback routing when no model is pinned.
+- Persistent automation runs with trigger payloads, model output, attempts, errors, leases, delivery attempts, and timestamps.
+- Private in-app notifications for automation success and failure with read and deletion controls.
+- SMTP integration configuration, encrypted credentials, explicit connection tests, and email result delivery.
+- CalDAV integration configuration, encrypted authentication, explicit connection tests, and stable iCalendar event creation.
+- Inbound webhooks using a public automation UUID and one-time-disclosed `X-Aster-Webhook-Token` secret header.
+- Persisted webhook delivery identifiers and idempotent duplicate handling through `X-Aster-Delivery` or `Idempotency-Key`.
+- Outbound HTTP webhook integrations with encrypted private headers and structured completion payloads.
+- Automation workspace with schedule, timezone, model, persona, delivery, retry, timeout, history, integration, and notification controls.
+- Migration `0012_automations` and a worker health contract in Docker Compose.
+- Bounded runtime configuration for polling, leases, heartbeat, scheduling batches, output size, integration timeouts, and webhook body size.
 - Explicit image-model capability profiles for generation, editing, multiple inputs, masks, normalized defaults, and bounded provider parameters.
 - OpenAI-compatible image generation through `/images/generations` and multipart editing through `/images/edits`.
 - Explicit image mode in the chat composer with PNG, JPEG, and WebP inputs, optional masks, previews, and provider-aware parameters.
@@ -56,7 +69,7 @@ All notable changes to Aster are documented in this file.
 - Versioned JSON conversation export and authenticated import.
 - Human-readable Markdown conversation export.
 - Inline conversation renaming and keyboard access to history search.
-- Shared application frame for chat, image, model, persona, and account navigation.
+- Shared application frame for chat, image, automation, model, persona, and account navigation.
 - Internal interface icon set and dedicated Aster brand mark.
 - Responsive workspace navigation for desktop and mobile layouts.
 - Single-owner authentication with first-access setup.
@@ -74,6 +87,12 @@ All notable changes to Aster are documented in this file.
 
 ### Changed
 
+- The default application stack now includes a continuously running automation worker built from the API image.
+- Automation model output is committed before SMTP, CalDAV, or outbound-webhook side effects begin.
+- Automatic retries stop before external delivery begins so a failed delivery is recorded instead of repeated silently.
+- Returning from downtime creates at most one catch-up run per overdue automation before advancing to the next future occurrence.
+- Inbound webhook secrets are carried only in `X-Aster-Webhook-Token`, never in request paths that normal access logs record.
+- The same-origin proxy forwards only the explicit webhook control headers required by Stage 15.
 - The Image role is active and falls back to Primary only when that exact model explicitly declares the required image capability.
 - Provider image URLs are downloaded immediately and never stored as durable history.
 - Image media is stored outside PostgreSQL in a private persistent volume instead of inside chat text or database binary columns.
@@ -102,13 +121,18 @@ All notable changes to Aster are documented in this file.
 - Chat now uses a compact workspace layout with clearer conversation selection, message hierarchy, contextual actions, and a focused composer.
 - Model, persona, account, setup, and sign-in screens now share one dense interface system.
 - Forms, endpoint metadata, model browsing, empty states, notices, and responsive behavior use consistent tokens and interaction states.
-- Every chat, image, model, persona, and account route requires an authenticated owner session.
+- Every chat, image, automation, model, persona, and account route requires an authenticated owner session.
 - The bundled PostgreSQL service no longer publishes port 5432 to the host.
 - Endpoint discovery now allows 30 seconds by default.
 - The API, web package, and release documentation use version `0.1.0` consistently.
 
 ### Fixed
 
+- Webhook delivery identifiers no longer roll back unrelated scheduler state when a duplicate is received.
+- Expired automation leases are recovered, and a worker that loses ownership stops its local execution.
+- The worker survives temporary database and schema unavailability during migrations instead of crashing permanently.
+- Overdue interval schedules no longer replay every missed occurrence after downtime.
+- Webhook secrets no longer appear in Uvicorn or ordinary reverse-proxy request paths.
 - Provider failures remain visible as failed image operations and failed assistant messages without persisting partial outputs.
 - Invalid base64, empty responses, oversized downloads, false media types, excessive dimensions, and unsupported image formats are rejected explicitly.
 - Partially stored output files are removed when image persistence fails.

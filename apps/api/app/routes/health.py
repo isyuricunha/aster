@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.automation_service import recover_expired_automation_runs
 from app.chat_generation import recover_interrupted_streams
 from app.db import AsyncSessionFactory, engine
 from app.image_service import recover_interrupted_image_operations
@@ -31,6 +32,7 @@ async def _recover_interrupted_work_once() -> None:
             await recover_interrupted_streams(session)
             await recover_interrupted_tool_executions(session)
             await recover_interrupted_image_operations(session)
+            await recover_expired_automation_runs(session)
         _recovery_complete = True
 
 
@@ -50,5 +52,4 @@ async def ready() -> HealthResponse:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database is not ready",
         ) from error
-
     return HealthResponse(status="ok")

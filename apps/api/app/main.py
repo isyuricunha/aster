@@ -4,12 +4,13 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app import image_models, retrieval_models  # noqa: F401
+from app import automation_models, image_models, retrieval_models  # noqa: F401
 from app.auth_dependencies import require_auth
 from app.config import settings
 from app.db import engine
 from app.middleware import security_middleware
 from app.routes.auth import router as auth_router
+from app.routes.automations import private_router as automations_router
 from app.routes.chat import router as chat_router
 from app.routes.health import router as health_router
 from app.routes.images import router as images_router
@@ -19,6 +20,7 @@ from app.routes.model_endpoints import router as model_endpoints_router
 from app.routes.model_profiles import router as model_profiles_router
 from app.routes.persona import router as persona_router
 from app.routes.tools import router as tools_router
+from app.routes.webhooks import router as webhook_router
 
 
 @asynccontextmanager
@@ -45,6 +47,7 @@ app.add_middleware(
 )
 app.include_router(health_router)
 app.include_router(auth_router)
+app.include_router(webhook_router)
 
 private_route_dependencies = [Depends(require_auth)]
 app.include_router(model_endpoints_router, dependencies=private_route_dependencies)
@@ -54,4 +57,5 @@ app.include_router(tools_router, dependencies=private_route_dependencies)
 app.include_router(memory_router, dependencies=private_route_dependencies)
 app.include_router(knowledge_router, dependencies=private_route_dependencies)
 app.include_router(images_router, dependencies=private_route_dependencies)
+app.include_router(automations_router, dependencies=private_route_dependencies)
 app.include_router(chat_router, dependencies=private_route_dependencies)
