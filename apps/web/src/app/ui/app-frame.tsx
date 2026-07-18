@@ -5,6 +5,7 @@ import {
   MobileWorkspaceNavigation,
   type NavigationKey,
   WorkspaceBrand,
+  WorkspaceChrome,
   WorkspaceNavigation,
 } from "./workspace-navigation";
 
@@ -26,6 +27,7 @@ export function AppFrame({
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
+      <WorkspaceChrome active={active} title={title} />
       <aside className="application-sidebar">
         <WorkspaceBrand />
         <WorkspaceNavigation active={active} />
@@ -56,7 +58,7 @@ export function AppFrame({
         <main className="settings-content" id="main-content" tabIndex={-1}>
           <header className="settings-hero">
             <p>{kicker}</p>
-            <h1>{title}</h1>
+            <h1 className="shimmer-text">{title}</h1>
             <span>{description}</span>
           </header>
           {children}

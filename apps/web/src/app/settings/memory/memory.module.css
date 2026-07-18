@@ -25,9 +25,11 @@
   display: grid;
   gap: 14px;
   border: 1px solid var(--border-subtle);
-  border-radius: 9px;
-  background: var(--surface-raised);
-  padding: 16px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 17px;
+  box-shadow: none;
+  animation: surface-enter 340ms var(--ease-enter) both;
 }
 
 .panelHeader {
@@ -156,13 +158,23 @@
   font-size: 12px;
   font-weight: 570;
   cursor: pointer;
+  transition:
+    border-color var(--duration-default) var(--ease-standard),
+    background var(--duration-default) var(--ease-standard),
+    color var(--duration-default) var(--ease-standard),
+    transform 180ms var(--ease-enter);
 }
 
 .primaryButton {
   border: 1px solid color-mix(in oklab, var(--accent) 60%, var(--border-subtle));
   background: var(--accent);
-  color: var(--accent-foreground);
+  color: var(--accent-contrast);
   padding: 7px 11px;
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: var(--accent-strong);
+  transform: translateY(-1px);
 }
 
 .secondaryButton,
@@ -202,6 +214,11 @@
   gap: 16px;
   min-width: 0;
   padding: 11px 12px;
+  transition: background var(--duration-default) var(--ease-standard);
+}
+
+.row:hover {
+  background: var(--surface-hover);
 }
 
 .row + .row {
@@ -262,6 +279,16 @@
   border-radius: 8px;
   background: var(--surface-base);
   padding: 12px;
+  transition:
+    border-color var(--duration-default) var(--ease-standard),
+    background var(--duration-default) var(--ease-standard),
+    transform 180ms var(--ease-enter);
+}
+
+.collectionCard:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-hover);
+  transform: translateY(-1px);
 }
 
 .collectionCard h3 {

@@ -1,6 +1,6 @@
 .stack {
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 
 .serverPanel {
@@ -46,6 +46,7 @@
   background: var(--surface-raised);
   color: var(--text-muted);
   font-size: 0.78rem;
+  box-shadow: inset 2px 0 color-mix(in oklab, var(--accent) 58%, transparent);
 }
 
 .serverList,
@@ -54,7 +55,7 @@
   gap: 1px;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: var(--border);
 }
 
@@ -65,6 +66,16 @@
   align-items: center;
   gap: 14px;
   background: var(--surface);
+  transition:
+    background var(--duration-default) var(--ease-standard),
+    transform 180ms var(--ease-enter);
+}
+
+.serverRow:hover,
+.toolRow:hover {
+  z-index: 1;
+  background: var(--surface-hover);
+  transform: translateX(1px);
 }
 
 .serverRow {
@@ -191,6 +202,14 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface-raised);
+  transition:
+    border-color var(--duration-default) var(--ease-standard),
+    background var(--duration-default) var(--ease-standard);
+}
+
+.scopeItem:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-hover);
 }
 
 .scopeItem > span {
