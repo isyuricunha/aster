@@ -3,8 +3,8 @@ set -eu
 
 api_url="${1:-http://localhost:8000}"
 web_url="${2:-http://localhost:3000}"
-username="stage16-owner"
-password="stage16-owner-password"
+username="owner"
+password="correct horse battery staple"
 cookie_jar="$(mktemp)"
 response_file="$(mktemp)"
 trap 'rm -f "${cookie_jar}" "${response_file}"' EXIT
