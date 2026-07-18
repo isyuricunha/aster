@@ -156,7 +156,7 @@ async def test_chat_falls_back_before_first_delta(api_client: tuple) -> None:
 
     assert response.status_code == 200
     assert "event: fallback" in response.text
-    assert fake_client.chat_calls == ["primary-model", "fallback-model"]
+    assert fake_client.chat_calls == ["primary-model", "primary-model", "fallback-model"]
     detail = (await client.get(f"/api/conversations/{conversation_id}")).json()
     assert detail["messages"][-1]["content"] == "Fallback answer"
     assert detail["messages"][-1]["model_id"] == "fallback-model"
@@ -183,7 +183,7 @@ async def test_chat_does_not_fallback_for_authentication_failure(api_client: tup
 
     assert "event: fallback" not in response.text
     assert "event: error" in response.text
-    assert fake_client.chat_calls == ["primary-model"]
+    assert fake_client.chat_calls == ["primary-model", "primary-model"]
 
 
 async def test_chat_does_not_fallback_after_partial_output(api_client: tuple) -> None:
@@ -207,7 +207,7 @@ async def test_chat_does_not_fallback_after_partial_output(api_client: tuple) ->
 
     assert "event: fallback" not in response.text
     assert "event: error" in response.text
-    assert fake_client.chat_calls == ["primary-model"]
+    assert fake_client.chat_calls == ["primary-model", "primary-model"]
     detail = (await client.get(f"/api/conversations/{conversation_id}")).json()
     assert detail["messages"][-1]["content"] == "Partial answer"
     assert detail["messages"][-1]["status"] == "failed"

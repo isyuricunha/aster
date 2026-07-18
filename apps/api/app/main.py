@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import automation_models, image_models, retrieval_models  # noqa: F401
 from app.auth_dependencies import require_auth
 from app.config import settings
+from app.conversation_titles import ConversationTitleMiddleware
 from app.db import engine
 from app.middleware import security_middleware
 from app.routes.auth import router as auth_router
@@ -45,6 +46,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(ConversationTitleMiddleware)
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(webhook_router)

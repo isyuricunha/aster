@@ -58,7 +58,7 @@ async def test_chat_persists_streamed_messages_and_uses_primary_model(api_client
     ]
 
     detail = (await client.get(f"/api/conversations/{conversation_id}")).json()
-    assert detail["title"] == "Keep my spacing"
+    assert detail["title"] == "Hello from Aster"
     assert detail["persona"]["name"] == "Assistant"
     assert detail["messages"][0]["content"] == "  Keep my spacing  "
     assert detail["messages"][1]["content"] == "Hello from Aster"

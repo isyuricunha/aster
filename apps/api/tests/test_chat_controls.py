@@ -70,7 +70,7 @@ async def test_edit_and_resend_replaces_the_conversation_tail(api_client: tuple)
         {"role": "user", "content": "Edited request"},
     ]
     updated = (await client.get(f"/api/conversations/{conversation_id}")).json()
-    assert updated["title"] == "Edited request"
+    assert updated["title"] == "Edited answer"
     assert [message["content"] for message in updated["messages"]] == [
         "Edited request",
         "Edited answer",
