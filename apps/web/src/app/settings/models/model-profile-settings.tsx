@@ -13,12 +13,15 @@ import { ModelSelect } from "./model-browser";
 import styles from "./model-profile-settings.module.css";
 
 type ReasoningEffortDraft = "" | "minimal" | "low" | "medium" | "high" | "xhigh";
+type InstructionRole = "system" | "developer";
+type InstructionAwareModelProfile = ModelProfile & { instruction_role: InstructionRole };
 
 type ProfileDraft = {
   displayName: string;
   contextWindow: string;
   maxOutputTokens: string;
   tokenParameter: ModelProfile["token_parameter"];
+  instructionRole: InstructionRole;
   temperature: string;
   topP: string;
   reasoningEffort: ReasoningEffortDraft;
@@ -31,6 +34,7 @@ const emptyProfile: ProfileDraft = {
   contextWindow: "",
   maxOutputTokens: "",
   tokenParameter: "max_tokens",
+  instructionRole: "system",
   temperature: "",
   topP: "",
   reasoningEffort: "",
@@ -38,12 +42,13 @@ const emptyProfile: ProfileDraft = {
   supportsStreaming: true,
 };
 
-function profileDraft(profile: ModelProfile): ProfileDraft {
+function profileDraft(profile: InstructionAwareModelProfile): ProfileDraft {
   return {
     displayName: profile.display_name ?? "",
     contextWindow: profile.context_window?.toString() ?? "",
     maxOutputTokens: profile.max_output_tokens?.toString() ?? "",
     tokenParameter: profile.token_parameter,
+    instructionRole: profile.instruction_role,
     temperature: profile.temperature?.toString() ?? "",
     topP: profile.top_p?.toString() ?? "",
     reasoningEffort: profile.reasoning_effort ?? "",
@@ -110,7 +115,9 @@ export function ModelProfileSettings({
       return;
     }
     await run("load-profile", async () => {
-      const loaded = await apiRequest<ModelProfile>(`/api/model-profiles/${modelId}`);
+      const loaded = await apiRequest<InstructionAwareModelProfile>(
+        `/api/model-profiles/${modelId}`,
+      );
       setProfile(profileDraft(loaded));
       setProfileLoaded(true);
     });
@@ -120,20 +127,24 @@ export function ModelProfileSettings({
     event.preventDefault();
     if (!selectedModelId) return;
     await run("save-profile", async () => {
-      const saved = await apiRequest<ModelProfile>(`/api/model-profiles/${selectedModelId}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          display_name: profile.displayName || null,
-          context_window: nullableNumber(profile.contextWindow),
-          max_output_tokens: nullableNumber(profile.maxOutputTokens),
-          token_parameter: profile.tokenParameter,
-          temperature: nullableNumber(profile.temperature),
-          top_p: nullableNumber(profile.topP),
-          reasoning_effort: profile.reasoningEffort || null,
-          supports_chat: profile.supportsChat,
-          supports_streaming: profile.supportsStreaming,
-        }),
-      });
+      const saved = await apiRequest<InstructionAwareModelProfile>(
+        `/api/model-profiles/${selectedModelId}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            display_name: profile.displayName || null,
+            context_window: nullableNumber(profile.contextWindow),
+            max_output_tokens: nullableNumber(profile.maxOutputTokens),
+            token_parameter: profile.tokenParameter,
+            instruction_role: profile.instructionRole,
+            temperature: nullableNumber(profile.temperature),
+            top_p: nullableNumber(profile.topP),
+            reasoning_effort: profile.reasoningEffort || null,
+            supports_chat: profile.supportsChat,
+            supports_streaming: profile.supportsStreaming,
+          }),
+        },
+      );
       setProfile(profileDraft(saved));
       setProfileLoaded(true);
       setNotice("Model profile saved.");
@@ -144,7 +155,9 @@ export function ModelProfileSettings({
     if (!selectedModelId) return;
     await run("reset-profile", async () => {
       await apiRequest(`/api/model-profiles/${selectedModelId}`, { method: "DELETE" });
-      const defaults = await apiRequest<ModelProfile>(`/api/model-profiles/${selectedModelId}`);
+      const defaults = await apiRequest<InstructionAwareModelProfile>(
+        `/api/model-profiles/${selectedModelId}`,
+      );
       setProfile(profileDraft(defaults));
       setProfileLoaded(true);
       setNotice("Model profile reset to provider defaults.");
@@ -251,6 +264,21 @@ export function ModelProfileSettings({
                 <option value="max_tokens">max_tokens</option>
                 <option value="max_completion_tokens">max_completion_tokens</option>
                 <option value="none">Do not send a token limit</option>
+              </select>
+            </label>
+            <label>
+              <span>Instruction role</span>
+              <select
+                value={profile.instructionRole}
+                onChange={(event) =>
+                  setProfile({
+                    ...profile,
+                    instructionRole: event.target.value as InstructionRole,
+                  })
+                }
+              >
+                <option value="system">System — maximum compatibility</option>
+                <option value="developer">Developer — OpenAI-style</option>
               </select>
             </label>
             <label>
@@ -396,8 +424,6 @@ export function ModelProfileSettings({
                     ↓
                   </button>
                   <button
-                    aria-label="Remove fallback"
-                    className={styles.remove}
                     onClick={() =>
                       setFallbackIds((current) => current.filter((id) => id !== model.id))
                     }
