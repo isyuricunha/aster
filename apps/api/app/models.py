@@ -128,6 +128,10 @@ class ModelProfile(TimestampMixin, Base):
             "('minimal', 'low', 'medium', 'high', 'xhigh')",
             name="ck_model_profiles_reasoning_effort",
         ),
+        CheckConstraint(
+            "instruction_role IN ('system', 'developer')",
+            name="ck_model_profiles_instruction_role",
+        ),
     )
 
     model_id: Mapped[UUID] = mapped_column(
@@ -138,6 +142,9 @@ class ModelProfile(TimestampMixin, Base):
     max_output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     token_parameter: Mapped[str] = mapped_column(
         String(32), default="max_tokens", server_default="max_tokens", nullable=False
+    )
+    instruction_role: Mapped[str] = mapped_column(
+        String(16), default="system", server_default="system", nullable=False
     )
     temperature: Mapped[float | None] = mapped_column(Float, nullable=True)
     top_p: Mapped[float | None] = mapped_column(Float, nullable=True)
