@@ -16,6 +16,7 @@ from app.agent_models import (
 )
 from app.agent_run_scope_models import (
     AgentRunCommunicationScope,
+    AgentRunContextScope,
     AgentRunKnowledgeScope,
     AgentRunToolScope,
 )
@@ -34,24 +35,32 @@ async def agent_control(session: AsyncSession) -> AgentControl:
 async def _snapshot_run_scopes(
     session: AsyncSession,
     *,
-    agent_id: UUID,
+    agent: Agent,
     run_id: UUID,
 ) -> None:
     tools = list(
         await session.scalars(
-            select(AgentToolScope).where(AgentToolScope.agent_id == agent_id)
+            select(AgentToolScope).where(AgentToolScope.agent_id == agent.id)
         )
     )
     communications = list(
         await session.scalars(
             select(AgentCommunicationScope).where(
-                AgentCommunicationScope.agent_id == agent_id
+                AgentCommunicationScope.agent_id == agent.id
             )
         )
     )
     collections = list(
         await session.scalars(
-            select(AgentKnowledgeScope).where(AgentKnowledgeScope.agent_id == agent_id)
+            select(AgentKnowledgeScope).where(AgentKnowledgeScope.agent_id == agent.id)
+        )
+    )
+    session.add(
+        AgentRunContextScope(
+            run_id=run_id,
+            persona_id=agent.persona_id,
+            memory_enabled=agent.memory_enabled,
+            rag_enabled=agent.rag_enabled,
         )
     )
     session.add_all(
@@ -121,11 +130,7 @@ async def enqueue_agent_run(
         async with session.begin_nested():
             session.add(run)
             await session.flush()
-            await _snapshot_run_scopes(
-                session,
-                agent_id=agent.id,
-                run_id=run.id,
-            )
+            await _snapshot_run_scopes(session, agent=agent, run_id=run.id)
     except IntegrityError:
         return None
     agent.last_enqueued_at = now
