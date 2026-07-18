@@ -84,7 +84,7 @@ Communication automations do not inherit permission to send a reply.
 
 ## Deployment
 
-Back up PostgreSQL before changing branches:
+Back up PostgreSQL before changing branches. The following command applies to the bundled database profile:
 
 ```bash
 cd ~/github/aster
@@ -107,7 +107,7 @@ docker compose ps
 Check the migration and worker:
 
 ```bash
-curl -fsS http://localhost:8005/ready
+curl -fsS "http://localhost:${API_PORT:-8000}/ready"
 docker compose exec -T api alembic current
 docker compose exec -T worker test -f /tmp/aster-worker-ready && echo "Worker ready"
 ```
