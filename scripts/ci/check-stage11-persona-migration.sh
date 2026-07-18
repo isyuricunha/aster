@@ -71,4 +71,17 @@ SQL
 retrieval_result="$(printf '%s' "${retrieval_result}" | tr -d '\r')"
 test "${retrieval_result}" = "true|true" || test "${retrieval_result}" = "t|t"
 
-docker compose exec -T api alembic current | grep --quiet '0013_conversation_titles'
+instruction_role_result="$(
+  docker compose exec -T postgres sh -lc \
+    'psql -At -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
+SELECT column_default || '|' || is_nullable
+FROM information_schema.columns
+WHERE table_name = 'model_profiles'
+  AND column_name = 'instruction_role';
+SQL
+)"
+instruction_role_result="$(printf '%s' "${instruction_role_result}" | tr -d '\r')"
+printf '%s' "${instruction_role_result}" | grep --quiet "system"
+printf '%s' "${instruction_role_result}" | grep --quiet "NO"
+
+docker compose exec -T api alembic current | grep --quiet '0014_model_instruction_roles'
