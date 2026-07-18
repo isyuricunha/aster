@@ -2,35 +2,24 @@
 
 ## Completed foundation
 
-Stages 1 through 15 established the self-hosted application foundation: OpenAI-compatible model endpoints, personas, persistent chat, authentication, model profiles and fallbacks, export and search, interface refinement, persona snapshots, MCP tools, memory and RAG, images, and durable automations with outbound integrations.
-
-## Stage 16 — Communication Hub
-
-Stage 16 adds private inbound communication surfaces:
-
-- IMAP email accounts and inbox synchronization
-- Discord bots restricted to explicitly allowed channels
-- persistent threads, messages, unread state, and private attachments
-- manual email and Discord replies
-- explicit communication-to-automation allowlist rules
-- durable cursors, leases, deduplication, and audit history
-
-Receiving content does not grant a model access to the account and does not permit automatic replies.
+Stages 1 through 16 established the self-hosted application foundation: OpenAI-compatible model endpoints, personas, persistent chat, authentication, model profiles and fallbacks, export and search, interface refinement, persona snapshots, MCP tools, memory and RAG, images, durable automations with outbound integrations, and private inbound email and Discord communication channels.
 
 ## Stage 17 — Autonomous Agents
 
-Stage 17 adds bounded agents on top of the existing tools, memory, RAG, automations, and communication events:
+Stage 17 adds bounded persistent agents on top of the existing tools, memory, RAG, automations, and communication events:
 
 - persistent goals, plans, and subtasks
-- event-driven and scheduled execution
-- explicit tool and channel scopes
-- approval policies for sensitive actions
-- step, time, token, and cost limits
-- pause, resume, cancel, and emergency stop controls
+- manual, scheduled, and communication-event execution
+- explicit MCP tool, communication account, and knowledge collection scopes
+- immutable permissions and budgets for every queued run
+- owner approvals for sensitive tools and communication replies
+- step, model-call, action, runtime, token, and optional cost limits
+- pause, resume, cancel, retry, and emergency stop controls
 - loop prevention and complete execution history
+- private completion and failure notifications
 
-Agents must never inherit communication reply authority or tool permissions implicitly.
+Agents never inherit communication reply authority, tools, accounts, knowledge collections, or approval-free side effects implicitly.
 
 ## Later stages
 
-Mobile and narrow-screen remediation, routing analytics, additional providers, and specialized integrations remain planned improvements. They are not prerequisites for Stage 17 and will be scheduled according to deployment feedback and operational need.
+Mobile and narrow-screen remediation, routing analytics, controlled worker concurrency, authoritative provider usage accounting, additional providers, and specialized integrations remain planned improvements. They are not prerequisites for the bounded autonomous agent foundation and will be scheduled according to deployment feedback and operational need.
