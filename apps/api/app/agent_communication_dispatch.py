@@ -1,5 +1,4 @@
 import fnmatch
-from uuid import UUID
 
 from sqlalchemy import and_, select
 from sqlalchemy.exc import IntegrityError
@@ -26,17 +25,12 @@ def _matches(rule: AgentCommunicationRule, message: CommunicationMessage) -> boo
         return False
     if rule.source_ids:
         candidates = {
-            value.casefold()
-            for value in (message.source_id, message.sender_address)
-            if value
+            value.casefold() for value in (message.source_id, message.sender_address) if value
         }
         allowed = {item.casefold() for item in rule.source_ids}
         if not candidates.intersection(allowed):
             return False
-    if (
-        rule.body_contains
-        and rule.body_contains.casefold() not in message.content_text.casefold()
-    ):
+    if rule.body_contains and rule.body_contains.casefold() not in message.content_text.casefold():
         return False
     if rule.require_mention and not bool(message.metadata.get("mentioned_bot")):
         return False
@@ -53,9 +47,7 @@ async def _payload(
 ) -> dict[str, object]:
     attachments = list(
         await session.scalars(
-            select(CommunicationAttachment).where(
-                CommunicationAttachment.message_id == message.id
-            )
+            select(CommunicationAttachment).where(CommunicationAttachment.message_id == message.id)
         )
     )
     return {

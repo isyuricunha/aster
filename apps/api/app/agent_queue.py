@@ -39,15 +39,11 @@ async def _snapshot_run_scopes(
     run_id: UUID,
 ) -> None:
     tools = list(
-        await session.scalars(
-            select(AgentToolScope).where(AgentToolScope.agent_id == agent.id)
-        )
+        await session.scalars(select(AgentToolScope).where(AgentToolScope.agent_id == agent.id))
     )
     communications = list(
         await session.scalars(
-            select(AgentCommunicationScope).where(
-                AgentCommunicationScope.agent_id == agent.id
-            )
+            select(AgentCommunicationScope).where(AgentCommunicationScope.agent_id == agent.id)
         )
     )
     collections = list(

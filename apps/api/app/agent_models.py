@@ -11,7 +11,6 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
-    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -95,9 +94,7 @@ class Agent(TimestampMixin, Base):
     rag_enabled: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false", nullable=False
     )
-    max_steps: Mapped[int] = mapped_column(
-        Integer, default=12, server_default="12", nullable=False
-    )
+    max_steps: Mapped[int] = mapped_column(Integer, default=12, server_default="12", nullable=False)
     max_model_calls: Mapped[int] = mapped_column(
         Integer, default=12, server_default="12", nullable=False
     )
@@ -269,9 +266,7 @@ class AgentRun(TimestampMixin, Base):
     max_estimated_cost_microusd: Mapped[int | None] = mapped_column(Integer, nullable=True)
     input_cost_per_million_microusd: Mapped[int | None] = mapped_column(Integer, nullable=True)
     output_cost_per_million_microusd: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    steps_used: Mapped[int] = mapped_column(
-        Integer, default=0, server_default="0", nullable=False
-    )
+    steps_used: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     model_calls_used: Mapped[int] = mapped_column(
         Integer, default=0, server_default="0", nullable=False
     )
@@ -320,9 +315,7 @@ class AgentStep(TimestampMixin, Base):
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     kind: Mapped[str] = mapped_column(String(24), nullable=False)
     status: Mapped[str] = mapped_column(String(24), nullable=False)
-    summary: Mapped[str] = mapped_column(
-        String(500), default="", server_default="", nullable=False
-    )
+    summary: Mapped[str] = mapped_column(String(500), default="", server_default="", nullable=False)
     content: Mapped[str | None] = mapped_column(Text, nullable=True)
     provider_model_id: Mapped[str | None] = mapped_column(String(512), nullable=True)
     tool_id: Mapped[UUID | None] = mapped_column(
@@ -375,7 +368,5 @@ class AgentControl(TimestampMixin, Base):
     emergency_stop: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false", nullable=False
     )
-    reason: Mapped[str] = mapped_column(
-        String(500), default="", server_default="", nullable=False
-    )
+    reason: Mapped[str] = mapped_column(String(500), default="", server_default="", nullable=False)
     activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

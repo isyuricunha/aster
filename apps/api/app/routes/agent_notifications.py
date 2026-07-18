@@ -27,16 +27,12 @@ async def list_agent_notifications(
 ) -> AgentNotificationListResponse:
     items = list(
         await session.scalars(
-            select(AgentNotification)
-            .order_by(AgentNotification.created_at.desc())
-            .limit(limit)
+            select(AgentNotification).order_by(AgentNotification.created_at.desc()).limit(limit)
         )
     )
     unread = int(
         await session.scalar(
-            select(func.count(AgentNotification.id)).where(
-                AgentNotification.read_at.is_(None)
-            )
+            select(func.count(AgentNotification.id)).where(AgentNotification.read_at.is_(None))
         )
         or 0
     )
@@ -71,9 +67,7 @@ async def mark_agent_notification_read(
 )
 async def mark_all_agent_notifications_read(session: SessionDep) -> Response:
     items = list(
-        await session.scalars(
-            select(AgentNotification).where(AgentNotification.read_at.is_(None))
-        )
+        await session.scalars(select(AgentNotification).where(AgentNotification.read_at.is_(None)))
     )
     now = datetime.now(UTC)
     for item in items:

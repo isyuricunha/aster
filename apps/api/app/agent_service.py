@@ -138,9 +138,7 @@ async def _replace_knowledge_scopes(
         collection = await session.get(KnowledgeCollection, item.collection_id)
         if collection is None or not collection.enabled:
             raise HTTPException(status_code=422, detail="A knowledge collection is unavailable.")
-        session.add(
-            AgentKnowledgeScope(agent_id=agent.id, collection_id=collection.id)
-        )
+        session.add(AgentKnowledgeScope(agent_id=agent.id, collection_id=collection.id))
 
 
 async def apply_agent_write(
@@ -332,9 +330,7 @@ async def run_response(session: AsyncSession, run: AgentRun) -> AgentRunResponse
     agent = await session.get(Agent, run.agent_id)
     steps = list(
         await session.scalars(
-            select(AgentStep)
-            .where(AgentStep.run_id == run.id)
-            .order_by(AgentStep.position)
+            select(AgentStep).where(AgentStep.run_id == run.id).order_by(AgentStep.position)
         )
     )
     approvals = list(
@@ -420,7 +416,9 @@ async def validate_communication_rule_targets(
     if agent is None or account is None:
         raise HTTPException(status_code=422, detail="The selected agent or account is unavailable.")
     if agent.trigger_type != "communication":
-        raise HTTPException(status_code=422, detail="The selected agent does not use communication events.")
+        raise HTTPException(
+            status_code=422, detail="The selected agent does not use communication events."
+        )
     scope = await session.scalar(
         select(AgentCommunicationScope).where(
             AgentCommunicationScope.agent_id == agent.id,
@@ -471,14 +469,14 @@ async def set_emergency_stop(
             run.status = "cancelled"
             run.cancel_requested = True
             run.error_code = "emergency_stop"
-            run.error_message = control.reason or "The autonomous agent emergency stop was activated."
+            run.error_message = (
+                control.reason or "The autonomous agent emergency stop was activated."
+            )
             run.finished_at = now
             run.lease_owner = None
             run.lease_expires_at = None
         approvals = list(
-            await session.scalars(
-                select(AgentApproval).where(AgentApproval.status == "pending")
-            )
+            await session.scalars(select(AgentApproval).where(AgentApproval.status == "pending"))
         )
         for approval in approvals:
             approval.status = "cancelled"
@@ -514,9 +512,7 @@ async def create_agent_notification(
 async def unread_agent_notification_count(session: AsyncSession) -> int:
     return int(
         await session.scalar(
-            select(func.count(AgentNotification.id)).where(
-                AgentNotification.read_at.is_(None)
-            )
+            select(func.count(AgentNotification.id)).where(AgentNotification.read_at.is_(None))
         )
         or 0
     )

@@ -133,16 +133,16 @@ def upgrade() -> None:
         sa.Column("account_id", sa.Uuid(), nullable=False),
         sa.Column("allow_read", sa.Boolean(), server_default="true", nullable=False),
         sa.Column("allow_reply", sa.Boolean(), server_default="false", nullable=False),
-        sa.Column("reply_approval_policy", sa.String(length=16), server_default="always", nullable=False),
+        sa.Column(
+            "reply_approval_policy", sa.String(length=16), server_default="always", nullable=False
+        ),
         *_timestamps(),
         sa.CheckConstraint(
             "reply_approval_policy IN ('always', 'never')",
             name="ck_agent_communication_reply_approval",
         ),
         sa.ForeignKeyConstraint(["agent_id"], ["agents.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(
-            ["account_id"], ["communication_accounts.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["account_id"], ["communication_accounts.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("agent_id", "account_id", name="uq_agent_communication_scope"),
     )
@@ -170,9 +170,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("agent_id", "collection_id", name="uq_agent_knowledge_scope"),
     )
-    op.create_index(
-        "ix_agent_knowledge_scopes_agent_id", "agent_knowledge_scopes", ["agent_id"]
-    )
+    op.create_index("ix_agent_knowledge_scopes_agent_id", "agent_knowledge_scopes", ["agent_id"])
     op.create_index(
         "ix_agent_knowledge_scopes_collection_id",
         "agent_knowledge_scopes",
@@ -192,9 +190,7 @@ def upgrade() -> None:
         sa.Column("require_mention", sa.Boolean(), server_default="false", nullable=False),
         *_timestamps(),
         sa.ForeignKeyConstraint(["agent_id"], ["agents.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(
-            ["account_id"], ["communication_accounts.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["account_id"], ["communication_accounts.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
@@ -260,9 +256,7 @@ def upgrade() -> None:
         sa.CheckConstraint("model_calls_used >= 0", name="ck_agent_runs_model_calls_used"),
         sa.CheckConstraint("tool_calls_used >= 0", name="ck_agent_runs_tool_calls_used"),
         sa.CheckConstraint("estimated_tokens >= 0", name="ck_agent_runs_estimated_tokens"),
-        sa.CheckConstraint(
-            "estimated_cost_microusd >= 0", name="ck_agent_runs_estimated_cost"
-        ),
+        sa.CheckConstraint("estimated_cost_microusd >= 0", name="ck_agent_runs_estimated_cost"),
         sa.ForeignKeyConstraint(["agent_id"], ["agents.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(
             ["requested_model_id"], ["model_cache_entries.id"], ondelete="SET NULL"
@@ -321,13 +315,9 @@ def upgrade() -> None:
             name="ck_agent_run_communication_reply_approval",
         ),
         sa.ForeignKeyConstraint(["run_id"], ["agent_runs.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(
-            ["account_id"], ["communication_accounts.id"], ondelete="RESTRICT"
-        ),
+        sa.ForeignKeyConstraint(["account_id"], ["communication_accounts.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint(
-            "run_id", "account_id", name="uq_agent_run_communication_scope"
-        ),
+        sa.UniqueConstraint("run_id", "account_id", name="uq_agent_run_communication_scope"),
     )
     op.create_index(
         "ix_agent_run_communication_scopes_run_id",
@@ -462,27 +452,19 @@ def upgrade() -> None:
         sa.Column("message_id", sa.Uuid(), nullable=False),
         sa.Column("run_id", sa.Uuid(), nullable=True),
         *_timestamps(),
-        sa.ForeignKeyConstraint(
-            ["rule_id"], ["agent_communication_rules.id"], ondelete="CASCADE"
-        ),
-        sa.ForeignKeyConstraint(
-            ["message_id"], ["communication_messages.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["rule_id"], ["agent_communication_rules.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["message_id"], ["communication_messages.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["run_id"], ["agent_runs.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("rule_id", "message_id", name="uq_agent_message_dispatch"),
     )
-    op.create_index(
-        "ix_agent_message_dispatches_rule_id", "agent_message_dispatches", ["rule_id"]
-    )
+    op.create_index("ix_agent_message_dispatches_rule_id", "agent_message_dispatches", ["rule_id"])
     op.create_index(
         "ix_agent_message_dispatches_message_id",
         "agent_message_dispatches",
         ["message_id"],
     )
-    op.create_index(
-        "ix_agent_message_dispatches_run_id", "agent_message_dispatches", ["run_id"]
-    )
+    op.create_index("ix_agent_message_dispatches_run_id", "agent_message_dispatches", ["run_id"])
 
 
 def downgrade() -> None:

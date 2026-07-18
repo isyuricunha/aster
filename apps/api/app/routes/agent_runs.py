@@ -57,11 +57,7 @@ async def list_agent_runs(
         if run_status not in allowed:
             raise HTTPException(status_code=422, detail="Unsupported agent run status")
         statement = statement.where(AgentRun.status == run_status)
-    runs = list(
-        await session.scalars(
-            statement.order_by(AgentRun.created_at.desc()).limit(limit)
-        )
-    )
+    runs = list(await session.scalars(statement.order_by(AgentRun.created_at.desc()).limit(limit)))
     return [await run_response(session, item) for item in runs]
 
 

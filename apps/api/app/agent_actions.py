@@ -7,10 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent_models import AgentApproval, AgentRun, AgentStep
 from app.agent_runtime import (
-    AgentExecutionError,
     LIST_COMMUNICATIONS_TOOL,
     READ_COMMUNICATION_TOOL,
     REPLY_COMMUNICATION_TOOL,
+    AgentExecutionError,
     ScopedCommunication,
     ScopedToolRuntime,
     parse_uuid,
@@ -55,9 +55,7 @@ async def list_communications(
     communications: dict[UUID, ScopedCommunication],
 ) -> str:
     readable = {
-        account_id: item
-        for account_id, item in communications.items()
-        if item.scope.allow_read
+        account_id: item for account_id, item in communications.items() if item.scope.allow_read
     }
     account_ids = list(readable)
     raw_account_id = arguments.get("account_id")
@@ -75,9 +73,7 @@ async def list_communications(
     unread_only = bool(arguments.get("unread_only", False))
     if not account_ids:
         return "[]"
-    statement = select(CommunicationThread).where(
-        CommunicationThread.account_id.in_(account_ids)
-    )
+    statement = select(CommunicationThread).where(CommunicationThread.account_id.in_(account_ids))
     if unread_only:
         statement = statement.where(CommunicationThread.unread_count > 0)
     threads = list(

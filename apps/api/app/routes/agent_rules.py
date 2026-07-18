@@ -39,9 +39,7 @@ async def list_agent_communication_rules(
     session: SessionDep,
 ) -> list[AgentCommunicationRuleResponse]:
     rules = list(
-        await session.scalars(
-            select(AgentCommunicationRule).order_by(AgentCommunicationRule.name)
-        )
+        await session.scalars(select(AgentCommunicationRule).order_by(AgentCommunicationRule.name))
     )
     return [await communication_rule_response(session, item) for item in rules]
 

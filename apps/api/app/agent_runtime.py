@@ -197,11 +197,15 @@ def parse_uuid(value: object, field_name: str) -> UUID:
 def parse_arguments(buffer: ToolCallBuffer, maximum: int) -> dict[str, object]:
     raw = "".join(buffer.arguments)
     if len(raw) > maximum:
-        raise AgentExecutionError("arguments_too_large", "The proposed action arguments are too large.")
+        raise AgentExecutionError(
+            "arguments_too_large", "The proposed action arguments are too large."
+        )
     try:
         value = json.loads(raw or "{}")
     except json.JSONDecodeError as error:
-        raise AgentExecutionError("invalid_arguments", "The proposed action contains invalid JSON.") from error
+        raise AgentExecutionError(
+            "invalid_arguments", "The proposed action contains invalid JSON."
+        ) from error
     if not isinstance(value, dict):
         raise AgentExecutionError("invalid_arguments", "Action arguments must be a JSON object.")
     return value
@@ -236,10 +240,7 @@ def estimated_tokens(characters: int) -> int:
 
 
 def estimated_cost(run: AgentRun, input_tokens: int, output_tokens: int) -> int:
-    if (
-        run.input_cost_per_million_microusd is None
-        or run.output_cost_per_million_microusd is None
-    ):
+    if run.input_cost_per_million_microusd is None or run.output_cost_per_million_microusd is None:
         return 0
     input_cost = input_tokens * run.input_cost_per_million_microusd / 1_000_000
     output_cost = output_tokens * run.output_cost_per_million_microusd / 1_000_000
@@ -290,8 +291,7 @@ async def scoped_communications(
         )
     ).all()
     return {
-        account.id: ScopedCommunication(scope=scope, account=account)
-        for scope, account in rows
+        account.id: ScopedCommunication(scope=scope, account=account) for scope, account in rows
     }
 
 
@@ -311,10 +311,7 @@ def step_history(steps: list[AgentStep], maximum: int) -> str:
     blocks: list[str] = []
     size = 0
     for step in steps:
-        value = (
-            f"Step {step.position} · {step.kind} · {step.status}\n"
-            f"Summary: {step.summary}\n"
-        )
+        value = f"Step {step.position} · {step.kind} · {step.status}\nSummary: {step.summary}\n"
         if step.content:
             value += f"Model content:\n{step.content}\n"
         if step.tool_name:

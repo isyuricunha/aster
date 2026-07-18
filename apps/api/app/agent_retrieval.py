@@ -3,7 +3,6 @@ import math
 import re
 from collections import Counter
 from dataclasses import dataclass
-from uuid import UUID
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -137,8 +136,7 @@ async def agent_retrieval_context(
                 (
                     AgentSource(
                         label=(
-                            f"{collection.name} · {document.filename} · "
-                            f"chunk {chunk.position + 1}"
+                            f"{collection.name} · {document.filename} · chunk {chunk.position + 1}"
                         ),
                         content=chunk.content,
                         score=_score(query, chunk.content),

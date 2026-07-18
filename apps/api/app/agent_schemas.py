@@ -102,9 +102,7 @@ class AgentWrite(BaseModel):
     communication_scopes: list[AgentCommunicationScopeInput] = Field(
         default_factory=list, max_length=100
     )
-    knowledge_scopes: list[AgentKnowledgeScopeInput] = Field(
-        default_factory=list, max_length=100
-    )
+    knowledge_scopes: list[AgentKnowledgeScopeInput] = Field(default_factory=list, max_length=100)
 
     @field_validator("name")
     @classmethod

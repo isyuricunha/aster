@@ -10,11 +10,11 @@ from app.agent_actions import prepare_external_action, resume_approved_action
 from app.agent_models import Agent, AgentRun, AgentStep
 from app.agent_retrieval import agent_retrieval_context
 from app.agent_runtime import (
-    AgentExecutionError,
     FINISH_TOOL,
+    UPDATE_PLAN_TOOL,
+    AgentExecutionError,
     ModelRound,
     ToolCallBuffer,
-    UPDATE_PLAN_TOOL,
     agent_instruction,
     merge_tool_deltas,
     parse_arguments,
@@ -68,9 +68,7 @@ async def build_agent_messages(
         messages.append({"role": "developer", "content": retrieval})
     steps = list(
         await session.scalars(
-            select(AgentStep)
-            .where(AgentStep.run_id == run.id)
-            .order_by(AgentStep.position)
+            select(AgentStep).where(AgentStep.run_id == run.id).order_by(AgentStep.position)
         )
     )
     content = f"SAVED_GOAL:\n{run.goal_snapshot}"
@@ -81,10 +79,7 @@ async def build_agent_messages(
             "[/UNTRUSTED_TRIGGER_PAYLOAD]"
         )
     if run.plan:
-        content += (
-            "\n\nCURRENT_PLAN:\n"
-            f"{json.dumps(run.plan, ensure_ascii=False, indent=2)}"
-        )
+        content += f"\n\nCURRENT_PLAN:\n{json.dumps(run.plan, ensure_ascii=False, indent=2)}"
     history = step_history(steps, settings.aster_agent_history_max_characters)
     if history:
         content += f"\n\nPERSISTED_EXECUTION_HISTORY:\n{history}"
@@ -132,7 +127,10 @@ async def run_model_round(
                 ):
                     if delta.content:
                         content.append(delta.content)
-                        if sum(len(item) for item in content) > settings.aster_agent_output_max_characters:
+                        if (
+                            sum(len(item) for item in content)
+                            > settings.aster_agent_output_max_characters
+                        ):
                             raise AgentExecutionError(
                                 "output_too_large",
                                 "The agent model output exceeded the configured character limit.",
