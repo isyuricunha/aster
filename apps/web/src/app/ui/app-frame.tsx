@@ -6,6 +6,7 @@ import { AsterMark, Icon, type IconName } from "./icons";
 type NavigationKey =
   | "chat"
   | "communications"
+  | "agents"
   | "images"
   | "automations"
   | "models"
@@ -29,6 +30,7 @@ const workspaceItems: NavigationItem[] = [
     icon: "chat",
     label: "Communications",
   },
+  { key: "agents", href: "/agents", icon: "tools", label: "Agents" },
   { key: "images", href: "/images", icon: "images", label: "Images" },
   {
     key: "automations",
