@@ -23,20 +23,20 @@ status="$({
   curl -sS -o "${response_file}" -w '%{http_code}' \
     -H 'Content-Type: application/json' \
     -d "{\"username\":\"${username}\",\"password\":\"${password}\"}" \
-    "${web_url}/api/setup"
+    "${web_url}/api/auth/setup"
 } || true)"
 
 if [ "${status}" = "409" ]; then
   curl -fsS -c "${cookie_jar}" \
     -H 'Content-Type: application/json' \
     -d "{\"username\":\"${username}\",\"password\":\"${password}\"}" \
-    "${web_url}/api/login" >/dev/null
+    "${web_url}/api/auth/login" >/dev/null
 else
   test "${status}" = "201"
   curl -fsS -c "${cookie_jar}" \
     -H 'Content-Type: application/json' \
     -d "{\"username\":\"${username}\",\"password\":\"${password}\"}" \
-    "${web_url}/api/login" >/dev/null
+    "${web_url}/api/auth/login" >/dev/null
 fi
 
 test "$(curl -sS -o /dev/null -w '%{http_code}' "${api_url}/api/communication-accounts")" = "401"
