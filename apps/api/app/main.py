@@ -4,7 +4,12 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app import automation_models, image_models, retrieval_models  # noqa: F401
+from app import (  # noqa: F401
+    automation_models,
+    communication_models,
+    image_models,
+    retrieval_models,
+)
 from app.auth_dependencies import require_auth
 from app.config import settings
 from app.conversation_titles import ConversationTitleMiddleware
@@ -13,6 +18,7 @@ from app.middleware import security_middleware
 from app.routes.auth import router as auth_router
 from app.routes.automations import private_router as automations_router
 from app.routes.chat import router as chat_router
+from app.routes.communications import router as communications_router
 from app.routes.health import router as health_router
 from app.routes.images import router as images_router
 from app.routes.knowledge import router as knowledge_router
@@ -60,4 +66,5 @@ app.include_router(memory_router, dependencies=private_route_dependencies)
 app.include_router(knowledge_router, dependencies=private_route_dependencies)
 app.include_router(images_router, dependencies=private_route_dependencies)
 app.include_router(automations_router, dependencies=private_route_dependencies)
+app.include_router(communications_router, dependencies=private_route_dependencies)
 app.include_router(chat_router, dependencies=private_route_dependencies)
