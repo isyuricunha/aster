@@ -8,7 +8,7 @@ from email import policy
 from email.header import decode_header
 from email.message import Message
 from email.parser import BytesParser
-from email.utils import getaddresses, parsedate_to_datetime, parseaddr
+from email.utils import getaddresses, parseaddr, parsedate_to_datetime
 from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import urlsplit
@@ -113,7 +113,9 @@ def _decoded_payload(part: Message) -> str:
     return payload.decode(charset, errors="replace")
 
 
-def _email_content(message: Message) -> tuple[str, str | None, tuple[ReceivedAttachment, ...]]:
+def _email_content(
+    message: Message,
+) -> tuple[str, str | None, tuple[ReceivedAttachment, ...]]:
     plain_parts: list[str] = []
     html_parts: list[str] = []
     attachments: list[ReceivedAttachment] = []
@@ -151,7 +153,12 @@ def _email_content(message: Message) -> tuple[str, str | None, tuple[ReceivedAtt
 def _normalized_subject(subject: str) -> str:
     value = subject.strip()
     while True:
-        next_value = re.sub(r"^(re|fw|fwd)\s*:\s*", "", value, flags=re.IGNORECASE)
+        next_value = re.sub(
+            r"^(re|fw|fwd)\s*:\s*",
+            "",
+            value,
+            flags=re.IGNORECASE,
+        )
         if next_value == value:
             return value.casefold()
         value = next_value
@@ -192,7 +199,10 @@ def _imap_connect(
     username = credentials.get("username")
     password = credentials.get("password")
     if not username:
-        raise CommunicationAdapterError("invalid_credentials", "IMAP username is required.")
+        raise CommunicationAdapterError(
+            "invalid_credentials",
+            "IMAP username is required.",
+        )
     client.login(username, password or "")
     return client
 
@@ -207,7 +217,8 @@ def _test_imap_sync(
         status, data = client.select(folder, readonly=True)
         if status != "OK":
             raise CommunicationAdapterError(
-                "connection_failed", f"IMAP could not open {folder}."
+                "connection_failed",
+                f"IMAP could not open {folder}.",
             )
         count = int(data[0]) if data and data[0] else 0
         return AccountTestResult(
@@ -250,7 +261,11 @@ def _parse_imap_message(
     external_message_id = header_message_id or f"imap:{folder}:{uid}"
     return ReceivedMessage(
         external_message_id=external_message_id[:512],
-        external_thread_id=_email_thread_id(message, subject, external_message_id),
+        external_thread_id=_email_thread_id(
+            message,
+            subject,
+            external_message_id,
+        ),
         source_id=folder,
         sender_name=sender_name,
         sender_address=sender_address,
@@ -284,7 +299,8 @@ def _sync_imap_sync(
         status, _ = client.select(folder, readonly=True)
         if status != "OK":
             raise CommunicationAdapterError(
-                "sync_failed", f"IMAP could not open {folder}."
+                "sync_failed",
+                f"IMAP could not open {folder}.",
             )
         if cursor_value and cursor_value.isdigit():
             criteria = f"UID {int(cursor_value) + 1}:*"
@@ -292,7 +308,10 @@ def _sync_imap_sync(
             criteria = "ALL"
         status, data = client.uid("search", None, criteria)
         if status != "OK":
-            raise CommunicationAdapterError("sync_failed", "IMAP search failed.")
+            raise CommunicationAdapterError(
+                "sync_failed",
+                "IMAP search failed.",
+            )
         raw_uids = data[0].split() if data and data[0] else []
         if not cursor_value:
             raw_uids = raw_uids[-limit:]
@@ -323,7 +342,12 @@ def _sync_imap_sync(
                 if isinstance(item, tuple) and isinstance(item[0], bytes)
             )
             messages.append(
-                _parse_imap_message(raw_message, uid=uid, folder=folder, flags=flags)
+                _parse_imap_message(
+                    raw_message,
+                    uid=uid,
+                    folder=folder,
+                    flags=flags,
+                )
             )
             last_uid = uid
         return SourceSync(
@@ -349,11 +373,15 @@ def _mark_imap_seen_sync(
         status, _ = client.select(folder, readonly=False)
         if status != "OK":
             raise CommunicationAdapterError(
-                "sync_failed", f"IMAP could not open {folder}."
+                "sync_failed",
+                f"IMAP could not open {folder}.",
             )
         status, _ = client.uid("store", uid, "+FLAGS", "(\\Seen)")
         if status != "OK":
-            raise CommunicationAdapterError("sync_failed", "IMAP could not mark the message read.")
+            raise CommunicationAdapterError(
+                "sync_failed",
+                "IMAP could not mark the message read.",
+            )
     finally:
         try:
             client.logout()
@@ -371,7 +399,8 @@ async def test_imap_account(
         raise
     except (OSError, imaplib.IMAP4.error) as error:
         raise CommunicationAdapterError(
-            "connection_failed", "The IMAP account could not be reached."
+            "connection_failed",
+            "The IMAP account could not be reached.",
         ) from error
 
 
@@ -381,12 +410,18 @@ async def sync_imap_account(
     cursor_value: str | None,
 ) -> SourceSync:
     try:
-        return await asyncio.to_thread(_sync_imap_sync, config, credentials, cursor_value)
+        return await asyncio.to_thread(
+            _sync_imap_sync,
+            config,
+            credentials,
+            cursor_value,
+        )
     except CommunicationAdapterError:
         raise
     except (OSError, imaplib.IMAP4.error) as error:
         raise CommunicationAdapterError(
-            "sync_failed", "The IMAP account could not be synchronized."
+            "sync_failed",
+            "The IMAP account could not be synchronized.",
         ) from error
 
 
@@ -396,19 +431,28 @@ async def mark_imap_seen(
     uid: str,
 ) -> None:
     try:
-        await asyncio.to_thread(_mark_imap_seen_sync, config, credentials, uid)
+        await asyncio.to_thread(
+            _mark_imap_seen_sync,
+            config,
+            credentials,
+            uid,
+        )
     except CommunicationAdapterError:
         raise
     except (OSError, imaplib.IMAP4.error) as error:
         raise CommunicationAdapterError(
-            "sync_failed", "The IMAP message could not be marked read."
+            "sync_failed",
+            "The IMAP message could not be marked read.",
         ) from error
 
 
 def _discord_headers(credentials: dict[str, str]) -> dict[str, str]:
     token = credentials.get("token")
     if not token:
-        raise CommunicationAdapterError("invalid_credentials", "Discord bot token is required.")
+        raise CommunicationAdapterError(
+            "invalid_credentials",
+            "Discord bot token is required.",
+        )
     return {
         "Authorization": f"Bot {token}",
         "Accept": "application/json",
@@ -417,7 +461,9 @@ def _discord_headers(credentials: dict[str, str]) -> dict[str, str]:
 
 
 def _discord_api_base(config: dict[str, object]) -> str:
-    return str(config.get("api_base_url", "https://discord.com/api/v10")).rstrip("/")
+    return str(
+        config.get("api_base_url", "https://discord.com/api/v10")
+    ).rstrip("/")
 
 
 def _discord_datetime(value: object) -> datetime:
@@ -439,19 +485,27 @@ async def test_discord_account(
     timeout_seconds: float,
 ) -> AccountTestResult:
     try:
-        async with httpx.AsyncClient(timeout=timeout_seconds, follow_redirects=True) as client:
+        async with httpx.AsyncClient(
+            timeout=timeout_seconds,
+            follow_redirects=True,
+        ) as client:
             response = await client.get(
                 f"{_discord_api_base(config)}/users/@me",
                 headers=_discord_headers(credentials),
             )
         if response.status_code >= 400:
             raise CommunicationAdapterError(
-                "connection_failed", f"Discord returned HTTP {response.status_code}."
+                "connection_failed",
+                f"Discord returned HTTP {response.status_code}.",
             )
         payload = response.json()
-        if not isinstance(payload, dict) or not isinstance(payload.get("id"), str):
+        if not isinstance(payload, dict) or not isinstance(
+            payload.get("id"),
+            str,
+        ):
             raise CommunicationAdapterError(
-                "invalid_response", "Discord returned an invalid bot identity."
+                "invalid_response",
+                "Discord returned an invalid bot identity.",
             )
         username = str(payload.get("username") or "Discord bot")
         return AccountTestResult(
@@ -466,7 +520,8 @@ async def test_discord_account(
         raise
     except (httpx.HTTPError, ValueError) as error:
         raise CommunicationAdapterError(
-            "connection_failed", "The Discord account could not be reached."
+            "connection_failed",
+            "The Discord account could not be reached.",
         ) from error
 
 
@@ -512,7 +567,10 @@ async def sync_discord_account(
     bot_id = str(identity.get("id") or "")
     results: list[SourceSync] = []
     try:
-        async with httpx.AsyncClient(timeout=timeout_seconds, follow_redirects=True) as client:
+        async with httpx.AsyncClient(
+            timeout=timeout_seconds,
+            follow_redirects=True,
+        ) as client:
             for channel_id in channel_ids:
                 source_key = f"discord:{channel_id}"
                 cursor = cursors.get(source_key)
@@ -527,12 +585,16 @@ async def sync_discord_account(
                 if response.status_code >= 400:
                     raise CommunicationAdapterError(
                         "sync_failed",
-                        f"Discord channel {channel_id} returned HTTP {response.status_code}.",
+                        (
+                            f"Discord channel {channel_id} returned "
+                            f"HTTP {response.status_code}."
+                        ),
                     )
                 payload = response.json()
                 if not isinstance(payload, list):
                     raise CommunicationAdapterError(
-                        "invalid_response", "Discord returned an invalid message list."
+                        "invalid_response",
+                        "Discord returned an invalid message list.",
                     )
                 ordered = sorted(
                     (item for item in payload if isinstance(item, dict)),
@@ -563,30 +625,46 @@ async def sync_discord_account(
                             if downloaded is not None:
                                 attachments.append(downloaded)
                     mentions = item.get("mentions")
-                    mention_ids = [
-                        str(mention.get("id"))
-                        for mention in mentions
-                        if isinstance(mention, dict) and mention.get("id") is not None
-                    ] if isinstance(mentions, list) else []
-                    recipients = [
-                        {
-                            "name": str(mention.get("username") or ""),
-                            "address": str(mention.get("id")),
-                        }
-                        for mention in mentions
-                        if isinstance(mention, dict) and mention.get("id") is not None
-                    ] if isinstance(mentions, list) else []
+                    mention_ids = (
+                        [
+                            str(mention.get("id"))
+                            for mention in mentions
+                            if isinstance(mention, dict)
+                            and mention.get("id") is not None
+                        ]
+                        if isinstance(mentions, list)
+                        else []
+                    )
+                    recipients = (
+                        [
+                            {
+                                "name": str(mention.get("username") or ""),
+                                "address": str(mention.get("id")),
+                            }
+                            for mention in mentions
+                            if isinstance(mention, dict)
+                            and mention.get("id") is not None
+                        ]
+                        if isinstance(mentions, list)
+                        else []
+                    )
                     reply_reference = item.get("message_reference")
                     thread_id = str(item.get("channel_id") or channel_id)
-                    title = str(label_map.get(channel_id) or f"Discord channel {channel_id}")
+                    title = str(
+                        label_map.get(channel_id)
+                        or f"Discord channel {channel_id}"
+                    )
+                    author_name = str(
+                        author.get("global_name")
+                        or author.get("username")
+                        or "Discord user"
+                    )
                     messages.append(
                         ReceivedMessage(
                             external_message_id=f"discord:{message_id}",
                             external_thread_id=f"discord:{thread_id}",
                             source_id=channel_id,
-                            sender_name=str(
-                                author.get("global_name") or author.get("username") or "Discord user"
-                            ),
+                            sender_name=author_name,
                             sender_address=author_id or None,
                             recipients=recipients,
                             subject=title,
@@ -597,10 +675,14 @@ async def sync_discord_account(
                                 "channel_id": channel_id,
                                 "guild_id": item.get("guild_id"),
                                 "author_is_bot": bool(author.get("bot")),
-                                "mentioned_bot": bool(bot_id and bot_id in mention_ids),
-                                "message_reference": reply_reference
-                                if isinstance(reply_reference, dict)
-                                else None,
+                                "mentioned_bot": bool(
+                                    bot_id and bot_id in mention_ids
+                                ),
+                                "message_reference": (
+                                    reply_reference
+                                    if isinstance(reply_reference, dict)
+                                    else None
+                                ),
                             },
                             sent_at=_discord_datetime(item.get("timestamp")),
                             is_read=False,
@@ -620,7 +702,8 @@ async def sync_discord_account(
         raise
     except (httpx.HTTPError, ValueError) as error:
         raise CommunicationAdapterError(
-            "sync_failed", "The Discord account could not be synchronized."
+            "sync_failed",
+            "The Discord account could not be synchronized.",
         ) from error
 
 
@@ -644,7 +727,10 @@ async def send_discord_reply(
             "fail_if_not_exists": False,
         }
     try:
-        async with httpx.AsyncClient(timeout=timeout_seconds, follow_redirects=True) as client:
+        async with httpx.AsyncClient(
+            timeout=timeout_seconds,
+            follow_redirects=True,
+        ) as client:
             response = await client.post(
                 f"{_discord_api_base(config)}/channels/{channel_id}/messages",
                 headers=_discord_headers(credentials),
@@ -652,12 +738,14 @@ async def send_discord_reply(
             )
         if response.status_code >= 400:
             raise CommunicationAdapterError(
-                "delivery_failed", f"Discord returned HTTP {response.status_code}."
+                "delivery_failed",
+                f"Discord returned HTTP {response.status_code}.",
             )
         body = response.json()
         if not isinstance(body, dict) or not isinstance(body.get("id"), str):
             raise CommunicationAdapterError(
-                "invalid_response", "Discord returned an invalid sent message."
+                "invalid_response",
+                "Discord returned an invalid sent message.",
             )
         return DiscordSendResult(
             external_message_id=f"discord:{body['id']}",
@@ -672,5 +760,6 @@ async def send_discord_reply(
         raise
     except (httpx.HTTPError, ValueError) as error:
         raise CommunicationAdapterError(
-            "delivery_failed", "The Discord reply could not be sent."
+            "delivery_failed",
+            "The Discord reply could not be sent.",
         ) from error
