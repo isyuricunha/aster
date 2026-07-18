@@ -8,7 +8,6 @@ import {
   deleteAutomation,
   listAutomationRuns,
   listAutomations,
-  listNotifications,
   rotateWebhookToken,
   runAutomation,
   updateAutomation,
@@ -17,24 +16,10 @@ import {
   type AutomationRun,
   type AutomationWrite,
   type IntegrationConnection,
-  type NotificationList,
   type TriggerType,
 } from "../../lib/automation-api";
-import { Icon } from "../ui/icons";
-import { AutomationHistory } from "./history-panel";
-import { IntegrationPanel } from "./integration-panel";
+import { ModelSelect } from "../settings/models/model-browser";
 import styles from "./automations.module.css";
-
-type Tab = "automations" | "runs" | "integrations" | "notifications";
-
-type DeliveryDraft = {
-  integrationId: string;
-  channel: "email" | "calendar" | "webhook";
-  recipients: string;
-  subject: string;
-  summary: string;
-  durationMinutes: number;
-};
 
 type AutomationDraft = {
   name: string;
@@ -44,50 +29,73 @@ type AutomationDraft = {
   triggerType: TriggerType;
   timezone: string;
   runAt: string;
-  intervalSeconds: number;
-  dailyTime: string;
-  weekday: number;
+  intervalSeconds: string;
+  clock: string;
+  weekday: string;
   modelId: string;
-  personaChoice: string;
+  personaId: string;
   notifyOnSuccess: boolean;
   notifyOnFailure: boolean;
-  maxAttempts: number;
-  retryDelaySeconds: number;
-  timeoutSeconds: number;
+  maxAttempts: string;
+  retryDelaySeconds: string;
+  timeoutSeconds: string;
   deliveries: DeliveryDraft[];
 };
 
-const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+type DeliveryDraft = {
+  integrationId: string;
+  channel: "email" | "calendar" | "webhook";
+  enabled: boolean;
+  recipients: string;
+  subject: string;
+  eventTitle: string;
+  durationMinutes: string;
+};
 
-function localDateTime(value: string | null): string {
-  if (!value) return "";
+const defaultDraft: AutomationDraft = {
+  name: "",
+  description: "",
+  instruction: "",
+  enabled: true,
+  triggerType: "daily",
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+  runAt: "",
+  intervalSeconds: "3600",
+  clock: "09:00",
+  weekday: "0",
+  modelId: "",
+  personaId: "",
+  notifyOnSuccess: true,
+  notifyOnFailure: true,
+  maxAttempts: "3",
+  retryDelaySeconds: "60",
+  timeoutSeconds: "300",
+  deliveries: [],
+};
+
+function toLocalInput(value: unknown): string {
+  if (typeof value !== "string") return "";
   const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return "";
   const offset = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+  return new Date(date.valueOf() - offset).toISOString().slice(0, 16);
 }
 
-function emptyDraft(): AutomationDraft {
-  const nextHour = new Date(Date.now() + 60 * 60 * 1000);
-  nextHour.setMinutes(0, 0, 0);
+function deliveryDraft(delivery: Automation["deliveries"][number]): DeliveryDraft {
   return {
-    name: "",
-    description: "",
-    instruction: "",
-    enabled: true,
-    triggerType: "daily",
-    timezone: "UTC",
-    runAt: localDateTime(nextHour.toISOString()),
-    intervalSeconds: 3600,
-    dailyTime: "08:00",
-    weekday: 0,
-    modelId: "",
-    personaChoice: "none",
-    notifyOnSuccess: true,
-    notifyOnFailure: true,
-    maxAttempts: 3,
-    retryDelaySeconds: 60,
-    timeoutSeconds: 300,
-    deliveries: [],
+    integrationId: delivery.integration_id,
+    channel: delivery.channel,
+    enabled: delivery.enabled,
+    recipients: Array.isArray(delivery.config.recipients)
+      ? delivery.config.recipients.join(", ")
+      : "",
+    subject: typeof delivery.config.subject === "string" ? delivery.config.subject : "",
+    eventTitle:
+      typeof delivery.config.event_title === "string" ? delivery.config.event_title : "",
+    durationMinutes:
+      typeof delivery.config.duration_minutes === "number"
+        ? String(delivery.config.duration_minutes)
+        : "60",
   };
 }
 
@@ -100,410 +108,629 @@ function draftFromAutomation(automation: Automation): AutomationDraft {
     enabled: automation.enabled,
     triggerType: automation.trigger_type,
     timezone: automation.timezone,
-    runAt: localDateTime(typeof schedule.run_at === "string" ? schedule.run_at : null),
+    runAt: toLocalInput(schedule.run_at),
     intervalSeconds:
-      typeof schedule.interval_seconds === "number" ? schedule.interval_seconds : 3600,
-    dailyTime: typeof schedule.time === "string" ? schedule.time : "08:00",
-    weekday: typeof schedule.weekday === "number" ? schedule.weekday : 0,
+      typeof schedule.interval_seconds === "number" ? String(schedule.interval_seconds) : "3600",
+    clock: typeof schedule.time === "string" ? schedule.time : "09:00",
+    weekday: typeof schedule.weekday === "number" ? String(schedule.weekday) : "0",
     modelId: automation.model_id ?? "",
-    personaChoice: automation.persona_id ?? (automation.persona_name ? "snapshot" : "none"),
+    personaId: automation.persona_id ?? "",
     notifyOnSuccess: automation.notify_on_success,
     notifyOnFailure: automation.notify_on_failure,
-    maxAttempts: automation.max_attempts,
-    retryDelaySeconds: automation.retry_delay_seconds,
-    timeoutSeconds: automation.timeout_seconds,
-    deliveries: automation.deliveries.map((delivery) => ({
-      integrationId: delivery.integration_id,
-      channel: delivery.channel,
-      recipients: Array.isArray(delivery.config.recipients)
-        ? delivery.config.recipients.join(", ")
-        : "",
-      subject: typeof delivery.config.subject === "string" ? delivery.config.subject : "",
-      summary: typeof delivery.config.summary === "string" ? delivery.config.summary : "",
-      durationMinutes:
-        typeof delivery.config.duration_minutes === "number"
-          ? delivery.config.duration_minutes
-          : 30,
-    })),
+    maxAttempts: String(automation.max_attempts),
+    retryDelaySeconds: String(automation.retry_delay_seconds),
+    timeoutSeconds: String(automation.timeout_seconds),
+    deliveries: automation.deliveries.map(deliveryDraft),
   };
 }
 
-function schedulePayload(draft: AutomationDraft): Record<string, unknown> {
+function schedulePayload(draft: AutomationDraft): Record<string, object> {
   if (draft.triggerType === "once") {
-    if (!draft.runAt) throw new Error("Choose when the one-time automation should run.");
     return { run_at: new Date(draft.runAt).toISOString() };
   }
   if (draft.triggerType === "interval") {
-    return { interval_seconds: draft.intervalSeconds };
+    return { interval_seconds: Number(draft.intervalSeconds) };
   }
-  if (draft.triggerType === "daily") return { time: draft.dailyTime };
+  if (draft.triggerType === "daily") {
+    return { time: draft.clock };
+  }
   if (draft.triggerType === "weekly") {
-    return { time: draft.dailyTime, weekday: draft.weekday };
+    return { time: draft.clock, weekday: Number(draft.weekday) };
   }
   return {};
 }
 
-function deliveryPayload(deliveries: DeliveryDraft[]): AutomationDeliveryWrite[] {
-  return deliveries.map((delivery) => {
-    let config: Record<string, unknown> = {};
-    if (delivery.channel === "email") {
-      config = {
-        recipients: delivery.recipients
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
-        subject: delivery.subject.trim() || undefined,
-      };
-    } else if (delivery.channel === "calendar") {
-      config = {
-        summary: delivery.summary.trim() || undefined,
-        duration_minutes: delivery.durationMinutes,
-      };
-    }
-    return {
-      integration_id: delivery.integrationId,
-      channel: delivery.channel,
-      enabled: true,
-      config,
-    };
-  });
-}
-
-function payloadFromDraft(draft: AutomationDraft): AutomationWrite {
-  const personaId =
-    draft.personaChoice !== "none" &&
-    draft.personaChoice !== "default" &&
-    draft.personaChoice !== "snapshot"
-      ? draft.personaChoice
-      : null;
+function deliveryPayload(delivery: DeliveryDraft): AutomationDeliveryWrite {
+  const config: Record<string, object> = {};
+  if (delivery.channel === "email") {
+    config.recipients = delivery.recipients
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    if (delivery.subject.trim()) config.subject = delivery.subject.trim();
+  }
+  if (delivery.channel === "calendar") {
+    config.event_title = delivery.eventTitle.trim();
+    config.duration_minutes = Number(delivery.durationMinutes);
+  }
   return {
-    name: draft.name.trim(),
-    description: draft.description.trim(),
-    instruction: draft.instruction.trim(),
-    enabled: draft.enabled,
-    trigger_type: draft.triggerType,
-    timezone: draft.timezone.trim(),
-    schedule: schedulePayload(draft),
-    model_id: draft.modelId || null,
-    persona_id: personaId,
-    use_default_persona: draft.personaChoice === "default",
-    notify_on_success: draft.notifyOnSuccess,
-    notify_on_failure: draft.notifyOnFailure,
-    max_attempts: draft.maxAttempts,
-    retry_delay_seconds: draft.retryDelaySeconds,
-    timeout_seconds: draft.timeoutSeconds,
-    deliveries: deliveryPayload(draft.deliveries),
+    integration_id: delivery.integrationId,
+    channel: delivery.channel,
+    enabled: delivery.enabled,
+    config,
   };
 }
 
-function integrationChannel(kind: IntegrationConnection["kind"]): DeliveryDraft["channel"] {
-  if (kind === "smtp") return "email";
-  if (kind === "caldav") return "calendar";
-  return "webhook";
+function automationPayload(draft: AutomationDraft): AutomationWrite {
+  return {
+    name: draft.name,
+    description: draft.description,
+    instruction: draft.instruction,
+    enabled: draft.enabled,
+    trigger_type: draft.triggerType,
+    timezone: draft.timezone,
+    schedule: schedulePayload(draft),
+    model_id: draft.modelId || null,
+    persona_id: draft.personaId || null,
+    use_default_persona: false,
+    notify_on_success: draft.notifyOnSuccess,
+    notify_on_failure: draft.notifyOnFailure,
+    max_attempts: Number(draft.maxAttempts),
+    retry_delay_seconds: Number(draft.retryDelaySeconds),
+    timeout_seconds: Number(draft.timeoutSeconds),
+    deliveries: draft.deliveries.map(deliveryPayload),
+  };
 }
 
 function formatDate(value: string | null): string {
-  return value ? new Date(value).toLocaleString() : "Not yet";
+  if (!value) return "Not scheduled";
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 export function AutomationWorkspace({
   initialAutomations,
   initialRuns,
-  initialIntegrations,
-  initialNotifications,
   models,
   personas,
-  initialError,
+  integrations,
 }: {
   initialAutomations: Automation[];
   initialRuns: AutomationRun[];
-  initialIntegrations: IntegrationConnection[];
-  initialNotifications: NotificationList;
   models: CachedModel[];
   personas: Persona[];
-  initialError: string | null;
+  integrations: IntegrationConnection[];
 }) {
-  const [tab, setTab] = useState<Tab>("automations");
   const [automations, setAutomations] = useState(initialAutomations);
   const [runs, setRuns] = useState(initialRuns);
-  const [integrations, setIntegrations] = useState(initialIntegrations);
-  const [notifications, setNotifications] = useState(initialNotifications);
   const [selectedId, setSelectedId] = useState<string | null>(initialAutomations[0]?.id ?? null);
-  const [creating, setCreating] = useState(initialAutomations.length === 0);
   const [draft, setDraft] = useState<AutomationDraft>(
-    initialAutomations[0] ? draftFromAutomation(initialAutomations[0]) : emptyDraft(),
+    initialAutomations[0] ? draftFromAutomation(initialAutomations[0]) : defaultDraft,
   );
-  const [webhookToken, setWebhookToken] = useState<string | null>(null);
-  const [working, setWorking] = useState(false);
-  const [error, setError] = useState<string | null>(initialError);
-  const selected = automations.find((automation) => automation.id === selectedId) ?? null;
+  const [creating, setCreating] = useState(initialAutomations.length === 0);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const selected = automations.find((item) => item.id === selectedId) ?? null;
 
-  const availableModels = useMemo(
+  const selectableModels = useMemo(
     () => models.filter((model) => model.is_available),
     [models],
   );
-  const enabledPersonas = useMemo(
-    () => personas.filter((persona) => persona.enabled),
-    [personas],
-  );
 
-  function chooseAutomation(automation: Automation) {
-    setSelectedId(automation.id);
+  function choose(item: Automation) {
+    setSelectedId(item.id);
+    setDraft(draftFromAutomation(item));
     setCreating(false);
-    setDraft(draftFromAutomation(automation));
-    setWebhookToken(null);
+    setNotice(null);
     setError(null);
   }
 
   function beginCreate() {
     setSelectedId(null);
+    setDraft(defaultDraft);
     setCreating(true);
-    setDraft(emptyDraft());
-    setWebhookToken(null);
+    setNotice(null);
     setError(null);
   }
 
-  async function refreshActivity() {
-    const [nextRuns, nextNotifications] = await Promise.all([
+  async function refresh(selectId?: string) {
+    const [nextAutomations, nextRuns] = await Promise.all([
+      listAutomations(),
       listAutomationRuns(),
-      listNotifications(),
     ]);
+    setAutomations(nextAutomations);
     setRuns(nextRuns);
-    setNotifications(nextNotifications);
+    const target = nextAutomations.find((item) => item.id === selectId);
+    if (target) choose(target);
   }
 
-  async function saveAutomation(event: FormEvent<HTMLFormElement>) {
+  async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (working) return;
-    setWorking(true);
+    setBusy("save");
+    setNotice(null);
     setError(null);
     try {
-      const payload = payloadFromDraft(draft);
-      if (!payload.name || !payload.instruction) {
-        throw new Error("Name and instruction are required.");
-      }
+      const payload = automationPayload(draft);
       const saved = creating
         ? await createAutomation(payload)
         : await updateAutomation(selectedId as string, payload);
-      setWebhookToken(saved.webhook_token);
-      setCreating(false);
-      setSelectedId(saved.id);
-      setDraft(draftFromAutomation(saved));
-      setAutomations(await listAutomations());
+      await refresh(saved.id);
+      setNotice(creating ? "Automation created." : "Automation updated.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not save the automation.");
+      setError(caught instanceof Error ? caught.message : "The automation could not be saved.");
     } finally {
-      setWorking(false);
+      setBusy(null);
     }
   }
 
-  async function removeAutomation() {
-    if (!selected || !window.confirm(`Delete ${selected.name} and its run history?`)) return;
-    setWorking(true);
+  async function action(name: "run" | "delete" | "rotate") {
+    if (!selected || busy) return;
+    if (name === "delete" && !window.confirm(`Delete ${selected.name} and its complete run history?`)) {
+      return;
+    }
+    setBusy(name);
+    setNotice(null);
     setError(null);
     try {
-      await deleteAutomation(selected.id);
-      const next = await listAutomations();
-      setAutomations(next);
-      if (next[0]) chooseAutomation(next[0]);
-      else beginCreate();
-      await refreshActivity();
+      if (name === "run") {
+        await runAutomation(selected.id);
+        setNotice("Run queued.");
+      } else if (name === "rotate") {
+        const rotated = await rotateWebhookToken(selected.id);
+        await refresh(rotated.id);
+        setNotice(
+          rotated.webhook_token
+            ? `New webhook token: ${rotated.webhook_token}`
+            : "Webhook token rotated.",
+        );
+      } else {
+        await deleteAutomation(selected.id);
+        const next = await listAutomations();
+        setAutomations(next);
+        setRuns(await listAutomationRuns());
+        if (next[0]) choose(next[0]);
+        else beginCreate();
+        setNotice("Automation deleted.");
+      }
+      if (name !== "delete") await refresh(selected.id);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not delete the automation.");
+      setError(caught instanceof Error ? caught.message : `The ${name} action failed.`);
     } finally {
-      setWorking(false);
+      setBusy(null);
     }
   }
 
-  async function runNow() {
-    if (!selected || working) return;
-    setWorking(true);
-    setError(null);
-    try {
-      await runAutomation(selected.id);
-      await refreshActivity();
-      setTab("runs");
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not queue the automation.");
-    } finally {
-      setWorking(false);
+  function addDelivery() {
+    const first = integrations.find((item) => item.enabled);
+    if (!first) {
+      setError("Add and enable an integration before adding a delivery.");
+      return;
     }
-  }
-
-  async function rotateToken() {
-    if (!selected || working) return;
-    setWorking(true);
-    setError(null);
-    try {
-      const updated = await rotateWebhookToken(selected.id);
-      setWebhookToken(updated.webhook_token);
-      setAutomations((current) =>
-        current.map((automation) => (automation.id === updated.id ? updated : automation)),
-      );
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not rotate the webhook token.");
-    } finally {
-      setWorking(false);
-    }
-  }
-
-  function addDelivery(integrationId: string) {
-    const integration = integrations.find((item) => item.id === integrationId);
-    if (!integration) return;
-    setDraft((current) => ({
-      ...current,
+    const channel = first.kind === "smtp" ? "email" : first.kind === "caldav" ? "calendar" : "webhook";
+    setDraft({
+      ...draft,
       deliveries: [
-        ...current.deliveries,
+        ...draft.deliveries,
         {
-          integrationId: integration.id,
-          channel: integrationChannel(integration.kind),
+          integrationId: first.id,
+          channel,
+          enabled: true,
           recipients: "",
           subject: "",
-          summary: "",
-          durationMinutes: 30,
+          eventTitle: "",
+          durationMinutes: "60",
         },
       ],
-    }));
+    });
+  }
+
+  function updateDelivery(index: number, values: Partial<DeliveryDraft>) {
+    setDraft({
+      ...draft,
+      deliveries: draft.deliveries.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...values } : item,
+      ),
+    });
+  }
+
+  function changeDeliveryIntegration(index: number, integrationId: string) {
+    const integration = integrations.find((item) => item.id === integrationId);
+    if (!integration) return;
+    const channel = integration.kind === "smtp" ? "email" : integration.kind === "caldav" ? "calendar" : "webhook";
+    updateDelivery(index, { integrationId, channel });
   }
 
   return (
     <div className={styles.workspace}>
-      {error ? <div className={styles.error}>{error}</div> : null}
-      <nav className={styles.tabs} aria-label="Automation sections">
-        <button className={tab === "automations" ? styles.activeTab : ""} onClick={() => setTab("automations")} type="button">
-          Automations <span>{automations.length}</span>
+      <aside className={styles.automationList}>
+        <button className={styles.newButton} onClick={beginCreate} type="button">
+          New automation
         </button>
-        <button className={tab === "runs" ? styles.activeTab : ""} onClick={() => setTab("runs")} type="button">
-          Runs <span>{runs.length}</span>
-        </button>
-        <button className={tab === "integrations" ? styles.activeTab : ""} onClick={() => setTab("integrations")} type="button">
-          Integrations <span>{integrations.length}</span>
-        </button>
-        <button className={tab === "notifications" ? styles.activeTab : ""} onClick={() => setTab("notifications")} type="button">
-          Notifications <span>{notifications.unread_count}</span>
-        </button>
-      </nav>
+        {automations.map((automation) => (
+          <button
+            className={selectedId === automation.id && !creating ? styles.selectedAutomation : ""}
+            key={automation.id}
+            onClick={() => choose(automation)}
+            type="button"
+          >
+            <span className={automation.enabled ? styles.enabledDot : styles.disabledDot} />
+            <div>
+              <strong>{automation.name}</strong>
+              <span>
+                {automation.trigger_type} · {formatDate(automation.next_run_at)}
+              </span>
+            </div>
+          </button>
+        ))}
+      </aside>
 
-      {tab === "automations" ? (
-        <div className={styles.editorLayout}>
-          <aside className={styles.automationList}>
-            <button className={styles.newButton} onClick={beginCreate} type="button">
-              <Icon name="new-chat" size={14} /> New automation
+      <form className={styles.editor} onSubmit={(event) => void save(event)}>
+        <header className={styles.editorHeader}>
+          <div>
+            <p>{creating ? "New automation" : "Automation editor"}</p>
+            <h2>{draft.name || "Untitled automation"}</h2>
+            <span>Scheduled model output with explicit, auditable delivery.</span>
+          </div>
+          <div className={styles.headerActions}>
+            {!creating ? (
+              <>
+                <button disabled={Boolean(busy)} onClick={() => void action("run")} type="button">
+                  Run now
+                </button>
+                {selected?.trigger_type === "webhook" ? (
+                  <button disabled={Boolean(busy)} onClick={() => void action("rotate")} type="button">
+                    Rotate token
+                  </button>
+                ) : null}
+                <button disabled={Boolean(busy)} onClick={() => void action("delete")} type="button">
+                  Delete
+                </button>
+              </>
+            ) : null}
+            <button className={styles.primaryButton} disabled={Boolean(busy)} type="submit">
+              {busy === "save" ? "Saving…" : "Save"}
             </button>
-            {automations.map((automation) => (
-              <button
-                className={selectedId === automation.id && !creating ? styles.selectedAutomation : ""}
-                key={automation.id}
-                onClick={() => chooseAutomation(automation)}
-                type="button"
+          </div>
+        </header>
+
+        {notice ? <div className={styles.notice}>{notice}</div> : null}
+        {error ? <div className={styles.error}>{error}</div> : null}
+
+        <section className={styles.formSection}>
+          <div className={styles.gridTwo}>
+            <label>
+              Name
+              <input
+                maxLength={160}
+                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                value={draft.name}
+              />
+            </label>
+            <label className={styles.checkLabel}>
+              <input
+                checked={draft.enabled}
+                onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })}
+                type="checkbox"
+              />
+              Enabled
+            </label>
+            <label className={styles.formSpanTwo}>
+              Description
+              <input
+                maxLength={500}
+                onChange={(event) => setDraft({ ...draft, description: event.target.value })}
+                value={draft.description}
+              />
+            </label>
+            <label className={styles.formSpanTwo}>
+              Instruction
+              <textarea
+                onChange={(event) => setDraft({ ...draft, instruction: event.target.value })}
+                rows={7}
+                value={draft.instruction}
+              />
+            </label>
+          </div>
+        </section>
+
+        <section className={styles.formSection}>
+          <div className={styles.sectionTitle}>
+            <p>Trigger</p>
+            <h3>When should it run?</h3>
+          </div>
+          <div className={styles.gridThree}>
+            <label>
+              Trigger type
+              <select
+                onChange={(event) =>
+                  setDraft({ ...draft, triggerType: event.target.value as TriggerType })
+                }
+                value={draft.triggerType}
               >
-                <span className={automation.enabled ? styles.enabledDot : styles.disabledDot} />
-                <div>
-                  <strong>{automation.name}</strong>
-                  <span>{automation.trigger_type} · {formatDate(automation.next_run_at)}</span>
+                <option value="once">One time</option>
+                <option value="interval">Fixed interval</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="webhook">Inbound webhook</option>
+                <option value="communication">Communication message</option>
+              </select>
+            </label>
+            <label>
+              Timezone
+              <input
+                onChange={(event) => setDraft({ ...draft, timezone: event.target.value })}
+                placeholder="America/Sao_Paulo"
+                value={draft.timezone}
+              />
+            </label>
+            {draft.triggerType === "once" ? (
+              <label>
+                Run at
+                <input
+                  onChange={(event) => setDraft({ ...draft, runAt: event.target.value })}
+                  required
+                  type="datetime-local"
+                  value={draft.runAt}
+                />
+              </label>
+            ) : null}
+            {draft.triggerType === "interval" ? (
+              <label>
+                Interval seconds
+                <input
+                  min={60}
+                  onChange={(event) =>
+                    setDraft({ ...draft, intervalSeconds: event.target.value })
+                  }
+                  type="number"
+                  value={draft.intervalSeconds}
+                />
+              </label>
+            ) : null}
+            {draft.triggerType === "daily" || draft.triggerType === "weekly" ? (
+              <label>
+                Local time
+                <input
+                  onChange={(event) => setDraft({ ...draft, clock: event.target.value })}
+                  type="time"
+                  value={draft.clock}
+                />
+              </label>
+            ) : null}
+            {draft.triggerType === "weekly" ? (
+              <label>
+                Weekday
+                <select
+                  onChange={(event) => setDraft({ ...draft, weekday: event.target.value })}
+                  value={draft.weekday}
+                >
+                  <option value="0">Monday</option>
+                  <option value="1">Tuesday</option>
+                  <option value="2">Wednesday</option>
+                  <option value="3">Thursday</option>
+                  <option value="4">Friday</option>
+                  <option value="5">Saturday</option>
+                  <option value="6">Sunday</option>
+                </select>
+              </label>
+            ) : null}
+          </div>
+          {draft.triggerType === "webhook" && selected?.webhook_path ? (
+            <div className={styles.webhookCard}>
+              <code>{selected.webhook_path}</code>
+              <span>
+                Send the secret in <code>X-Aster-Webhook-Token</code>. It is shown only after creation
+                or rotation.
+              </span>
+            </div>
+          ) : null}
+          {draft.triggerType === "communication" ? (
+            <div className={styles.webhookCard}>
+              <span>
+                Add an allowlist rule in Communications after saving. Receiving a message alone does
+                not queue this automation.
+              </span>
+            </div>
+          ) : null}
+        </section>
+
+        <section className={styles.formSection}>
+          <div className={styles.sectionTitle}>
+            <p>Execution</p>
+            <h3>Model, persona, and bounds</h3>
+          </div>
+          <div className={styles.gridThree}>
+            <ModelSelect
+              label="Model"
+              emptyLabel="Use Primary and fallbacks"
+              models={selectableModels}
+              onChange={(value) => setDraft({ ...draft, modelId: value })}
+              value={draft.modelId}
+            />
+            <label>
+              Persona
+              <select
+                onChange={(event) => setDraft({ ...draft, personaId: event.target.value })}
+                value={draft.personaId}
+              >
+                <option value="">No persona</option>
+                {personas.filter((persona) => persona.enabled).map((persona) => (
+                  <option key={persona.id} value={persona.id}>
+                    {persona.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Timeout seconds
+              <input
+                min={10}
+                onChange={(event) => setDraft({ ...draft, timeoutSeconds: event.target.value })}
+                type="number"
+                value={draft.timeoutSeconds}
+              />
+            </label>
+            <label>
+              Maximum attempts
+              <input
+                max={10}
+                min={1}
+                onChange={(event) => setDraft({ ...draft, maxAttempts: event.target.value })}
+                type="number"
+                value={draft.maxAttempts}
+              />
+            </label>
+            <label>
+              Retry delay seconds
+              <input
+                min={0}
+                onChange={(event) => setDraft({ ...draft, retryDelaySeconds: event.target.value })}
+                type="number"
+                value={draft.retryDelaySeconds}
+              />
+            </label>
+            <label className={styles.checkLabel}>
+              <input
+                checked={draft.notifyOnSuccess}
+                onChange={(event) =>
+                  setDraft({ ...draft, notifyOnSuccess: event.target.checked })
+                }
+                type="checkbox"
+              />
+              Notify on success
+            </label>
+            <label className={styles.checkLabel}>
+              <input
+                checked={draft.notifyOnFailure}
+                onChange={(event) =>
+                  setDraft({ ...draft, notifyOnFailure: event.target.checked })
+                }
+                type="checkbox"
+              />
+              Notify on failure
+            </label>
+          </div>
+        </section>
+
+        <section className={styles.formSection}>
+          <div className={styles.sectionTitleRow}>
+            <div className={styles.sectionTitle}>
+              <p>Delivery</p>
+              <h3>External side effects</h3>
+            </div>
+            <button onClick={addDelivery} type="button">
+              Add delivery
+            </button>
+          </div>
+          {draft.deliveries.length === 0 ? (
+            <div className={styles.emptyDelivery}>
+              The result stays in private run history unless a delivery is added.
+            </div>
+          ) : (
+            <div className={styles.deliveryList}>
+              {draft.deliveries.map((delivery, index) => (
+                <div className={styles.deliveryCard} key={`${delivery.integrationId}-${index}`}>
+                  <label>
+                    Integration
+                    <select
+                      onChange={(event) => changeDeliveryIntegration(index, event.target.value)}
+                      value={delivery.integrationId}
+                    >
+                      {integrations.filter((item) => item.enabled).map((integration) => (
+                        <option key={integration.id} value={integration.id}>
+                          {integration.name} · {integration.kind}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {delivery.channel === "email" ? (
+                    <>
+                      <label>
+                        Recipients
+                        <input
+                          onChange={(event) =>
+                            updateDelivery(index, { recipients: event.target.value })
+                          }
+                          placeholder="one@example.com, two@example.com"
+                          value={delivery.recipients}
+                        />
+                      </label>
+                      <label>
+                        Subject
+                        <input
+                          onChange={(event) =>
+                            updateDelivery(index, { subject: event.target.value })
+                          }
+                          placeholder="Automation completed"
+                          value={delivery.subject}
+                        />
+                      </label>
+                    </>
+                  ) : null}
+                  {delivery.channel === "calendar" ? (
+                    <>
+                      <label>
+                        Event title
+                        <input
+                          onChange={(event) =>
+                            updateDelivery(index, { eventTitle: event.target.value })
+                          }
+                          value={delivery.eventTitle}
+                        />
+                      </label>
+                      <label>
+                        Duration minutes
+                        <input
+                          min={5}
+                          onChange={(event) =>
+                            updateDelivery(index, { durationMinutes: event.target.value })
+                          }
+                          type="number"
+                          value={delivery.durationMinutes}
+                        />
+                      </label>
+                    </>
+                  ) : null}
+                  <button
+                    onClick={() =>
+                      setDraft({
+                        ...draft,
+                        deliveries: draft.deliveries.filter((_, itemIndex) => itemIndex !== index),
+                      })
+                    }
+                    type="button"
+                  >
+                    Remove
+                  </button>
                 </div>
-              </button>
-            ))}
-          </aside>
+              ))}
+            </div>
+          )}
+        </section>
 
-          <form className={styles.editor} onSubmit={(event) => void saveAutomation(event)}>
-            <header className={styles.editorHeader}>
-              <div>
-                <p>{creating ? "New automation" : "Automation settings"}</p>
-                <h2>{draft.name || "Untitled automation"}</h2>
-                <span>Every run is persisted before its result is delivered.</span>
-              </div>
-              <div className={styles.headerActions}>
-                {!creating ? <button disabled={working} onClick={() => void runNow()} type="button"><Icon name="arrow-up" size={13} /> Run now</button> : null}
-                {!creating ? <button disabled={working} onClick={() => void removeAutomation()} type="button"><Icon name="trash" size={13} /> Delete</button> : null}
-                <button className={styles.primary} disabled={working} type="submit">{working ? "Saving…" : "Save"}</button>
-              </div>
-            </header>
-
-            <section className={styles.formSection}>
-              <div className={styles.sectionTitle}><p>Definition</p><h3>What should happen?</h3></div>
-              <div className={styles.gridTwo}>
-                <label>Name<input maxLength={160} onChange={(event) => setDraft({ ...draft, name: event.target.value })} value={draft.name} /></label>
-                <label>Description<input maxLength={500} onChange={(event) => setDraft({ ...draft, description: event.target.value })} value={draft.description} /></label>
-              </div>
-              <label>Instruction<textarea onChange={(event) => setDraft({ ...draft, instruction: event.target.value })} rows={7} value={draft.instruction} /></label>
-              <label className={styles.check}><input checked={draft.enabled} onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })} type="checkbox" /> Enabled and allowed to enqueue new runs</label>
-            </section>
-
-            <section className={styles.formSection}>
-              <div className={styles.sectionTitle}><p>Schedule</p><h3>When should it run?</h3></div>
-              <div className={styles.gridThree}>
-                <label>Trigger<select onChange={(event) => setDraft({ ...draft, triggerType: event.target.value as TriggerType })} value={draft.triggerType}><option value="once">One time</option><option value="interval">Fixed interval</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="webhook">Inbound webhook</option></select></label>
-                <label>Timezone<input onChange={(event) => setDraft({ ...draft, timezone: event.target.value })} placeholder="America/Sao_Paulo" value={draft.timezone} /></label>
-                {draft.triggerType === "once" ? <label>Run at<input onChange={(event) => setDraft({ ...draft, runAt: event.target.value })} type="datetime-local" value={draft.runAt} /></label> : null}
-                {draft.triggerType === "interval" ? <label>Every seconds<input min={60} onChange={(event) => setDraft({ ...draft, intervalSeconds: Number(event.target.value) })} type="number" value={draft.intervalSeconds} /></label> : null}
-                {draft.triggerType === "daily" || draft.triggerType === "weekly" ? <label>Local time<input onChange={(event) => setDraft({ ...draft, dailyTime: event.target.value })} type="time" value={draft.dailyTime} /></label> : null}
-                {draft.triggerType === "weekly" ? <label>Weekday<select onChange={(event) => setDraft({ ...draft, weekday: Number(event.target.value) })} value={draft.weekday}>{weekdays.map((day, index) => <option key={day} value={index}>{day}</option>)}</select></label> : null}
-              </div>
-              {draft.triggerType === "webhook" && selected?.webhook_configured ? (
-                <div className={styles.secretBox}>
-                  <div><strong>Inbound webhook configured</strong><span>The secret token is shown only when created or rotated.</span></div>
-                  <button disabled={working} onClick={() => void rotateToken()} type="button">Rotate token</button>
-                </div>
-              ) : null}
-              {webhookToken && selectedId ? (
-                <div className={styles.tokenBox}>
-                  <strong>Copy these webhook credentials now</strong>
-                  <span>Endpoint</span>
-                  <code>{`${window.location.origin}/api/webhooks/${selectedId}`}</code>
-                  <span>Request header</span>
-                  <code>{`X-Aster-Webhook-Token: ${webhookToken}`}</code>
-                </div>
-              ) : null}
-            </section>
-
-            <section className={styles.formSection}>
-              <div className={styles.sectionTitle}><p>Context</p><h3>Which identity and model?</h3></div>
-              <div className={styles.gridTwo}>
-                <label>Model<select onChange={(event) => setDraft({ ...draft, modelId: event.target.value })} value={draft.modelId}><option value="">Primary with fallback chain</option>{availableModels.map((model) => <option key={model.id} value={model.id}>{model.endpoint_name} / {model.model_id}</option>)}</select></label>
-                <label>Persona<select onChange={(event) => setDraft({ ...draft, personaChoice: event.target.value })} value={draft.personaChoice}><option value="none">No persona</option><option value="default">Current default persona</option>{draft.personaChoice === "snapshot" ? <option value="snapshot">Saved persona snapshot</option> : null}{enabledPersonas.map((persona) => <option key={persona.id} value={persona.id}>{persona.name}</option>)}</select></label>
-              </div>
-              <p className={styles.help}>Persona instructions are frozen into the automation when you save it. Model credentials never enter the prompt.</p>
-            </section>
-
-            <section className={styles.formSection}>
-              <div className={styles.sectionTitle}><p>Delivery</p><h3>Where should the result go?</h3></div>
-              <div className={styles.deliveryToolbar}>
-                <select defaultValue="" onChange={(event) => { addDelivery(event.target.value); event.target.value = ""; }}><option value="" disabled>Add an integration…</option>{integrations.filter((item) => item.enabled).map((integration) => <option key={integration.id} value={integration.id}>{integration.name} · {integration.kind}</option>)}</select>
-                <button onClick={() => setTab("integrations")} type="button">Manage integrations</button>
-              </div>
-              {draft.deliveries.length === 0 ? <div className={styles.emptyInline}>No external delivery. The result remains in run history and notifications.</div> : null}
-              <div className={styles.deliveryList}>
-                {draft.deliveries.map((delivery, index) => {
-                  const integration = integrations.find((item) => item.id === delivery.integrationId);
-                  return (
-                    <article key={`${delivery.integrationId}-${index}`}>
-                      <header><div><strong>{integration?.name ?? "Missing integration"}</strong><span>{delivery.channel}</span></div><button onClick={() => setDraft({ ...draft, deliveries: draft.deliveries.filter((_, itemIndex) => itemIndex !== index) })} type="button"><Icon name="close" size={12} /></button></header>
-                      {delivery.channel === "email" ? <div className={styles.gridTwo}><label>Recipients<input onChange={(event) => setDraft({ ...draft, deliveries: draft.deliveries.map((item, itemIndex) => itemIndex === index ? { ...item, recipients: event.target.value } : item) })} placeholder="one@example.com, two@example.com" value={delivery.recipients} /></label><label>Subject<input onChange={(event) => setDraft({ ...draft, deliveries: draft.deliveries.map((item, itemIndex) => itemIndex === index ? { ...item, subject: event.target.value } : item) })} value={delivery.subject} /></label></div> : null}
-                      {delivery.channel === "calendar" ? <div className={styles.gridTwo}><label>Event title<input onChange={(event) => setDraft({ ...draft, deliveries: draft.deliveries.map((item, itemIndex) => itemIndex === index ? { ...item, summary: event.target.value } : item) })} value={delivery.summary} /></label><label>Duration minutes<input min={5} onChange={(event) => setDraft({ ...draft, deliveries: draft.deliveries.map((item, itemIndex) => itemIndex === index ? { ...item, durationMinutes: Number(event.target.value) } : item) })} type="number" value={delivery.durationMinutes} /></label></div> : null}
-                      {delivery.channel === "webhook" ? <p>The completed run is posted as structured JSON.</p> : null}
-                    </article>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section className={styles.formSection}>
-              <div className={styles.sectionTitle}><p>Reliability</p><h3>Limits, retries, and notifications</h3></div>
-              <div className={styles.gridThree}>
-                <label>Max attempts<input max={10} min={1} onChange={(event) => setDraft({ ...draft, maxAttempts: Number(event.target.value) })} type="number" value={draft.maxAttempts} /></label>
-                <label>Retry delay seconds<input min={0} onChange={(event) => setDraft({ ...draft, retryDelaySeconds: Number(event.target.value) })} type="number" value={draft.retryDelaySeconds} /></label>
-                <label>Timeout seconds<input max={3600} min={10} onChange={(event) => setDraft({ ...draft, timeoutSeconds: Number(event.target.value) })} type="number" value={draft.timeoutSeconds} /></label>
-              </div>
-              <div className={styles.checkRow}><label className={styles.check}><input checked={draft.notifyOnSuccess} onChange={(event) => setDraft({ ...draft, notifyOnSuccess: event.target.checked })} type="checkbox" /> Notify on success</label><label className={styles.check}><input checked={draft.notifyOnFailure} onChange={(event) => setDraft({ ...draft, notifyOnFailure: event.target.checked })} type="checkbox" /> Notify on failure</label></div>
-            </section>
-          </form>
-        </div>
-      ) : null}
-
-      {tab === "runs" ? <AutomationHistory runs={runs} onRunsChange={setRuns} /> : null}
-      {tab === "integrations" ? <IntegrationPanel integrations={integrations} onChange={setIntegrations} /> : null}
-      {tab === "notifications" ? <AutomationHistory notifications={notifications} onNotificationsChange={setNotifications} /> : null}
+        {!creating && selected ? (
+          <section className={styles.runSection}>
+            <div className={styles.sectionTitle}>
+              <p>Recent history</p>
+              <h3>Runs for this automation</h3>
+            </div>
+            <div className={styles.runList}>
+              {runs.filter((run) => run.automation_id === selected.id).slice(0, 8).map((run) => (
+                <article key={run.id}>
+                  <div>
+                    <strong>{run.status}</strong>
+                    <span>{formatDate(run.created_at)}</span>
+                  </div>
+                  <p>{run.response || run.error_message || "No output yet."}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+      </form>
     </div>
   );
 }
