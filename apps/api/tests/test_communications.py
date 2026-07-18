@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from uuid import UUID
 
 from sqlalchemy import select
 
@@ -192,7 +193,8 @@ async def test_thread_can_be_marked_read(api_client: tuple) -> None:
     )
 
     async with session_factory() as session:
-        account_row = await session.get(CommunicationAccount, account["id"])
+        account_row = await session.get(CommunicationAccount, UUID(account["id"]))
+        assert account_row is not None
         thread = CommunicationThread(
             account_id=account_row.id,
             kind="discord",
