@@ -46,6 +46,14 @@ print(json.dumps({
     "communication_message_max_characters": settings.aster_communication_message_max_characters,
     "communication_attachment_max_bytes": settings.aster_communication_attachment_max_bytes,
     "communication_max_attachments": settings.aster_communication_max_attachments,
+    "agent_lease_seconds": settings.aster_agent_lease_seconds,
+    "agent_heartbeat_seconds": settings.aster_agent_heartbeat_seconds,
+    "agent_scheduler_batch_size": settings.aster_agent_scheduler_batch_size,
+    "agent_dispatch_batch_size": settings.aster_agent_dispatch_batch_size,
+    "agent_output_max_characters": settings.aster_agent_output_max_characters,
+    "agent_history_max_characters": settings.aster_agent_history_max_characters,
+    "agent_retrieval_max_characters": settings.aster_agent_retrieval_max_characters,
+    "agent_loop_repeat_limit": settings.aster_agent_loop_repeat_limit,
 }))
 PY
 )"
@@ -89,5 +97,13 @@ printf '%s' "${runtime_json}" | grep --quiet '"communication_lease_seconds": 180
 printf '%s' "${runtime_json}" | grep --quiet '"communication_message_max_characters": 200000'
 printf '%s' "${runtime_json}" | grep --quiet '"communication_attachment_max_bytes": 15000000'
 printf '%s' "${runtime_json}" | grep --quiet '"communication_max_attachments": 16'
+printf '%s' "${runtime_json}" | grep --quiet '"agent_lease_seconds": 180'
+printf '%s' "${runtime_json}" | grep --quiet '"agent_heartbeat_seconds": 45'
+printf '%s' "${runtime_json}" | grep --quiet '"agent_scheduler_batch_size": 25'
+printf '%s' "${runtime_json}" | grep --quiet '"agent_dispatch_batch_size": 100'
+printf '%s' "${runtime_json}" | grep --quiet '"agent_output_max_characters": 100000'
+printf '%s' "${runtime_json}" | grep --quiet '"agent_history_max_characters": 50000'
+printf '%s' "${runtime_json}" | grep --quiet '"agent_retrieval_max_characters": 24000'
+printf '%s' "${runtime_json}" | grep --quiet '"agent_loop_repeat_limit": 3'
 
 docker compose exec -T worker test -f /tmp/aster-worker-ready
