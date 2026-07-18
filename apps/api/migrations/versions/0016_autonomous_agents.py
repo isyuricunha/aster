@@ -249,7 +249,8 @@ def upgrade() -> None:
             name="ck_agent_runs_trigger_source",
         ),
         sa.CheckConstraint(
-            "status IN ('queued', 'running', 'waiting_approval', 'paused', 'completed', 'failed', 'cancelled')",
+            "status IN ('queued', 'running', 'waiting_approval', 'paused', "
+            "'completed', 'failed', 'cancelled')",
             name="ck_agent_runs_status",
         ),
         sa.CheckConstraint("steps_used >= 0", name="ck_agent_runs_steps_used"),

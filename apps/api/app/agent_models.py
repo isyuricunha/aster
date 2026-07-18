@@ -221,7 +221,8 @@ class AgentRun(TimestampMixin, Base):
             name="ck_agent_runs_trigger_source",
         ),
         CheckConstraint(
-            "status IN ('queued', 'running', 'waiting_approval', 'paused', 'completed', 'failed', 'cancelled')",
+            "status IN ('queued', 'running', 'waiting_approval', 'paused', "
+            "'completed', 'failed', 'cancelled')",
             name="ck_agent_runs_status",
         ),
         CheckConstraint("steps_used >= 0", name="ck_agent_runs_steps_used"),
