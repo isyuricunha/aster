@@ -78,6 +78,20 @@ class Settings(BaseSettings):
         default=15_000_000, ge=10_000, le=200_000_000
     )
     aster_communication_max_attachments: int = Field(default=16, ge=0, le=100)
+    aster_agent_lease_seconds: int = Field(default=180, ge=30, le=3_600)
+    aster_agent_heartbeat_seconds: int = Field(default=45, ge=5, le=1_200)
+    aster_agent_scheduler_batch_size: int = Field(default=25, ge=1, le=500)
+    aster_agent_dispatch_batch_size: int = Field(default=100, ge=1, le=2_000)
+    aster_agent_output_max_characters: int = Field(
+        default=100_000, ge=1_000, le=1_000_000
+    )
+    aster_agent_history_max_characters: int = Field(
+        default=50_000, ge=2_000, le=500_000
+    )
+    aster_agent_retrieval_max_characters: int = Field(
+        default=24_000, ge=2_000, le=200_000
+    )
+    aster_agent_loop_repeat_limit: int = Field(default=3, ge=1, le=20)
 
     @field_validator("aster_encryption_key")
     @classmethod
@@ -113,6 +127,11 @@ class Settings(BaseSettings):
             raise ValueError(
                 "ASTER_AUTOMATION_HEARTBEAT_SECONDS must be less than half of "
                 "ASTER_AUTOMATION_LEASE_SECONDS"
+            )
+        if self.aster_agent_heartbeat_seconds * 2 >= self.aster_agent_lease_seconds:
+            raise ValueError(
+                "ASTER_AGENT_HEARTBEAT_SECONDS must be less than half of "
+                "ASTER_AGENT_LEASE_SECONDS"
             )
         return self
 
