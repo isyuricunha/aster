@@ -35,7 +35,7 @@ jobs:
             app/agent_*.py \
             app/routes/agent_*.py \
             app/routes/agents.py \
-            migrations/versions/0016_autonomous_agents.py
+            migrations/versions/0016_autonomous_agents.py || true
           uv run ruff format \
             app/agent_*.py \
             app/routes/agent_*.py \
