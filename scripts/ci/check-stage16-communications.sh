@@ -127,4 +127,5 @@ curl -fsS -b "${cookie_jar}" "${web_url}/communications" \
 
 docker compose exec -T api alembic current | grep --quiet '0015_communication_hub'
 docker compose config | grep --quiet 'ASTER_COMMUNICATION_LEASE_SECONDS'
-docker compose config | grep --quiet 'aster-media:/var/lib/aster/media'
+docker compose config | grep --quiet 'source: aster-media'
+docker compose config | grep --quiet 'target: /var/lib/aster/media'
