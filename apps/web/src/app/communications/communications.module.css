@@ -1,0 +1,609 @@
+.workspace {
+  display: grid;
+  gap: 18px;
+}
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-raised);
+}
+
+.tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tabs button span {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text-secondary);
+  font-size: 11px;
+  text-align: center;
+}
+
+.tabs .activeTab {
+  background: var(--surface-selected);
+  color: var(--text-primary);
+}
+
+.inbox,
+.editor {
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+
+.inboxToolbar {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.8fr) minmax(140px, 0.8fr) minmax(220px, 1.5fr) auto auto auto;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.inboxToolbar input,
+.inboxToolbar select,
+.inboxToolbar button,
+.editor input,
+.editor select,
+.editor textarea,
+.editor button,
+.replyBox button {
+  min-height: 38px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-base);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.inboxToolbar input,
+.inboxToolbar select,
+.editor input,
+.editor select,
+.editor textarea {
+  width: 100%;
+  padding: 8px 10px;
+}
+
+.inboxToolbar button,
+.editor button,
+.replyBox button {
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.inboxToolbar button:hover,
+.editor button:hover,
+.replyBox button:hover {
+  background: var(--surface-soft);
+}
+
+.inboxToolbar button:disabled,
+.editor button:disabled,
+.replyBox button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.inboxLayout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.7fr);
+  min-height: 620px;
+}
+
+.threadList {
+  border-right: 1px solid var(--border-subtle);
+  background: var(--surface-base);
+  overflow: auto;
+}
+
+.threadList > button {
+  display: grid;
+  width: 100%;
+  gap: 5px;
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.threadList > button:hover,
+.threadList .selectedThread {
+  background: var(--surface-selected);
+}
+
+.threadList header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.threadList header strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.threadList header span {
+  min-width: 20px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 11px;
+  text-align: center;
+}
+
+.threadList small,
+.threadList time,
+.threadList p,
+.threadHeader p,
+.threadHeader span,
+.editorHeader p,
+.editorHeader span,
+.help,
+.replyBox span,
+.sideList button span,
+.statusGrid span {
+  color: var(--text-muted);
+}
+
+.threadList p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.threadList time {
+  font-size: 11px;
+}
+
+.threadDetail {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  background: var(--surface-raised);
+}
+
+.threadHeader,
+.editorHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.threadHeader h2,
+.editorHeader h2 {
+  margin: 3px 0 5px;
+  font-size: 20px;
+}
+
+.threadHeader p,
+.editorHeader p {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.threadHeader > button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-base);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.messageList {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 18px;
+  overflow: auto;
+}
+
+.inboundMessage,
+.outboundMessage {
+  display: grid;
+  gap: 10px;
+  max-width: 88%;
+  padding: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+}
+
+.inboundMessage {
+  justify-self: start;
+  background: var(--surface-base);
+}
+
+.outboundMessage {
+  justify-self: end;
+  background: var(--surface-selected);
+}
+
+.inboundMessage header,
+.outboundMessage header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.inboundMessage header div,
+.outboundMessage header div {
+  display: grid;
+  gap: 2px;
+}
+
+.inboundMessage header span,
+.outboundMessage header span,
+.inboundMessage time,
+.outboundMessage time {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.inboundMessage h3,
+.outboundMessage h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.inboundMessage pre,
+.outboundMessage pre {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  font: inherit;
+  line-height: 1.55;
+}
+
+.attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.attachments a {
+  padding: 5px 8px;
+  border-radius: 7px;
+  background: var(--surface-soft);
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.replyBox {
+  display: grid;
+  gap: 10px;
+  padding: 14px 18px 18px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.replyBox label,
+.editor label {
+  display: grid;
+  gap: 7px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.replyBox textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-base);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.replyBox > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.managementLayout {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.55fr) minmax(0, 1.65fr);
+  min-height: 620px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+
+.sideList {
+  border-right: 1px solid var(--border-subtle);
+  background: var(--surface-base);
+}
+
+.sideList > button {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sideList > button:hover,
+.sideList .selectedItem {
+  background: var(--surface-selected);
+}
+
+.sideList button div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.sideList button strong,
+.sideList button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sideList button span {
+  font-size: 11px;
+}
+
+.sideList .newButton {
+  justify-content: center;
+  margin: 10px;
+  width: calc(100% - 20px);
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+}
+
+.enabledDot,
+.disabledDot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  margin-top: 5px;
+  border-radius: 50%;
+}
+
+.enabledDot {
+  background: var(--success);
+}
+
+.disabledDot {
+  background: var(--text-muted);
+}
+
+.editor {
+  border: 0;
+  border-radius: 0;
+}
+
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.headerActions .primary,
+.editor .primary {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.formSection {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sectionTitle {
+  display: grid;
+  gap: 3px;
+}
+
+.sectionTitle p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sectionTitle h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.gridTwo,
+.gridThree {
+  display: grid;
+  gap: 12px;
+}
+
+.gridTwo {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.gridThree {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.formSpanTwo {
+  grid-column: 1 / -1;
+}
+
+.check {
+  display: flex !important;
+  align-items: center;
+  align-self: end;
+  min-height: 38px;
+  gap: 8px !important;
+  font-weight: 500 !important;
+}
+
+.check input {
+  width: auto;
+  min-height: auto;
+}
+
+.help {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.statusGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--border-subtle);
+}
+
+.statusGrid div {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  padding: 14px;
+  background: var(--surface-base);
+}
+
+.statusGrid span {
+  font-size: 11px;
+}
+
+.statusGrid strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.notice,
+.error {
+  margin: 12px 12px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.notice {
+  border: 1px solid color-mix(in srgb, var(--success) 40%, transparent);
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  color: var(--text-primary);
+}
+
+.error {
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  color: var(--text-primary);
+}
+
+.emptyState {
+  display: grid;
+  place-content: center;
+  gap: 6px;
+  min-height: 220px;
+  padding: 28px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.emptyState strong {
+  color: var(--text-primary);
+}
+
+@media (max-width: 1050px) {
+  .inboxToolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .statusGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .tabs {
+    overflow-x: auto;
+  }
+
+  .inboxLayout,
+  .managementLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .threadList,
+  .sideList {
+    max-height: 320px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .inboxToolbar,
+  .gridTwo,
+  .gridThree,
+  .statusGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .threadHeader,
+  .editorHeader,
+  .replyBox > div {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .headerActions {
+    justify-content: flex-start;
+  }
+
+  .inboundMessage,
+  .outboundMessage {
+    max-width: 100%;
+  }
+}
