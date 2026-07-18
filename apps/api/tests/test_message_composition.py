@@ -29,7 +29,7 @@ def test_disabled_persona_does_not_change_user_message() -> None:
     ]
 
 
-def test_developer_persona_is_separate_from_user_message() -> None:
+def test_developer_persona_is_separate_and_delimited() -> None:
     messages = compose_messages(
         persona=PersonaConfiguration(
             name="Aster",
@@ -46,8 +46,10 @@ def test_developer_persona_is_separate_from_user_message() -> None:
     ]
     assert messages[0].source is MessageSource.PERSONA
     assert messages[0].content == (
+        "[USER_DEFINED_PERSONA]\n"
         "Your name is Aster.\n\n"
-        "Answer in the user's language.\nKeep the tone natural."
+        "Answer in the user's language.\nKeep the tone natural.\n"
+        "[/USER_DEFINED_PERSONA]"
     )
     assert messages[1].content == "Explique volumes Docker."
 

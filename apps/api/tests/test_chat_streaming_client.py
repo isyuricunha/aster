@@ -41,7 +41,7 @@ async def test_stream_chat_completion_yields_text_and_sends_canonical_roles() ->
     assert received["payload"] == {
         "model": "chat-model",
         "messages": [
-            {"role": "developer", "content": "Persona"},
+            {"role": "system", "content": "Persona"},
             {"role": "user", "content": "Hi"},
         ],
         "stream": True,

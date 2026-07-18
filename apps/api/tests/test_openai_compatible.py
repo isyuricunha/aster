@@ -4,6 +4,10 @@ import httpx
 import pytest
 
 from app.openai_compatible import ModelEndpointError, OpenAICompatibleClient
+from app.provider_instruction_roles import (
+    clear_provider_instruction_roles,
+    register_provider_instruction_role,
+)
 
 
 @pytest.mark.asyncio
@@ -33,6 +37,61 @@ async def test_list_models_returns_sanitized_authentication_error() -> None:
 
     assert raised.value.code == "authentication_failed"
     assert "secret upstream body" not in raised.value.message
+
+
+@pytest.mark.asyncio
+async def test_chat_instruction_roles_default_to_system_and_allow_developer_opt_in() -> None:
+    payloads: list[dict[str, object]] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        payloads.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            text="data: [DONE]\n\n",
+            headers={"Content-Type": "text/event-stream"},
+        )
+
+    clear_provider_instruction_roles()
+    client = OpenAICompatibleClient(transport=httpx.MockTransport(handler))
+    assert [
+        item
+        async for item in client.stream_chat_completion(
+            base_url="https://models.example/v1",
+            api_key=None,
+            model_id="system-model",
+            messages=[
+                {"role": "developer", "content": "Internal instruction"},
+                {"role": "user", "content": "Hello"},
+            ],
+        )
+    ] == []
+    assert payloads[-1]["messages"] == [
+        {"role": "system", "content": "Internal instruction"},
+        {"role": "user", "content": "Hello"},
+    ]
+
+    register_provider_instruction_role(
+        base_url="https://models.example/v1",
+        model_id="developer-model",
+        instruction_role="developer",
+    )
+    assert [
+        item
+        async for item in client.stream_chat_completion(
+            base_url="https://models.example/v1",
+            api_key=None,
+            model_id="developer-model",
+            messages=[
+                {"role": "system", "content": "Internal instruction"},
+                {"role": "user", "content": "Hello"},
+            ],
+        )
+    ] == []
+    assert payloads[-1]["messages"] == [
+        {"role": "developer", "content": "Internal instruction"},
+        {"role": "user", "content": "Hello"},
+    ]
+    clear_provider_instruction_roles()
 
 
 @pytest.mark.asyncio

@@ -53,7 +53,15 @@ async def test_chat_persists_streamed_messages_and_uses_primary_model(api_client
     assert "event: done" in response.text
     assert fake_client.received_chat_model == "chat-model"
     assert fake_client.received_chat_messages == [
-        {"role": "developer", "content": "Your name is Assistant.\n\nBe direct."},
+        {
+            "role": "developer",
+            "content": (
+                "[USER_DEFINED_PERSONA]\n"
+                "Your name is Assistant.\n\n"
+                "Be direct.\n"
+                "[/USER_DEFINED_PERSONA]"
+            ),
+        },
         {"role": "user", "content": "  Keep my spacing  "},
     ]
 
@@ -81,7 +89,15 @@ async def test_chat_includes_completed_history_in_order(api_client: tuple) -> No
     )
 
     assert fake_client.received_chat_messages == [
-        {"role": "developer", "content": "Your name is Assistant.\n\nBe direct."},
+        {
+            "role": "developer",
+            "content": (
+                "[USER_DEFINED_PERSONA]\n"
+                "Your name is Assistant.\n\n"
+                "Be direct.\n"
+                "[/USER_DEFINED_PERSONA]"
+            ),
+        },
         {"role": "user", "content": "First"},
         {"role": "assistant", "content": "Hello from Aster"},
         {"role": "user", "content": "Second"},

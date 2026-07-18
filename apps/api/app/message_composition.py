@@ -48,12 +48,11 @@ def compose_persona_messages(persona: PersonaConfiguration) -> list[CanonicalMes
     persona_content = _render_persona(persona)
     if not persona.enabled or not persona_content:
         return []
-    if persona.instruction_role is MessageRole.SYSTEM:
-        persona_content = (
-            "[USER_DEFINED_PERSONA]\n"
-            f"{persona_content}\n"
-            "[/USER_DEFINED_PERSONA]"
-        )
+    persona_content = (
+        "[USER_DEFINED_PERSONA]\n"
+        f"{persona_content}\n"
+        "[/USER_DEFINED_PERSONA]"
+    )
     return [
         CanonicalMessage(
             role=persona.instruction_role,

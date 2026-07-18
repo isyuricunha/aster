@@ -18,6 +18,7 @@ from app.models import (
     Persona,
 )
 from app.openai_compatible import ModelEndpointError, OpenAICompatibleClient
+from app.provider_instruction_roles import register_provider_instruction_role
 from app.retrieval_models import Memory, MemorySuggestion
 from app.retrieval_schemas import MemoryResponse, MemorySuggestionResponse
 from app.security import SecretCipher
@@ -117,6 +118,11 @@ async def _utility_target(
         cipher.decrypt(endpoint.encrypted_api_key)
         if endpoint.encrypted_api_key is not None
         else None
+    )
+    register_provider_instruction_role(
+        base_url=endpoint.base_url,
+        model_id=model.model_id,
+        instruction_role=profile.instruction_role if profile else "system",
     )
     return ModelTarget(
         model_id=model.id,
@@ -258,7 +264,7 @@ async def generate_memory_suggestions(
             limit=settings.aster_memory_suggestion_max_items,
         )
     except ValueError as error:
-        raise HTTPException(status_code=502, detail=str(error)) from error
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
     existing_text = {
         content.casefold()

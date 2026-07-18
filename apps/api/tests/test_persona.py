@@ -101,7 +101,12 @@ async def test_preview_supports_default_specific_and_no_persona(api_client: tupl
     expected_persona = {
         "role": "developer",
         "source": "persona",
-        "content": "Your name is Assistant.\n\nBe direct.",
+        "content": (
+            "[USER_DEFINED_PERSONA]\n"
+            "Your name is Assistant.\n\n"
+            "Be direct.\n"
+            "[/USER_DEFINED_PERSONA]"
+        ),
     }
     assert default_preview.json()["messages"][0] == expected_persona
     assert specific_preview.json()["messages"][0] == expected_persona

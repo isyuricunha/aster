@@ -66,7 +66,15 @@ async def test_edit_and_resend_replaces_the_conversation_tail(api_client: tuple)
     assert response.status_code == 200
     assert '"operation": "edit"' in response.text
     assert fake_client.received_chat_messages == [
-        {"role": "developer", "content": "Your name is Assistant.\n\nBe direct."},
+        {
+            "role": "developer",
+            "content": (
+                "[USER_DEFINED_PERSONA]\n"
+                "Your name is Assistant.\n\n"
+                "Be direct.\n"
+                "[/USER_DEFINED_PERSONA]"
+            ),
+        },
         {"role": "user", "content": "Edited request"},
     ]
     updated = (await client.get(f"/api/conversations/{conversation_id}")).json()
@@ -102,7 +110,15 @@ async def test_regenerate_replaces_the_selected_assistant_and_later_messages(
     assert response.status_code == 200
     assert '"operation": "regenerate"' in response.text
     assert fake_client.received_chat_messages == [
-        {"role": "developer", "content": "Your name is Assistant.\n\nBe direct."},
+        {
+            "role": "developer",
+            "content": (
+                "[USER_DEFINED_PERSONA]\n"
+                "Your name is Assistant.\n\n"
+                "Be direct.\n"
+                "[/USER_DEFINED_PERSONA]"
+            ),
+        },
         {"role": "user", "content": "First"},
     ]
     updated = (await client.get(f"/api/conversations/{conversation_id}")).json()
