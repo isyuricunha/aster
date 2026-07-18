@@ -55,6 +55,7 @@ async def test_model_profile_defaults_update_and_reset(api_client: tuple) -> Non
     assert defaults.status_code == 200
     assert defaults.json()["temperature"] is None
     assert defaults.json()["token_parameter"] == "max_tokens"
+    assert defaults.json()["instruction_role"] == "system"
     assert defaults.json()["supports_chat"] is True
 
     updated = await client.put(
@@ -64,6 +65,7 @@ async def test_model_profile_defaults_update_and_reset(api_client: tuple) -> Non
             "context_window": 131072,
             "max_output_tokens": 8192,
             "token_parameter": "max_completion_tokens",
+            "instruction_role": "developer",
             "temperature": 0.4,
             "top_p": 0.9,
             "reasoning_effort": "high",
@@ -74,11 +76,13 @@ async def test_model_profile_defaults_update_and_reset(api_client: tuple) -> Non
     assert updated.status_code == 200
     assert updated.json()["display_name"] == "Primary profile"
     assert updated.json()["max_output_tokens"] == 8192
+    assert updated.json()["instruction_role"] == "developer"
 
     assert (await client.delete(f"/api/model-profiles/{primary.id}")).status_code == 204
     reset = (await client.get(f"/api/model-profiles/{primary.id}")).json()
     assert reset["display_name"] is None
     assert reset["max_output_tokens"] is None
+    assert reset["instruction_role"] == "system"
 
 
 async def test_model_routing_validates_and_preserves_order(api_client: tuple) -> None:
@@ -111,6 +115,7 @@ async def test_chat_applies_profile_parameters(api_client: tuple) -> None:
                 model_id=primary.id,
                 max_output_tokens=4096,
                 token_parameter="max_completion_tokens",
+                instruction_role="developer",
                 temperature=0.25,
                 top_p=0.8,
                 reasoning_effort="medium",
