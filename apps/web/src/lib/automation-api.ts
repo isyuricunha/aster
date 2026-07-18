@@ -1,7 +1,13 @@
 import { apiRequest } from "./api";
 
 export type IntegrationKind = "smtp" | "caldav" | "webhook";
-export type TriggerType = "once" | "interval" | "daily" | "weekly" | "webhook";
+export type TriggerType =
+  | "once"
+  | "interval"
+  | "daily"
+  | "weekly"
+  | "webhook"
+  | "communication";
 export type DeliveryChannel = "email" | "calendar" | "webhook";
 export type RunStatus =
   | "queued"
@@ -117,7 +123,7 @@ export type AutomationRun = {
   id: string;
   automation_id: string;
   automation_name: string;
-  trigger_source: "schedule" | "manual" | "webhook" | "retry";
+  trigger_source: "schedule" | "manual" | "webhook" | "communication" | "retry";
   status: RunStatus;
   scheduled_for: string;
   available_at: string;
