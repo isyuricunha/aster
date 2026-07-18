@@ -6,7 +6,19 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agent_models import Agent, AgentControl, AgentRun
+from app.agent_models import (
+    Agent,
+    AgentCommunicationScope,
+    AgentControl,
+    AgentKnowledgeScope,
+    AgentRun,
+    AgentToolScope,
+)
+from app.agent_run_scope_models import (
+    AgentRunCommunicationScope,
+    AgentRunKnowledgeScope,
+    AgentRunToolScope,
+)
 from app.agent_schedule import next_agent_run_at
 
 
@@ -17,6 +29,57 @@ async def agent_control(session: AsyncSession) -> AgentControl:
         session.add(control)
         await session.flush()
     return control
+
+
+async def _snapshot_run_scopes(
+    session: AsyncSession,
+    *,
+    agent_id: UUID,
+    run_id: UUID,
+) -> None:
+    tools = list(
+        await session.scalars(
+            select(AgentToolScope).where(AgentToolScope.agent_id == agent_id)
+        )
+    )
+    communications = list(
+        await session.scalars(
+            select(AgentCommunicationScope).where(
+                AgentCommunicationScope.agent_id == agent_id
+            )
+        )
+    )
+    collections = list(
+        await session.scalars(
+            select(AgentKnowledgeScope).where(AgentKnowledgeScope.agent_id == agent_id)
+        )
+    )
+    session.add_all(
+        AgentRunToolScope(
+            run_id=run_id,
+            tool_id=item.tool_id,
+            approval_policy=item.approval_policy,
+        )
+        for item in tools
+    )
+    session.add_all(
+        AgentRunCommunicationScope(
+            run_id=run_id,
+            account_id=item.account_id,
+            allow_read=item.allow_read,
+            allow_reply=item.allow_reply,
+            reply_approval_policy=item.reply_approval_policy,
+        )
+        for item in communications
+    )
+    session.add_all(
+        AgentRunKnowledgeScope(
+            run_id=run_id,
+            collection_id=item.collection_id,
+        )
+        for item in collections
+    )
+    await session.flush()
 
 
 async def enqueue_agent_run(
@@ -58,6 +121,11 @@ async def enqueue_agent_run(
         async with session.begin_nested():
             session.add(run)
             await session.flush()
+            await _snapshot_run_scopes(
+                session,
+                agent_id=agent.id,
+                run_id=run.id,
+            )
     except IntegrityError:
         return None
     agent.last_enqueued_at = now
@@ -112,7 +180,10 @@ async def enqueue_due_agents(session: AsyncSession, *, limit: int) -> int:
 async def enqueue_manual_agent_run(session: AsyncSession, agent: Agent) -> AgentRun:
     control = await agent_control(session)
     if control.emergency_stop:
-        raise HTTPException(status_code=409, detail="The autonomous agent emergency stop is active.")
+        raise HTTPException(
+            status_code=409,
+            detail="The autonomous agent emergency stop is active.",
+        )
     if not agent.enabled or agent.paused:
         raise HTTPException(status_code=409, detail="The agent is disabled or paused.")
     now = datetime.now(UTC)
@@ -130,9 +201,16 @@ async def enqueue_manual_agent_run(session: AsyncSession, agent: Agent) -> Agent
     return run
 
 
-async def enqueue_agent_retry(session: AsyncSession, source: AgentRun, agent: Agent) -> AgentRun:
+async def enqueue_agent_retry(
+    session: AsyncSession,
+    source: AgentRun,
+    agent: Agent,
+) -> AgentRun:
     if source.status not in {"failed", "cancelled"}:
-        raise HTTPException(status_code=409, detail="Only failed or cancelled runs can be retried.")
+        raise HTTPException(
+            status_code=409,
+            detail="Only failed or cancelled runs can be retried.",
+        )
     now = datetime.now(UTC)
     run = await enqueue_agent_run(
         session,
@@ -164,7 +242,8 @@ async def recover_expired_agent_runs(session: AsyncSession) -> int:
         run.status = "failed"
         run.error_code = "worker_interrupted"
         run.error_message = (
-            "The worker lease expired. The run was stopped instead of replaying an uncertain external action."
+            "The worker lease expired. The run was stopped instead of replaying an "
+            "uncertain external action."
         )
         run.finished_at = now
         run.lease_owner = None
