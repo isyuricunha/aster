@@ -13,6 +13,7 @@ from app.models import (
     ModelProfile,
 )
 from app.openai_compatible import ModelEndpointError
+from app.provider_instruction_roles import register_provider_instruction_role
 from app.security import SecretCipher
 
 FALLBACK_ERROR_CODES = {
@@ -72,6 +73,11 @@ def _target(
     )
     if unavailable:
         return None
+    register_provider_instruction_role(
+        base_url=endpoint.base_url,
+        model_id=model.model_id,
+        instruction_role=profile.instruction_role if profile else "system",
+    )
     return ModelTarget(
         model_id=model.id,
         provider_model_id=model.model_id,
