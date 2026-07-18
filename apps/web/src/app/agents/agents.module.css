@@ -1,0 +1,377 @@
+.workspace {
+  display: grid;
+  gap: 18px;
+}
+
+.controlBar,
+.panel,
+.editor,
+.sideList {
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+  border-radius: 14px;
+}
+
+.controlBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 18px;
+}
+
+.controlBar[data-stopped="true"] {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border-subtle));
+  background: color-mix(in srgb, var(--danger) 7%, var(--surface-raised));
+}
+
+.controlCopy {
+  display: grid;
+  gap: 4px;
+}
+
+.controlCopy strong {
+  font-size: 14px;
+}
+
+.controlCopy span,
+.muted,
+.itemMeta,
+.help,
+.empty {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tabs button,
+.headerActions button,
+.primary,
+.danger,
+.secondary,
+.sideList > button,
+.card button,
+.approvalActions button {
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  border-radius: 9px;
+  min-height: 34px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.tabs button[aria-current="page"],
+.primary {
+  background: var(--accent-solid);
+  border-color: var(--accent-solid);
+  color: var(--accent-contrast);
+}
+
+.danger {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border-subtle));
+  color: var(--danger);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+  gap: 16px;
+  min-height: 620px;
+}
+
+.sideList {
+  padding: 10px;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+}
+
+.sideList > button {
+  min-height: 54px;
+  text-align: left;
+  display: grid;
+  gap: 4px;
+}
+
+.sideList > button[data-selected="true"] {
+  border-color: var(--accent-solid);
+  background: color-mix(in srgb, var(--accent-solid) 9%, var(--surface-raised));
+}
+
+.sideList strong,
+.card strong {
+  font-size: 13px;
+}
+
+.editor,
+.panel {
+  padding: 20px;
+  min-width: 0;
+}
+
+.editorHeader,
+.panelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.editorHeader h2,
+.panelHeader h2 {
+  margin: 3px 0 5px;
+  font-size: 20px;
+}
+
+.editorHeader p,
+.panelHeader p,
+.sectionTitle p {
+  margin: 0;
+  color: var(--accent-solid);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.headerActions,
+.approvalActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.form,
+.sections {
+  display: grid;
+  gap: 18px;
+}
+
+.section {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 18px;
+  display: grid;
+  gap: 13px;
+}
+
+.section:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.sectionTitle {
+  display: grid;
+  gap: 3px;
+}
+
+.sectionTitle h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.gridTwo,
+.gridThree,
+.metrics {
+  display: grid;
+  gap: 12px;
+}
+
+.gridTwo {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.gridThree,
+.metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.form label,
+.field {
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.form input,
+.form select,
+.form textarea {
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-base);
+  color: var(--text-primary);
+  border-radius: 9px;
+  padding: 9px 10px;
+  font: inherit;
+}
+
+.form textarea {
+  resize: vertical;
+}
+
+.check {
+  display: flex !important;
+  align-items: center;
+  gap: 8px !important;
+}
+
+.check input {
+  width: auto;
+}
+
+.optionList,
+.cardList,
+.timeline,
+.notificationList {
+  display: grid;
+  gap: 9px;
+}
+
+.option,
+.card,
+.timeline article,
+.notificationList article,
+.metric {
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-base);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(120px, auto);
+  align-items: center;
+  gap: 10px;
+}
+
+.option input[type="checkbox"] {
+  width: auto;
+}
+
+.option select {
+  min-width: 140px;
+}
+
+.card {
+  display: grid;
+  gap: 8px;
+}
+
+.cardHeader,
+.timelineHeader,
+.notificationHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.status {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+}
+
+.status[data-status="completed"] {
+  color: var(--success);
+}
+
+.status[data-status="failed"],
+.status[data-status="cancelled"] {
+  color: var(--danger);
+}
+
+.status[data-status="waiting_approval"] {
+  color: var(--warning);
+}
+
+.metrics {
+  margin-bottom: 16px;
+}
+
+.metric {
+  display: grid;
+  gap: 5px;
+}
+
+.metric span {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.metric strong {
+  overflow-wrap: anywhere;
+}
+
+.pre,
+.output {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-base);
+  border-radius: 10px;
+  padding: 12px;
+  font: 12px/1.55 var(--font-mono, monospace);
+  max-height: 420px;
+  overflow: auto;
+}
+
+.error,
+.success,
+.warning {
+  border-radius: 9px;
+  padding: 10px 12px;
+  font-size: 12px;
+}
+
+.error {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 9%, transparent);
+}
+
+.success {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 9%, transparent);
+}
+
+.warning {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 9%, transparent);
+}
+
+@media (max-width: 900px) {
+  .layout,
+  .gridTwo,
+  .gridThree,
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .controlBar,
+  .editorHeader,
+  .panelHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .option {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .option select {
+    grid-column: 1 / -1;
+  }
+}
