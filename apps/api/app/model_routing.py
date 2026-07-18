@@ -13,7 +13,7 @@ from app.models import (
     ModelProfile,
 )
 from app.openai_compatible import ModelEndpointError
-from app.provider_instruction_roles import register_provider_instruction_role
+from app.provider_instruction_roles import InstructionRole
 from app.security import SecretCipher
 
 FALLBACK_ERROR_CODES = {
@@ -44,6 +44,7 @@ class ModelTarget:
     endpoint_name: str
     base_url: str
     api_key: str | None
+    instruction_role: InstructionRole
     parameters: GenerationParameters
 
 
@@ -73,11 +74,6 @@ def _target(
     )
     if unavailable:
         return None
-    register_provider_instruction_role(
-        base_url=endpoint.base_url,
-        model_id=model.model_id,
-        instruction_role=profile.instruction_role if profile else "system",
-    )
     return ModelTarget(
         model_id=model.id,
         provider_model_id=model.model_id,
@@ -85,6 +81,7 @@ def _target(
         endpoint_name=endpoint.name,
         base_url=endpoint.base_url,
         api_key=_decrypt_api_key(endpoint, cipher),
+        instruction_role=profile.instruction_role if profile else "system",
         parameters=GenerationParameters(
             temperature=profile.temperature if profile else None,
             top_p=profile.top_p if profile else None,
@@ -190,6 +187,7 @@ async def resolve_utility_target(
         endpoint_name=target.endpoint_name,
         base_url=target.base_url,
         api_key=target.api_key,
+        instruction_role=target.instruction_role,
         parameters=GenerationParameters(
             temperature=temperature,
             top_p=target.parameters.top_p,
