@@ -104,7 +104,7 @@ async def test_dispatches_only_future_matching_messages_once(api_client: tuple) 
         assert account is not None
         thread = CommunicationThread(
             account_id=account.id,
-            kind="imap",
+            kind="email",
             external_thread_id="agent-dispatch-thread",
             title="Support",
             participants=[],
