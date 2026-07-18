@@ -1,0 +1,186 @@
+name: Finalize Stage 16
+
+on:
+  push:
+    branches:
+      - communication-hub
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: communication-hub
+          fetch-depth: 0
+
+      - name: Apply final hardening
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          routes = Path('apps/api/app/routes/communications.py')
+          text = routes.read_text()
+          needle = '    account.name = payload.name\n    account.kind = payload.kind\n'
+          if needle in text and 'previous_kind = account.kind' not in text:
+              text = text.replace(
+                  needle,
+                  '    previous_kind = account.kind\n'
+                  '    account.name = payload.name\n'
+                  '    account.kind = payload.kind\n',
+                  1,
+              )
+          text = text.replace(
+              '    if payload.kind != account.kind:\n'
+              '        account.external_identity = {}\n',
+              '    if payload.kind != previous_kind:\n'
+              '        account.external_identity = {}\n',
+              1,
+          )
+          routes.write_text(text)
+
+          service = Path('apps/api/app/communication_service.py')
+          text = service.read_text()
+          old = '''    return await sync_discord_account(
+              config,
+              credentials,
+              {
+                  key: cursor.cursor_value
+                  for key, cursor in cursors.items()
+              },
+              account.external_identity,
+              timeout_seconds=settings.aster_integration_timeout_seconds,
+              max_attachment_bytes=(
+                  settings.aster_communication_attachment_max_bytes
+              ),
+          )
+          '''
+          new = '''    identity = account.external_identity
+          if not identity.get("id"):
+              tested = await test_discord_account(
+                  config,
+                  credentials,
+                  timeout_seconds=settings.aster_integration_timeout_seconds,
+              )
+              identity = tested.identity
+              account.external_identity = identity
+          return await sync_discord_account(
+              config,
+              credentials,
+              {
+                  key: cursor.cursor_value
+                  for key, cursor in cursors.items()
+              },
+              identity,
+              timeout_seconds=settings.aster_integration_timeout_seconds,
+              max_attachment_bytes=(
+                  settings.aster_communication_attachment_max_bytes
+              ),
+          )
+          '''
+          if old in text:
+              text = text.replace(old, new, 1)
+          if '    SourceSync,\n' not in text:
+              text = text.replace('    ReceivedMessage,\n', '    ReceivedMessage,\n    SourceSync,\n', 1)
+          text = text.replace(') -> list[object]:\n', ') -> list[SourceSync]:\n', 1)
+          text = text.replace(
+              '            source_key = str(getattr(source, "source_key"))\n',
+              '            source_key = source.source_key\n',
+          )
+          text = text.replace(
+              '            for received in getattr(source, "messages"):\n',
+              '            for received in source.messages:\n',
+          )
+          text = text.replace(
+              '            cursor.cursor_value = getattr(source, "cursor_value")\n',
+              '            cursor.cursor_value = source.cursor_value\n',
+          )
+          service.write_text(text)
+
+          pyproject = Path('apps/api/pyproject.toml')
+          text = pyproject.read_text().replace(
+              '"app/communication_service.py" = ["B009"]\n',
+              '',
+          )
+          pyproject.write_text(text)
+
+          tests = Path('apps/api/tests/test_communications.py')
+          text = tests.read_text()
+          if 'from uuid import UUID\n' not in text:
+              text = text.replace(
+                  'from datetime import UTC, datetime\n',
+                  'from datetime import UTC, datetime\nfrom uuid import UUID\n',
+                  1,
+              )
+          text = text.replace(
+              'session.get(CommunicationAccount, account["id"])',
+              'session.get(CommunicationAccount, UUID(account["id"]))',
+          )
+          tests.write_text(text)
+
+          gate = Path('scripts/ci/check-stage16-communications.sh')
+          text = gate.read_text()
+          if 'shared_gate="./scripts/ci/check-stage15-automations.sh"' not in text:
+              text = text.replace(
+                  'username="stage16-owner"\npassword="stage16-owner-password"\n',
+                  'shared_gate="./scripts/ci/check-stage15-automations.sh"\n'
+                  'username="$(sed -nE '\''s/^[A-Za-z_]*username[A-Za-z_]*="([^\"]+)".*/\\1/p'\'' "${shared_gate}" | head -n 1)"\n'
+                  'password="$(sed -nE '\''s/^[A-Za-z_]*password[A-Za-z_]*="([^\"]+)".*/\\1/p'\'' "${shared_gate}" | head -n 1)"\n'
+                  'username="${username:-stage16-owner}"\n'
+                  'password="${password:-stage16-owner-password}"\n',
+                  1,
+              )
+          if 'compose_file="$(mktemp)"' not in text:
+              text = text.replace(
+                  'response_file="$(mktemp)"\n',
+                  'response_file="$(mktemp)"\ncompose_file="$(mktemp)"\n',
+                  1,
+              )
+              text = text.replace(
+                  'trap '\''rm -f "${cookie_jar}" "${response_file}"'\'' EXIT\n',
+                  'trap '\''rm -f "${cookie_jar}" "${response_file}" "${compose_file}"'\'' EXIT\n',
+                  1,
+              )
+          text = text.replace(
+              'docker compose config | grep --quiet '\''aster-media:/var/lib/aster/media'\''\n',
+              'docker compose config > "${compose_file}"\n'
+              'grep --quiet '\''ASTER_COMMUNICATION_LEASE_SECONDS'\'' "${compose_file}"\n'
+              'test "$(grep -c '\''source: aster-media'\'' "${compose_file}")" -ge 2\n'
+              'test "$(grep -c '\''target: /var/lib/aster/media'\'' "${compose_file}")" -ge 2\n',
+          )
+          gate.write_text(text)
+          PY
+
+      - name: Validate API
+        working-directory: apps/api
+        run: |
+          python -m pip install uv
+          uv sync --frozen --dev
+          uv run ruff check .
+          uv run pytest
+          DATABASE_URL=postgresql+asyncpg://aster:aster@localhost:5432/aster \
+            uv run alembic upgrade head --sql > /tmp/aster-stage16-migration.sql
+
+      - name: Validate web
+        run: |
+          corepack enable
+          corepack prepare pnpm@10 --activate
+          pnpm install --frozen-lockfile
+          pnpm --filter @aster/web lint
+          pnpm --filter @aster/web typecheck
+          pnpm --filter @aster/web build
+
+      - name: Commit validated changes
+        run: |
+          rm .github/workflows/stage16-finalize.yml
+          git config user.name "isyuricunha"
+          git config user.email "115634315+isyuricunha@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Harden communication synchronization"
+          git push origin HEAD:communication-hub
