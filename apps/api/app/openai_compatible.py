@@ -5,6 +5,8 @@ from dataclasses import dataclass
 
 import httpx
 
+from app.provider_instruction_roles import normalize_provider_messages
+
 
 class ModelEndpointError(Exception):
     def __init__(self, code: str, message: str, status_code: int = 502) -> None:
@@ -219,7 +221,11 @@ class OpenAICompatibleClient:
     ) -> AsyncIterator[ChatCompletionDelta]:
         payload: dict[str, object] = {
             "model": model_id,
-            "messages": list(messages),
+            "messages": normalize_provider_messages(
+                base_url=base_url,
+                model_id=model_id,
+                messages=messages,
+            ),
             "stream": True,
         }
         if tools:
