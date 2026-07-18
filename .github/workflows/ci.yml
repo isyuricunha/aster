@@ -115,7 +115,7 @@ jobs:
         run: >-
           curl --fail --silent --show-error --retry 30 --retry-all-errors --retry-delay 2
           http://localhost:3000/setup
-      - name: Check legacy upgrade through Stage 16
+      - name: Check legacy upgrade through Stage 17
         run: sh scripts/ci/check-stage11-persona-migration.sh
       - name: Check runtime configuration
         run: sh scripts/ci/check-runtime.sh
@@ -129,6 +129,8 @@ jobs:
         run: sh scripts/ci/check-stage15-automations.sh
       - name: Check Stage 16 communication contracts
         run: sh scripts/ci/check-stage16-communications.sh
+      - name: Check Stage 17 autonomous agent contracts
+        run: sh scripts/ci/check-stage17-agents.sh
       - name: Check Stage 12 tool contracts
         run: sh scripts/ci/check-stage12-tools.sh
       - name: Show service state

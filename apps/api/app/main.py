@@ -5,6 +5,10 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import (  # noqa: F401
+    agent_dispatch_models,
+    agent_models,
+    agent_notification_models,
+    agent_run_scope_models,
     automation_models,
     communication_models,
     image_models,
@@ -15,6 +19,10 @@ from app.config import settings
 from app.conversation_titles import ConversationTitleMiddleware
 from app.db import engine
 from app.middleware import security_middleware
+from app.routes.agent_notifications import router as agent_notifications_router
+from app.routes.agent_rules import router as agent_rules_router
+from app.routes.agent_runs import router as agent_runs_router
+from app.routes.agents import router as agents_router
 from app.routes.auth import router as auth_router
 from app.routes.automations import private_router as automations_router
 from app.routes.chat import router as chat_router
@@ -67,4 +75,8 @@ app.include_router(knowledge_router, dependencies=private_route_dependencies)
 app.include_router(images_router, dependencies=private_route_dependencies)
 app.include_router(automations_router, dependencies=private_route_dependencies)
 app.include_router(communications_router, dependencies=private_route_dependencies)
+app.include_router(agents_router, dependencies=private_route_dependencies)
+app.include_router(agent_runs_router, dependencies=private_route_dependencies)
+app.include_router(agent_rules_router, dependencies=private_route_dependencies)
+app.include_router(agent_notifications_router, dependencies=private_route_dependencies)
 app.include_router(chat_router, dependencies=private_route_dependencies)

@@ -84,4 +84,4 @@ instruction_role_result="$(printf '%s' "${instruction_role_result}" | tr -d '\r'
 printf '%s' "${instruction_role_result}" | grep --quiet 'system'
 printf '%s' "${instruction_role_result}" | grep --quiet 'NO'
 
-docker compose exec -T api alembic current | grep --quiet '0015_communication_hub'
+docker compose exec -T api alembic current | grep --quiet '0016_autonomous_agents'

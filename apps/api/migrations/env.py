@@ -6,6 +6,10 @@ from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app import (
+    agent_dispatch_models,  # noqa: F401
+    agent_models,  # noqa: F401
+    agent_notification_models,  # noqa: F401
+    agent_run_scope_models,  # noqa: F401
     automation_models,  # noqa: F401
     communication_models,  # noqa: F401
     image_models,  # noqa: F401
