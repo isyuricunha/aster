@@ -21,7 +21,7 @@ Interactive chat composes model input in this order:
 
 Autonomous agents and unattended automations use the same principle: application policy comes
 first, an optional persona follows, and the saved goal or instruction is supplied separately from
-untrusted trigger, retrieval, history, communication, and tool-result data.
+untrusted trigger, retrieval, plan, history, communication, and tool-result data.
 
 Persona instructions control identity, tone, style, and response preferences. They do not override
 platform reliability, privacy, authorization, or tool boundaries.
@@ -45,6 +45,7 @@ include:
 - `UNTRUSTED_AGENT_MEMORY_AND_RETRIEVAL_CONTEXT`;
 - `UNTRUSTED_COMMUNICATION_THREAD`;
 - `UNTRUSTED_TRIGGER_PAYLOAD`;
+- `UNTRUSTED_PERSISTED_PLAN_STATE`;
 - `UNTRUSTED_PERSISTED_EXECUTION_HISTORY`;
 - `UNTRUSTED_ACTION_RESULT`;
 - `UNTRUSTED_TOOL_RESULT`.
