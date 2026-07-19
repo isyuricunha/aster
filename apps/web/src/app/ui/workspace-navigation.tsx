@@ -4,7 +4,12 @@ import Link from "next/link";
 import type { MouseEvent } from "react";
 
 import { AsterMark, Icon, type IconName } from "./icons";
-import { OPEN_SETTINGS_EVENT } from "./settings-window-host";
+import {
+  OPEN_SETTINGS_EVENT,
+  OPEN_WORKSPACE_WINDOW_EVENT,
+  type SettingsSection,
+  type WorkspaceWindowKey,
+} from "./workspace-window-host";
 
 export type NavigationKey =
   | "chat"
@@ -25,7 +30,8 @@ type NavigationItem = {
   href: string;
   icon: IconName;
   label: string;
-  settingsSection?: "models" | "persona" | "tools" | "memory" | "account";
+  settingsSection?: SettingsSection;
+  workspaceWindow?: WorkspaceWindowKey;
 };
 
 type NavigationSection = {
@@ -45,8 +51,15 @@ const NAVIGATION_SECTIONS: readonly NavigationSection[] = [
         href: "/communications",
         icon: "chat",
         label: "Communications",
+        workspaceWindow: "communications",
       },
-      { key: "agents", href: "/agents", icon: "tools", label: "Agents" },
+      {
+        key: "agents",
+        href: "/agents",
+        icon: "tools",
+        label: "Agents",
+        workspaceWindow: "agents",
+      },
       { key: "images", href: "/images", icon: "images", label: "Images" },
       {
         key: "automations",
@@ -105,9 +118,8 @@ const NAVIGATION_SECTIONS: readonly NavigationSection[] = [
   },
 ];
 
-function openSettings(event: MouseEvent<HTMLAnchorElement>, item: NavigationItem) {
+function openOverlay(event: MouseEvent<HTMLAnchorElement>, item: NavigationItem) {
   if (
-    !item.settingsSection ||
     event.button !== 0 ||
     event.metaKey ||
     event.ctrlKey ||
@@ -116,10 +128,23 @@ function openSettings(event: MouseEvent<HTMLAnchorElement>, item: NavigationItem
   ) {
     return;
   }
-  event.preventDefault();
-  window.dispatchEvent(
-    new CustomEvent(OPEN_SETTINGS_EVENT, { detail: { section: item.settingsSection } }),
-  );
+
+  if (item.settingsSection) {
+    event.preventDefault();
+    window.dispatchEvent(
+      new CustomEvent(OPEN_SETTINGS_EVENT, { detail: { section: item.settingsSection } }),
+    );
+    return;
+  }
+
+  if (item.workspaceWindow) {
+    event.preventDefault();
+    window.dispatchEvent(
+      new CustomEvent(OPEN_WORKSPACE_WINDOW_EVENT, {
+        detail: { window: item.workspaceWindow },
+      }),
+    );
+  }
 }
 
 export function WorkspaceBrand() {
@@ -187,7 +212,7 @@ export function WorkspaceNavigation({
                 className={`navigation-item ${active === item.key ? "active" : ""}`}
                 href={item.href}
                 key={item.key}
-                onClick={(event) => openSettings(event, item)}
+                onClick={(event) => openOverlay(event, item)}
               >
                 <Icon name={item.icon} />
                 <span>{item.label}</span>
