@@ -7,7 +7,9 @@ import type {
 } from "../../../lib/api";
 import { requireServerAuth, serverApiFetch } from "../../../lib/server-api";
 import { AppFrame } from "../../ui/app-frame";
+import { AdvancedSettings } from "../settings-primitives";
 import { PersonaSettingsForm } from "./persona-settings";
+import { SimplePersonaSettings } from "./simple-persona-settings";
 
 export const metadata: Metadata = { title: "Persona settings" };
 
@@ -61,15 +63,24 @@ export default async function PersonaSettingsPage({
       active="persona"
       kicker="Configuration"
       title="Personas"
-      description="Build reusable assistant identities, choose the default for new chats, and freeze a persona snapshot into each conversation."
+      description="Create reusable identities and choose the default for new chats. Snapshot maintenance stays out of the everyday flow."
       embedded={params.embedded === "1"}
     >
-      <PersonaSettingsForm
-        initialConversations={data.conversations}
+      <SimplePersonaSettings
         initialError={data.error}
         initialPersonas={data.personas}
         initialPreferences={data.preferences}
       />
+      <AdvancedSettings
+        description="Instruction role, import and export, composition preview, duplication, deletion, and existing-conversation snapshot assignment."
+      >
+        <PersonaSettingsForm
+          initialConversations={data.conversations}
+          initialError={data.error}
+          initialPersonas={data.personas}
+          initialPreferences={data.preferences}
+        />
+      </AdvancedSettings>
     </AppFrame>
   );
 }
