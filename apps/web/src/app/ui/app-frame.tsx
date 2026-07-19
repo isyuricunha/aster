@@ -15,13 +15,28 @@ export function AppFrame({
   title,
   description,
   children,
+  embedded = false,
 }: {
   active: NavigationKey;
   kicker: string;
   title: string;
   description: string;
   children: ReactNode;
+  embedded?: boolean;
 }) {
+  if (embedded) {
+    return (
+      <main className="embedded-settings-page" id="main-content" tabIndex={-1}>
+        <header className="settings-hero">
+          <p>{kicker}</p>
+          <h1 className="shimmer-text">{title}</h1>
+          <span>{description}</span>
+        </header>
+        {children}
+      </main>
+    );
+  }
+
   return (
     <div className="application-shell">
       <a className="skip-link" href="#main-content">
