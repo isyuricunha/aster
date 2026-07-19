@@ -116,7 +116,10 @@ async def test_chat_persists_reasoning_but_excludes_it_from_provider_history(
     )
 
     assert first_response.status_code == 200
-    assert 'event: delta\ndata: {"content": "<reasoning>"}' in first_response.text
+    assert (
+        'event: delta\ndata: {"content": "<reasoning>Inspecting "}'
+        in first_response.text
+    )
     assert 'event: delta\ndata: {"content": "</reasoning>\\n\\nFinal answer."}' in first_response.text
     detail = (await client.get(f"/api/conversations/{conversation_id}")).json()
     assert detail["messages"][1]["content"] == (
