@@ -2,6 +2,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
+from app.prompt_library import CHAT_SYSTEM_PROMPT, render_persona
+
 
 class MessageRole(StrEnum):
     SYSTEM = "system"
@@ -35,31 +37,24 @@ class PersonaConfiguration:
     instruction_role: MessageRole
 
 
-def _render_persona(persona: PersonaConfiguration) -> str:
-    parts: list[str] = []
-    if persona.name:
-        parts.append(f"Your name is {persona.name}.")
-    if persona.instructions.strip():
-        parts.append(persona.instructions)
-    return "\n\n".join(parts)
-
-
 def compose_persona_messages(persona: PersonaConfiguration) -> list[CanonicalMessage]:
-    persona_content = _render_persona(persona)
-    if not persona.enabled or not persona_content:
-        return []
-    persona_content = (
-        "[USER_DEFINED_PERSONA]\n"
-        f"{persona_content}\n"
-        "[/USER_DEFINED_PERSONA]"
-    )
-    return [
+    messages = [
         CanonicalMessage(
-            role=persona.instruction_role,
-            source=MessageSource.PERSONA,
-            content=persona_content,
+            role=MessageRole.SYSTEM,
+            source=MessageSource.PLATFORM,
+            content=CHAT_SYSTEM_PROMPT,
         )
     ]
+    persona_content = render_persona(persona.name, persona.instructions)
+    if persona.enabled and persona_content:
+        messages.append(
+            CanonicalMessage(
+                role=persona.instruction_role,
+                source=MessageSource.PERSONA,
+                content=persona_content,
+            )
+        )
+    return messages
 
 
 def compose_messages(
