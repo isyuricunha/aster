@@ -15,6 +15,7 @@ import "./email-reader.css";
 import "./command-palette.css";
 import "./application-sidebar.css";
 import { ApplicationSidebarHost } from "./ui/application-sidebar-host";
+import { ChatDocumentTitle } from "./ui/chat-document-title";
 import { CommandPaletteHost } from "./ui/command-palette-host";
 import { ConversationRouteSync } from "./ui/conversation-route-sync";
 import { WorkspaceWindowHost } from "./ui/workspace-window-host";
@@ -28,9 +29,9 @@ export const metadata: Metadata = {
   description: "A self-hosted AI chat application",
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: [{ url: "/brand/aster-logo.svg", type: "image/svg+xml" }],
-    shortcut: "/brand/aster-logo.svg",
-    apple: "/brand/aster-logo.svg",
+    icon: [{ url: "/brand/aster-mark.svg?v=2", type: "image/svg+xml", sizes: "any" }],
+    shortcut: "/brand/aster-mark.svg?v=2",
+    apple: "/brand/aster-maskable.svg?v=2",
   },
 };
 
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         {children}
         <ConversationRouteSync />
         <Suspense fallback={null}>
+          <ChatDocumentTitle />
           <ApplicationSidebarHost />
         </Suspense>
         <WorkspaceWindowHost />
