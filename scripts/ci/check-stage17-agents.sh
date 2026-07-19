@@ -12,7 +12,7 @@ json_field() {
 }
 
 test "$(curl -sS -o /dev/null -w '%{http_code}' "${api_url}/api/agents")" = "401"
-test "$(curl -sS -o /dev/null -w '%{http_code}' "${web_url}/agents")" = "307"
+test "$(curl -sS -o /dev/null -w '%{http_code}' "${web_url}/api/agents")" = "401"
 
 agent_json="$(curl -fsS -b "${cookie_jar}" \
   -H 'Content-Type: application/json' \
@@ -78,16 +78,13 @@ account_json="$(curl -fsS -b "${cookie_jar}" \
       "security": "ssl",
       "folder": "INBOX"
     },
-    "credentials": {
-      "username": "agent@example.test",
-      "password": "stage17-private-password"
-    },
+    "credentials": {},
     "poll_interval_seconds": 60
   }' \
   "${web_url}/api/communication-accounts")"
 account_id="$(printf '%s' "${account_json}" | json_field id)"
 test -n "${account_id}"
-test "$(printf '%s' "${account_json}" | grep -c 'stage17-private-password' || true)" = "0"
+printf '%s' "${account_json}" | grep --quiet '"credential_names":\[\]'
 
 communication_agent_json="$(curl -fsS -b "${cookie_jar}" \
   -H 'Content-Type: application/json' \
