@@ -15,6 +15,18 @@ from app.models import (
     Persona,
     PersonaPreferences,
 )
+from app.prompt_library import CHAT_SYSTEM_PROMPT
+
+
+def persona_instruction() -> str:
+    return (
+        "[USER_DEFINED_PERSONA]\n"
+        "The owner defined this persona for identity, tone, style, and response preferences.\n"
+        "Name: Assistant\n\n"
+        "Instructions:\n"
+        "Be direct.\n"
+        "[/USER_DEFINED_PERSONA]"
+    )
 
 
 async def configure_primary(session_factory: async_sessionmaker[AsyncSession]) -> None:
@@ -66,15 +78,8 @@ async def test_edit_and_resend_replaces_the_conversation_tail(api_client: tuple)
     assert response.status_code == 200
     assert '"operation": "edit"' in response.text
     assert fake_client.received_chat_messages == [
-        {
-            "role": "developer",
-            "content": (
-                "[USER_DEFINED_PERSONA]\n"
-                "Your name is Assistant.\n\n"
-                "Be direct.\n"
-                "[/USER_DEFINED_PERSONA]"
-            ),
-        },
+        {"role": "system", "content": CHAT_SYSTEM_PROMPT},
+        {"role": "developer", "content": persona_instruction()},
         {"role": "user", "content": "Edited request"},
     ]
     updated = (await client.get(f"/api/conversations/{conversation_id}")).json()
@@ -110,15 +115,8 @@ async def test_regenerate_replaces_the_selected_assistant_and_later_messages(
     assert response.status_code == 200
     assert '"operation": "regenerate"' in response.text
     assert fake_client.received_chat_messages == [
-        {
-            "role": "developer",
-            "content": (
-                "[USER_DEFINED_PERSONA]\n"
-                "Your name is Assistant.\n\n"
-                "Be direct.\n"
-                "[/USER_DEFINED_PERSONA]"
-            ),
-        },
+        {"role": "system", "content": CHAT_SYSTEM_PROMPT},
+        {"role": "developer", "content": persona_instruction()},
         {"role": "user", "content": "First"},
     ]
     updated = (await client.get(f"/api/conversations/{conversation_id}")).json()
