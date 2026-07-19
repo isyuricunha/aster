@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254" role="img" aria-labelledby="title description">
+  <title id="title">Aster</title>
+  <desc id="description">A geometric silver Aster emblem with a lavender core on a dark rounded square.</desc>
+  <defs>
+    <linearGradient id="background" x1="180" y1="80" x2="1070" y2="1180" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#12161d"/>
+      <stop offset="0.55" stop-color="#0b0e13"/>
+      <stop offset="1" stop-color="#07090d"/>
+    </linearGradient>
+    <radialGradient id="backgroundGlow" cx="0" cy="0" r="1" gradientTransform="translate(627 548) rotate(90) scale(510)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6972e0" stop-opacity="0.12"/>
+      <stop offset="0.58" stop-color="#6972e0" stop-opacity="0.025"/>
+      <stop offset="1" stop-color="#6972e0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="silver" x1="394" y1="305" x2="869" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff"/>
+      <stop offset="0.48" stop-color="#eef0f6"/>
+      <stop offset="1" stop-color="#cdd1dc"/>
+    </linearGradient>
+    <linearGradient id="core" x1="579" y1="694" x2="677" y2="881" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f6f4ff"/>
+      <stop offset="0.5" stop-color="#c9c8ff"/>
+      <stop offset="1" stop-color="#8f97ff"/>
+    </linearGradient>
+    <filter id="symbolShadow" x="250" y="240" width="760" height="730" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+    <filter id="coreGlow" x="500" y="620" width="260" height="330" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="13" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="1254" height="1254" rx="190" fill="url(#background)"/>
+  <rect width="1254" height="1254" rx="190" fill="url(#backgroundGlow)"/>
+  <g filter="url(#symbolShadow)">
+    <path d="M606 305 402 635h111l93-152V305Z" fill="url(#silver)"/>
+    <path d="M648 304v178l91 151 113 2-204-331Z" fill="url(#silver)"/>
+    <path d="m379 678-55 92 76 124 183 2-58-94H415l73-124H379Z" fill="url(#silver)"/>
+    <path d="M875 678H766l73 123-111 1-57 94 182-1 77-126-55-91Z" fill="url(#silver)"/>
+  </g>
+  <path d="m627 681-63 103 63 103 62-102-62-104Z" fill="url(#core)" filter="url(#coreGlow)"/>
+</svg>
