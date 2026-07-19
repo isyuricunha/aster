@@ -26,8 +26,10 @@ The application-wide dark interface and responsive UX redesign consolidates the 
 
 The floating workspace system keeps chat as the primary surface while Settings, Communications, Agents, Images, and Automations can be moved, resized, focused, minimized, restored, or opened as normal full pages.
 
-Implementation and verification are recorded in [Aster interface redesign checklist](interface-redesign.md) and [Floating workspace windows](floating-workspace-windows.md).
+Global command-palette navigation provides keyboard-first access to blank chats, workspaces, settings, and full-history conversation search without duplicating feature interfaces.
+
+Implementation and verification are recorded in [Aster interface redesign checklist](interface-redesign.md), [Floating workspace windows](floating-workspace-windows.md), and [Command palette](command-palette.md).
 
 ## Later stages
 
-Routing analytics, controlled worker concurrency, authoritative provider usage accounting, additional providers, specialized integrations, command-palette navigation, and further settings simplification remain planned improvements. They will be scheduled according to deployment feedback and operational need.
+Routing analytics, controlled worker concurrency, authoritative provider usage accounting, additional providers, specialized integrations, and further settings simplification remain planned improvements. They will be scheduled according to deployment feedback and operational need.

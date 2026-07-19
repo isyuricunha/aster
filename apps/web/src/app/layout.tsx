@@ -11,6 +11,8 @@ import "./chat-content.css";
 import "./interface-refinement.css";
 import "./settings-window.css";
 import "./email-reader.css";
+import "./command-palette.css";
+import { CommandPaletteHost } from "./ui/command-palette-host";
 import { WorkspaceWindowHost } from "./ui/workspace-window-host";
 
 export const metadata: Metadata = {
@@ -27,6 +29,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
       <body>
         {children}
         <WorkspaceWindowHost />
+        <CommandPaletteHost />
       </body>
     </html>
   );
