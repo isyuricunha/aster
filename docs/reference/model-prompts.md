@@ -15,8 +15,8 @@ Interactive chat composes model input in this order:
 
 1. application-owned platform policy;
 2. optional frozen persona snapshot;
-3. optional bounded retrieval context;
-4. persisted completed conversation history;
+3. persisted completed conversation history;
+4. optional bounded retrieval context for the current turn;
 5. the current owner message.
 
 Autonomous agents and unattended automations use the same principle: application policy comes
