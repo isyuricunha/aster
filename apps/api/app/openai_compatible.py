@@ -278,7 +278,12 @@ class OpenAICompatibleClient:
                                 "The endpoint reported an error while streaming the response.",
                             )
                         delta = self._extract_completion_delta(event)
-                        if delta.content or delta.reasoning or delta.tool_calls or delta.finish_reason:
+                        if (
+                            delta.content
+                            or delta.reasoning
+                            or delta.tool_calls
+                            or delta.finish_reason
+                        ):
                             yield delta
         except httpx.TimeoutException as error:
             raise ModelEndpointError(
