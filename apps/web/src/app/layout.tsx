@@ -9,6 +9,9 @@ import "./chat-controls.css";
 import "./auth.css";
 import "./chat-content.css";
 import "./interface-refinement.css";
+import "./settings-window.css";
+import "./email-reader.css";
+import { SettingsWindowHost } from "./ui/settings-window-host";
 
 export const metadata: Metadata = {
   title: {
@@ -21,7 +24,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <SettingsWindowHost />
+      </body>
     </html>
   );
 }
