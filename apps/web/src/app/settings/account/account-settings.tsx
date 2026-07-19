@@ -3,7 +3,13 @@
 import { useState, type FormEvent } from "react";
 
 import { apiRequest, type AuthUser, type SessionRevocation } from "../../../lib/api";
-import styles from "./account-settings.module.css";
+import {
+  SummaryCard,
+  SummaryGrid,
+  UnsavedBadge,
+  useUnsavedChanges,
+} from "../settings-primitives";
+import styles from "../simple-settings.module.css";
 
 export function AccountSettings({ username }: { username: string }) {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -12,6 +18,8 @@ export function AccountSettings({ username }: { username: string }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const dirty = Boolean(currentPassword || newPassword || confirmation);
+  useUnsavedChanges(dirty);
 
   async function run(name: string, operation: () => Promise<void>) {
     if (busy) return;
@@ -70,114 +78,104 @@ export function AccountSettings({ username }: { username: string }) {
   }
 
   return (
-    <div aria-busy={busy !== null} className={`settings-stack ${styles.root}`}>
-      {error && (
-        <div className="banner banner-error" role="alert">
-          {error}
-        </div>
-      )}
-      {!error && notice && (
-        <div className="banner banner-success" role="status">
-          {notice}
-        </div>
-      )}
+    <div aria-busy={busy !== null} className={styles.root}>
+      {error ? <div className={styles.error} role="alert">{error}</div> : null}
+      {!error && notice ? <div className={styles.notice} role="status">{notice}</div> : null}
 
-      <section className="panel account-summary">
-        <div>
-          <p className="eyebrow">Owner</p>
-          <h2>{username}</h2>
-          <p className="section-copy">
-            Aster accepts one owner account. There is no public sign-up after the first setup.
-          </p>
-        </div>
-        <button
-          className="button button-secondary"
-          disabled={busy !== null}
-          onClick={() => void logout()}
-          type="button"
-        >
-          {busy === "logout" ? "Signing out" : "Sign out"}
-        </button>
-      </section>
+      <SummaryGrid>
+        <SummaryCard label="Owner" value={username} note="Single-owner workspace" />
+        <SummaryCard label="Authentication" value="Password" note="No public sign-up" />
+        <SummaryCard label="Session policy" value="Private" note="Other sessions can be revoked" />
+      </SummaryGrid>
 
-      <section className="panel">
-        <div className="section-heading">
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
           <div>
-            <p className="eyebrow">Security</p>
             <h2>Change password</h2>
-            <p className="section-copy">
-              Changing the password revokes every existing session and keeps this browser signed in.
-            </p>
+            <p>Updating it signs out every other browser while keeping this session active.</p>
           </div>
+          <UnsavedBadge visible={dirty} />
         </div>
-        <form aria-busy={busy === "password"} className="form-grid" onSubmit={changePassword}>
-          <label className="form-span-two">
-            <span>Current password</span>
-            <input
-              autoComplete="current-password"
-              disabled={busy !== null}
-              maxLength={256}
-              onChange={(event) => setCurrentPassword(event.target.value)}
-              required
-              type="password"
-              value={currentPassword}
-            />
-          </label>
-          <label>
-            <span>New password</span>
-            <input
-              aria-describedby="new-password-requirements"
-              autoComplete="new-password"
-              disabled={busy !== null}
-              minLength={12}
-              maxLength={256}
-              onChange={(event) => setNewPassword(event.target.value)}
-              required
-              type="password"
-              value={newPassword}
-            />
-          </label>
-          <label>
-            <span>Confirm new password</span>
-            <input
-              aria-describedby="new-password-requirements"
-              autoComplete="new-password"
-              disabled={busy !== null}
-              minLength={12}
-              maxLength={256}
-              onChange={(event) => setConfirmation(event.target.value)}
-              required
-              type="password"
-              value={confirmation}
-            />
-          </label>
-          <p className="form-help form-span-two" id="new-password-requirements">
-            Use 12 to 256 characters.
-          </p>
-          <div className="form-actions form-span-two">
-            <button className="button" disabled={busy !== null} type="submit">
+        <form className={styles.sectionBody} onSubmit={changePassword}>
+          <div className={styles.formGrid}>
+            <label className={styles.wideField}>
+              <span>Current password</span>
+              <input
+                autoComplete="current-password"
+                disabled={busy !== null}
+                maxLength={256}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+                required
+                type="password"
+                value={currentPassword}
+              />
+            </label>
+            <label className={styles.field}>
+              <span>New password</span>
+              <input
+                autoComplete="new-password"
+                disabled={busy !== null}
+                maxLength={256}
+                minLength={12}
+                onChange={(event) => setNewPassword(event.target.value)}
+                required
+                type="password"
+                value={newPassword}
+              />
+            </label>
+            <label className={styles.field}>
+              <span>Confirm new password</span>
+              <input
+                autoComplete="new-password"
+                disabled={busy !== null}
+                maxLength={256}
+                minLength={12}
+                onChange={(event) => setConfirmation(event.target.value)}
+                required
+                type="password"
+                value={confirmation}
+              />
+            </label>
+          </div>
+          <div className={styles.actions}>
+            <button
+              className={styles.primaryButton}
+              disabled={busy !== null || !dirty}
+              type="submit"
+            >
               {busy === "password" ? "Updating password" : "Update password"}
             </button>
           </div>
         </form>
       </section>
 
-      <section className="panel account-session-panel">
-        <div>
-          <p className="eyebrow">Sessions</p>
-          <h2>Sign out other browsers</h2>
-          <p className="section-copy">
-            Revoke every other active session while keeping this browser signed in.
-          </p>
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <div>
+            <h2>Sessions</h2>
+            <p>Revoke other browsers or end the current session.</p>
+          </div>
         </div>
-        <button
-          className="button button-secondary"
-          disabled={busy !== null}
-          onClick={() => void revokeSessions()}
-          type="button"
-        >
-          {busy === "sessions" ? "Revoking sessions" : "Sign out other sessions"}
-        </button>
+        <div className={styles.sectionBody}>
+          <div className={styles.actions}>
+            <button
+              className={styles.secondaryButton}
+              disabled={busy !== null}
+              onClick={() => void revokeSessions()}
+              type="button"
+            >
+              {busy === "sessions" ? "Revoking sessions" : "Sign out other sessions"}
+            </button>
+            <button
+              className={styles.dangerButton}
+              disabled={busy !== null}
+              onClick={() => void logout()}
+              type="button"
+            >
+              {busy === "logout" ? "Signing out" : "Sign out here"}
+            </button>
+          </div>
+        </div>
       </section>
     </div>
   );
