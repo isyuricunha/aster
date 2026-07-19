@@ -15,7 +15,10 @@ type InitialChatData = {
   error: string | null;
 };
 
-async function getInitialChatData(preferredConversationId?: string): Promise<InitialChatData> {
+async function getInitialChatData(
+  preferredConversationId?: string,
+  startNewConversation = false,
+): Promise<InitialChatData> {
   try {
     const [conversationResponse, preferenceResponse] = await Promise.all([
       serverApiFetch("/api/conversations"),
@@ -29,7 +32,7 @@ async function getInitialChatData(preferredConversationId?: string): Promise<Ini
     const preferences = (await preferenceResponse.json()) as ModelPreferences;
     let activeConversation: Conversation | null = null;
     const preferred = conversations.find((item) => item.id === preferredConversationId);
-    const activeSummary = preferred ?? conversations[0];
+    const activeSummary = startNewConversation ? undefined : (preferred ?? conversations[0]);
 
     if (activeSummary) {
       const activeResponse = await serverApiFetch(`/api/conversations/${activeSummary.id}`);
@@ -52,12 +55,16 @@ async function getInitialChatData(preferredConversationId?: string): Promise<Ini
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ conversation?: string | string[] }>;
+  searchParams: Promise<{
+    conversation?: string | string[];
+    new?: string | string[];
+  }>;
 }) {
   await requireServerAuth();
   const params = await searchParams;
   const preferredConversationId =
     typeof params.conversation === "string" ? params.conversation : undefined;
-  const initialData = await getInitialChatData(preferredConversationId);
+  const startNewConversation = params.new === "1";
+  const initialData = await getInitialChatData(preferredConversationId, startNewConversation);
   return <ChatShell {...initialData} />;
 }
