@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254" role="img" aria-labelledby="title">
+  <title id="title">Aster maskable app icon</title>
+  <defs>
+    <linearGradient id="background" x1="180" y1="80" x2="1070" y2="1180" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#12161d"/>
+      <stop offset="0.55" stop-color="#0b0e13"/>
+      <stop offset="1" stop-color="#07090d"/>
+    </linearGradient>
+    <radialGradient id="backgroundGlow" cx="0" cy="0" r="1" gradientTransform="translate(627 548) rotate(90) scale(510)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6972e0" stop-opacity="0.13"/>
+      <stop offset="1" stop-color="#6972e0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="silver" x1="394" y1="305" x2="869" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff"/>
+      <stop offset="0.48" stop-color="#eef0f6"/>
+      <stop offset="1" stop-color="#cdd1dc"/>
+    </linearGradient>
+    <linearGradient id="core" x1="579" y1="694" x2="677" y2="881" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f6f4ff"/>
+      <stop offset="0.5" stop-color="#c9c8ff"/>
+      <stop offset="1" stop-color="#8f97ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="1254" height="1254" fill="url(#background)"/>
+  <rect width="1254" height="1254" fill="url(#backgroundGlow)"/>
+  <g transform="translate(63 63) scale(.9)">
+    <path d="M606 305 402 635h111l93-152V305Z" fill="url(#silver)"/>
+    <path d="M648 304v178l91 151 113 2-204-331Z" fill="url(#silver)"/>
+    <path d="m379 678-55 92 76 124 183 2-58-94H415l73-124H379Z" fill="url(#silver)"/>
+    <path d="M875 678H766l73 123-111 1-57 94 182-1 77-126-55-91Z" fill="url(#silver)"/>
+    <path d="m627 681-63 103 63 103 62-102-62-104Z" fill="url(#core)"/>
+  </g>
+</svg>
