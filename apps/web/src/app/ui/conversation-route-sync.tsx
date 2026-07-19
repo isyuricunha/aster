@@ -20,11 +20,7 @@ function replaceNewChatUrl(conversationId: string): void {
 
   url.searchParams.delete("new");
   url.searchParams.set("conversation", conversationId);
-  window.history.replaceState(
-    window.history.state,
-    "",
-    `${url.pathname}${url.search}${url.hash}`,
-  );
+  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
 export function ConversationRouteSync() {
