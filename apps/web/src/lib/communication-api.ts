@@ -82,6 +82,12 @@ export type CommunicationThreadDetail = CommunicationThread & {
   messages: CommunicationMessage[];
 };
 
+export type CommunicationDraft = {
+  draft: string;
+  model: string;
+  endpoint: string;
+};
+
 export type CommunicationRule = {
   id: string;
   name: string;
@@ -170,6 +176,16 @@ export function readCommunicationThread(id: string): Promise<CommunicationThread
 export function markCommunicationThreadRead(id: string): Promise<CommunicationThreadDetail> {
   return apiRequest<CommunicationThreadDetail>(`/api/communication-threads/${id}/read`, {
     method: "POST",
+  });
+}
+
+export function draftCommunicationReply(
+  id: string,
+  instruction?: string,
+): Promise<CommunicationDraft> {
+  return apiRequest<CommunicationDraft>(`/api/communication-threads/${id}/draft-reply`, {
+    method: "POST",
+    body: JSON.stringify({ instruction: instruction?.trim() || null }),
   });
 }
 

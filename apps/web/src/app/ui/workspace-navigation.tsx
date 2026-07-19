@@ -1,6 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import type { MouseEvent } from "react";
 
 import { AsterMark, Icon, type IconName } from "./icons";
+import { OPEN_SETTINGS_EVENT } from "./settings-window-host";
 
 export type NavigationKey =
   | "chat"
@@ -21,6 +25,7 @@ type NavigationItem = {
   href: string;
   icon: IconName;
   label: string;
+  settingsSection?: "models" | "persona" | "tools" | "memory" | "account";
 };
 
 type NavigationSection = {
@@ -55,23 +60,67 @@ const NAVIGATION_SECTIONS: readonly NavigationSection[] = [
     key: "configuration",
     label: "Configuration",
     items: [
-      { key: "models", href: "/settings/models", icon: "models", label: "Models" },
-      { key: "persona", href: "/settings/persona", icon: "persona", label: "Personas" },
-      { key: "tools", href: "/settings/tools", icon: "tools", label: "Tools" },
+      {
+        key: "models",
+        href: "/settings/models",
+        icon: "models",
+        label: "Models",
+        settingsSection: "models",
+      },
+      {
+        key: "persona",
+        href: "/settings/persona",
+        icon: "persona",
+        label: "Personas",
+        settingsSection: "persona",
+      },
+      {
+        key: "tools",
+        href: "/settings/tools",
+        icon: "tools",
+        label: "Tools",
+        settingsSection: "tools",
+      },
       {
         key: "memory",
         href: "/settings/memory",
         icon: "memory",
         label: "Memory & Knowledge",
+        settingsSection: "memory",
       },
     ],
   },
   {
     key: "security",
     label: "Security",
-    items: [{ key: "account", href: "/settings/account", icon: "account", label: "Account" }],
+    items: [
+      {
+        key: "account",
+        href: "/settings/account",
+        icon: "account",
+        label: "Account",
+        settingsSection: "account",
+      },
+    ],
   },
 ];
+
+function openSettings(event: MouseEvent<HTMLAnchorElement>, item: NavigationItem) {
+  if (
+    !item.settingsSection ||
+    event.button !== 0 ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
+  ) {
+    return;
+  }
+  event.preventDefault();
+  window.dispatchEvent(
+    new CustomEvent(OPEN_SETTINGS_EVENT, { detail: { section: item.settingsSection } }),
+  );
+}
 
 export function WorkspaceBrand() {
   return (
@@ -138,6 +187,7 @@ export function WorkspaceNavigation({
                 className={`navigation-item ${active === item.key ? "active" : ""}`}
                 href={item.href}
                 key={item.key}
+                onClick={(event) => openSettings(event, item)}
               >
                 <Icon name={item.icon} />
                 <span>{item.label}</span>

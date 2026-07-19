@@ -11,6 +11,7 @@ import {
 
 import type { Automation, IntegrationConnection } from "../../lib/automation-api";
 import {
+  draftCommunicationReply,
   listCommunicationThreads,
   markCommunicationThreadRead,
   readCommunicationThread,
@@ -23,6 +24,7 @@ import {
   type CommunicationThreadKind,
 } from "../../lib/communication-api";
 import { AccountPanel } from "./account-panel";
+import { EmailMessageBody } from "./email-message-body";
 import { RulePanel } from "./rule-panel";
 import styles from "./communications.module.css";
 
@@ -38,7 +40,17 @@ function formatDate(value: string): string {
 }
 
 function senderLabel(message: CommunicationThreadDetail["messages"][number]): string {
-  return message.sender_name || message.sender_address || "Unknown sender";
+  const name = message.sender_name?.trim();
+  const address = message.sender_address?.trim();
+  if (name && address) return `${name} <${address}>`;
+  return name || address || "Unknown sender";
+}
+
+function recipientLabel(recipient: { name: string; address: string }): string {
+  const name = recipient.name?.trim();
+  const address = recipient.address?.trim();
+  if (name && address) return `${name} <${address}>`;
+  return name || address || "Unknown recipient";
 }
 
 export function CommunicationWorkspace({
@@ -72,6 +84,7 @@ export function CommunicationWorkspace({
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [query, setQuery] = useState("");
   const [reply, setReply] = useState("");
+  const [draftInstruction, setDraftInstruction] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(initialError);
@@ -142,6 +155,9 @@ export function CommunicationWorkspace({
     setThread(null);
     setThreadLoading(true);
     setError(null);
+    setNotice(null);
+    setReply("");
+    setDraftInstruction("");
     if (threadId === selectedThreadId) {
       setThreadRefreshKey((current) => current + 1);
       return;
@@ -197,6 +213,24 @@ export function CommunicationWorkspace({
     }
   }
 
+  async function generateDraft() {
+    if (!thread || busy) return;
+    setBusy("draft");
+    setNotice(null);
+    setError(null);
+    try {
+      const generated = await draftCommunicationReply(thread.id, draftInstruction);
+      setReply(generated.draft);
+      setNotice(
+        `Draft generated with ${generated.model} via ${generated.endpoint}. Review and edit it before sending.`,
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not generate a reply draft.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function sendReply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!thread || !reply.trim() || busy) return;
@@ -206,6 +240,7 @@ export function CommunicationWorkspace({
     try {
       await replyToCommunicationThread(thread.id, reply);
       setReply("");
+      setDraftInstruction("");
       setThread(await readCommunicationThread(thread.id));
       await refreshInbox();
       setNotice("Reply sent.");
@@ -328,8 +363,16 @@ export function CommunicationWorkspace({
             </button>
           </form>
 
-          {notice ? <div className={styles.notice} role="status">{notice}</div> : null}
-          {error ? <div className={styles.error} role="alert">{error}</div> : null}
+          {notice ? (
+            <div className={styles.notice} role="status">
+              {notice}
+            </div>
+          ) : null}
+          {error ? (
+            <div className={styles.error} role="alert">
+              {error}
+            </div>
+          ) : null}
 
           <div className={styles.inboxLayout}>
             <aside aria-label="Message threads" className={styles.threadList}>
@@ -351,7 +394,9 @@ export function CommunicationWorkspace({
                     <strong>{item.title}</strong>
                     {item.unread_count ? <span>{item.unread_count}</span> : null}
                   </header>
-                  <small>{item.account_name} · {item.kind}</small>
+                  <small>
+                    {item.account_name} · {item.kind}
+                  </small>
                   <p>{item.preview || "No text content"}</p>
                   <time>{formatDate(item.last_message_at)}</time>
                 </button>
@@ -367,7 +412,7 @@ export function CommunicationWorkspace({
               ) : !selectedThreadId ? (
                 <div className={styles.emptyState}>
                   <strong>Select a thread.</strong>
-                  <span>Messages and manual reply controls appear here.</span>
+                  <span>Messages and reply controls appear here.</span>
                 </div>
               ) : !thread ? (
                 <div className={styles.emptyState}>
@@ -378,7 +423,9 @@ export function CommunicationWorkspace({
                 <>
                   <header className={styles.threadHeader}>
                     <div>
-                      <p>{thread.account_name} · {thread.kind}</p>
+                      <p>
+                        {thread.account_name} · {thread.kind}
+                      </p>
                       <h2>{thread.title}</h2>
                       <span>{thread.message_count} message(s)</span>
                     </div>
@@ -396,26 +443,33 @@ export function CommunicationWorkspace({
                   <div className={styles.messageList}>
                     {thread.messages.map((message) => (
                       <section
-                        className={
-                          message.direction === "outbound"
-                            ? styles.outboundMessage
-                            : styles.inboundMessage
-                        }
+                        className={`communication-message-card ${message.direction}`}
                         key={message.id}
                       >
-                        <header>
+                        <header className="communication-message-header">
                           <div>
-                            <strong>{senderLabel(message)}</strong>
-                            <span>{message.direction}</span>
+                            <div>
+                              <strong>{senderLabel(message)}</strong>
+                              <small>{message.direction}</small>
+                            </div>
+                            <time>{formatDate(message.sent_at)}</time>
                           </div>
-                          <time>{formatDate(message.sent_at)}</time>
+                          {message.recipients.length ? (
+                            <div className="communication-addresses">
+                              <span>
+                                To: {message.recipients.map(recipientLabel).join(", ")}
+                              </span>
+                            </div>
+                          ) : null}
+                          {message.subject && message.subject !== thread.title ? (
+                            <h3>{message.subject}</h3>
+                          ) : null}
                         </header>
-                        {message.subject && message.subject !== thread.title ? (
-                          <h3>{message.subject}</h3>
-                        ) : null}
-                        <pre>{message.content_text || "No text content"}</pre>
+
+                        <EmailMessageBody message={message} threadKind={thread.kind} />
+
                         {message.attachments.length ? (
-                          <div className={styles.attachments}>
+                          <div className="communication-message-attachments">
                             {message.attachments.map((attachment) => (
                               <a href={attachment.content_path} key={attachment.id}>
                                 {attachment.filename} · {Math.ceil(attachment.size_bytes / 1024)} KB
@@ -428,18 +482,49 @@ export function CommunicationWorkspace({
                   </div>
 
                   <form className={styles.replyBox} onSubmit={(event) => void sendReply(event)}>
+                    <section className="communication-reply-assistant">
+                      <header>
+                        <div>
+                          <strong>Draft with AI</strong>
+                          <span>
+                            Uses the configured chat model and never sends automatically.
+                          </span>
+                        </div>
+                      </header>
+                      <input
+                        className="communication-reply-guidance"
+                        maxLength={4000}
+                        onChange={(event) => setDraftInstruction(event.target.value)}
+                        placeholder="Optional guidance, e.g. confirm Tuesday and keep it concise"
+                        value={draftInstruction}
+                      />
+                      <div className="communication-reply-actions">
+                        <span className="communication-draft-meta">
+                          The thread is passed to the model as bounded, untrusted context.
+                        </span>
+                        <button
+                          className="communication-ai-button"
+                          disabled={Boolean(busy)}
+                          onClick={() => void generateDraft()}
+                          type="button"
+                        >
+                          {busy === "draft" ? "Drafting…" : reply.trim() ? "Rewrite draft" : "Generate draft"}
+                        </button>
+                      </div>
+                    </section>
+
                     <label>
-                      Manual reply
+                      Reply draft
                       <textarea
                         onChange={(event) => setReply(event.target.value)}
-                        placeholder="Nothing is sent until you press Send reply."
-                        rows={5}
+                        placeholder="Write manually or generate a draft. Nothing is sent until you press Send reply."
+                        rows={7}
                         value={reply}
                       />
                     </label>
                     <div>
                       <span>
-                        Communication automations do not inherit permission to reply to this thread.
+                        Review the final text. Automations do not inherit permission to reply to this thread.
                       </span>
                       <button disabled={!reply.trim() || Boolean(busy)} type="submit">
                         {busy === "reply" ? "Sending…" : "Send reply"}

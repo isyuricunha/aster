@@ -6,6 +6,9 @@ All notable changes to Aster are documented in this file.
 
 ### Added
 
+- Movable, minimizable floating settings window with a compact internal menu and full-page fallback.
+- Sandboxed rich email rendering with scripts, forms, navigation, and remote content blocked by default.
+- Bounded AI-assisted email and Discord reply drafts that remain editable and are never sent automatically.
 - Private IMAP and Discord communication accounts with encrypted credentials, explicit connection tests, and bounded background synchronization.
 - Durable per-source cursors, expiring worker leases, inbound-message deduplication, and restart-safe polling.
 - Persistent communication threads, messages, participants, unread state, searchable text, metadata, and private attachments.

@@ -32,6 +32,8 @@ type InitialMemorySettings = {
   error: string | null;
 };
 
+type SettingsPageSearchParams = Promise<{ embedded?: string | string[] }>;
+
 async function getInitialMemorySettings(): Promise<InitialMemorySettings> {
   try {
     const responses = await Promise.all([
@@ -83,9 +85,13 @@ async function getInitialMemorySettings(): Promise<InitialMemorySettings> {
   }
 }
 
-export default async function MemorySettingsPage() {
+export default async function MemorySettingsPage({
+  searchParams,
+}: {
+  searchParams: SettingsPageSearchParams;
+}) {
   await requireServerAuth();
-  const initialData = await getInitialMemorySettings();
+  const [initialData, params] = await Promise.all([getInitialMemorySettings(), searchParams]);
 
   return (
     <AppFrame
@@ -93,6 +99,7 @@ export default async function MemorySettingsPage() {
       kicker="Context"
       title="Memory & Knowledge"
       description="Control approved memory, private document retrieval, embeddings, and conversation scope."
+      embedded={params.embedded === "1"}
     >
       <MemorySettings
         initialMemories={initialData.memories}

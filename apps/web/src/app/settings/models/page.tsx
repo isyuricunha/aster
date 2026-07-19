@@ -23,6 +23,8 @@ type InitialModelSettings = {
   error: string | null;
 };
 
+type SettingsPageSearchParams = Promise<{ embedded?: string | string[] }>;
+
 async function getInitialModelSettings(): Promise<InitialModelSettings> {
   try {
     const [endpointResponse, modelResponse, preferenceResponse, routingResponse] =
@@ -32,7 +34,6 @@ async function getInitialModelSettings(): Promise<InitialModelSettings> {
         serverApiFetch("/api/model-preferences"),
         serverApiFetch("/api/model-routing"),
       ]);
-
     if (
       !endpointResponse.ok ||
       !modelResponse.ok ||
@@ -60,9 +61,13 @@ async function getInitialModelSettings(): Promise<InitialModelSettings> {
   }
 }
 
-export default async function ModelsSettingsPage() {
+export default async function ModelsSettingsPage({
+  searchParams,
+}: {
+  searchParams: SettingsPageSearchParams;
+}) {
   await requireServerAuth();
-  const initialData = await getInitialModelSettings();
+  const [initialData, params] = await Promise.all([getInitialModelSettings(), searchParams]);
 
   return (
     <AppFrame
@@ -70,6 +75,7 @@ export default async function ModelsSettingsPage() {
       kicker="Configuration"
       title="Models"
       description="Connect compatible APIs, configure model behavior, and define reliable routing across Aster."
+      embedded={params.embedded === "1"}
     >
       <ModelSettings
         initialEndpoints={initialData.endpoints}
