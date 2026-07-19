@@ -120,7 +120,11 @@ async def test_chat_persists_reasoning_but_excludes_it_from_provider_history(
         'event: delta\ndata: {"content": "<reasoning>Inspecting "}'
         in first_response.text
     )
-    assert 'event: delta\ndata: {"content": "</reasoning>\\n\\nFinal answer."}' in first_response.text
+    closing_delta = (
+        'event: delta\ndata: '
+        '{"content": "</reasoning>\\n\\nFinal answer."}'
+    )
+    assert closing_delta in first_response.text
     detail = (await client.get(f"/api/conversations/{conversation_id}")).json()
     assert detail["messages"][1]["content"] == (
         "<reasoning>Inspecting the request.</reasoning>\n\nFinal answer."
@@ -132,5 +136,9 @@ async def test_chat_persists_reasoning_but_excludes_it_from_provider_history(
     )
 
     assert second_response.status_code == 200
-    assert {"role": "assistant", "content": "Final answer."} in fake_client.received_chat_messages
-    assert all("<reasoning>" not in str(message["content"]) for message in fake_client.received_chat_messages)
+    expected_history_message = {"role": "assistant", "content": "Final answer."}
+    assert expected_history_message in fake_client.received_chat_messages
+    assert all(
+        "<reasoning>" not in str(message["content"])
+        for message in fake_client.received_chat_messages
+    )
