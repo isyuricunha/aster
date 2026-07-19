@@ -1,0 +1,141 @@
+@keyframes aster-answer-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.message-rendered-content {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.reasoning-disclosure {
+  overflow: hidden;
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--canvas-raised) 72%, transparent);
+}
+
+.reasoning-disclosure summary {
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: 15px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--text-ui-sm);
+  font-weight: 560;
+  list-style: none;
+  user-select: none;
+}
+
+.reasoning-disclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.reasoning-disclosure summary:hover {
+  background: var(--canvas-hover);
+  color: var(--text);
+}
+
+.reasoning-disclosure summary small {
+  color: var(--text-faint);
+  font-size: var(--text-ui-xs);
+  font-weight: 500;
+}
+
+.reasoning-chevron {
+  color: var(--icon-muted);
+  transition: transform var(--duration-default) var(--ease-standard);
+}
+
+.reasoning-disclosure[open] .reasoning-chevron {
+  transform: rotate(90deg);
+}
+
+.reasoning-disclosure[open] summary {
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.reasoning-disclosure .reasoning-content {
+  max-height: min(44vh, 420px);
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.58;
+  scrollbar-width: thin;
+}
+
+.reasoning-disclosure .reasoning-content > :first-child {
+  margin-top: 0;
+}
+
+.reasoning-disclosure .reasoning-content > :last-child {
+  margin-bottom: 0;
+}
+
+.reasoning-disclosure.streaming summary span,
+.chat-transcript[aria-busy="true"] .chat-welcome::after,
+.chat-transcript[aria-busy="true"] .message-stack:has(> .chat-message:last-child.user)::after,
+.chat-transcript[aria-busy="true"]
+  .chat-message.assistant
+  .message-body:not(:has(.markdown-content:not(.reasoning-content)))::after {
+  background: linear-gradient(
+    90deg,
+    var(--text-faint) 10%,
+    var(--text-strong) 45%,
+    var(--text-faint) 80%
+  );
+  background-clip: text;
+  background-size: 220% 100%;
+  color: transparent;
+  animation: aster-answer-shimmer 1.65s linear infinite;
+}
+
+.chat-transcript[aria-busy="true"] .chat-welcome::after,
+.chat-transcript[aria-busy="true"] .message-stack:has(> .chat-message:last-child.user)::after,
+.chat-transcript[aria-busy="true"]
+  .chat-message.assistant
+  .message-body:not(:has(.markdown-content:not(.reasoning-content)))::after {
+  content: "Generating answer…";
+  width: fit-content;
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 560;
+  letter-spacing: -0.01em;
+}
+
+.chat-transcript[aria-busy="true"] .chat-welcome::after {
+  margin: 20px auto 0;
+}
+
+.chat-transcript[aria-busy="true"] .message-stack:has(> .chat-message:last-child.user)::after {
+  margin: 18px 0 0 42px;
+}
+
+.chat-transcript[aria-busy="true"]
+  .chat-message.assistant
+  .message-body:not(:has(.markdown-content:not(.reasoning-content)))::after {
+  margin-top: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reasoning-disclosure.streaming summary span,
+  .chat-transcript[aria-busy="true"] .chat-welcome::after,
+  .chat-transcript[aria-busy="true"] .message-stack:has(> .chat-message:last-child.user)::after,
+  .chat-transcript[aria-busy="true"]
+    .chat-message.assistant
+    .message-body:not(:has(.markdown-content:not(.reasoning-content)))::after {
+    background: none;
+    color: var(--text-muted);
+    animation: none;
+  }
+}
