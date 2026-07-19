@@ -8,8 +8,14 @@ export const metadata: Metadata = { title: "Account settings" };
 
 export const dynamic = "force-dynamic";
 
-export default async function AccountSettingsPage() {
-  const status = await requireServerAuth();
+type SettingsPageSearchParams = Promise<{ embedded?: string | string[] }>;
+
+export default async function AccountSettingsPage({
+  searchParams,
+}: {
+  searchParams: SettingsPageSearchParams;
+}) {
+  const [status, params] = await Promise.all([requireServerAuth(), searchParams]);
 
   return (
     <AppFrame
@@ -17,6 +23,7 @@ export default async function AccountSettingsPage() {
       kicker="Security"
       title="Account"
       description="Manage the owner password and active sessions protecting this Aster installation."
+      embedded={params.embedded === "1"}
     >
       <AccountSettings username={status.username ?? "owner"} />
     </AppFrame>
