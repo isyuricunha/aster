@@ -1,0 +1,518 @@
+.root {
+  display: grid;
+  min-width: 0;
+  gap: 14px;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.summaryCard,
+.section,
+.advanced {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--surface) 94%, transparent);
+}
+
+.summaryCard {
+  display: grid;
+  gap: 5px;
+  padding: 12px 13px;
+}
+
+.summaryCard span,
+.summaryCard small {
+  color: var(--text-faint);
+  font-size: 0.65rem;
+}
+
+.summaryCard span {
+  font-weight: 650;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.summaryCard strong {
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: 0.83rem;
+  font-weight: 590;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.section {
+  overflow: hidden;
+}
+
+.sectionHeader,
+.advancedToggle {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 15px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in oklab, var(--surface-raised) 72%, transparent);
+}
+
+.sectionHeader > div,
+.advancedToggle > span:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.sectionHeader h2,
+.sectionHeader p,
+.advancedToggle strong,
+.advancedToggle small {
+  margin: 0;
+}
+
+.sectionHeader h2,
+.advancedToggle strong {
+  color: var(--text-strong);
+  font-size: 0.88rem;
+  font-weight: 590;
+}
+
+.sectionHeader p,
+.advancedToggle small {
+  color: var(--text-faint);
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.sectionBody {
+  display: grid;
+  min-width: 0;
+  gap: 13px;
+  padding: 15px;
+}
+
+.tabs {
+  display: flex;
+  min-width: 0;
+  gap: 3px;
+  padding: 5px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--surface-raised) 70%, transparent);
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  min-height: 32px;
+  flex: 0 0 auto;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 570;
+}
+
+.tab:hover {
+  background: var(--surface-hover);
+  color: var(--text-strong);
+}
+
+.activeTab {
+  border-color: var(--border);
+  background: var(--surface-selected);
+  color: var(--text-strong);
+}
+
+.formGrid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px;
+}
+
+.field,
+.wideField,
+.checkboxField {
+  min-width: 0;
+}
+
+.field,
+.wideField {
+  display: grid;
+  gap: 6px;
+}
+
+.wideField {
+  grid-column: 1 / -1;
+}
+
+.field > span,
+.wideField > span {
+  color: var(--text-muted);
+  font-size: 0.69rem;
+  font-weight: 560;
+}
+
+.field input,
+.field select,
+.field textarea,
+.wideField input,
+.wideField select,
+.wideField textarea {
+  width: 100%;
+  min-width: 0;
+}
+
+.field textarea,
+.wideField textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.instructions textarea {
+  min-height: 220px;
+}
+
+.checkboxField {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.checkboxField input {
+  flex: 0 0 auto;
+}
+
+.actions,
+.rowActions,
+.inlineControl,
+.statusRow {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+
+.actions {
+  justify-content: flex-end;
+}
+
+.primaryButton,
+.secondaryButton,
+.dangerButton,
+.iconButton {
+  display: inline-flex;
+  min-height: 31px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--surface-raised) 86%, transparent);
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 570;
+}
+
+.primaryButton {
+  border-color: color-mix(in oklab, var(--accent) 52%, var(--border));
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.primaryButton:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 88%, white 12%);
+}
+
+.secondaryButton:hover:not(:disabled),
+.iconButton:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--text-strong);
+}
+
+.dangerButton {
+  color: color-mix(in oklab, var(--danger) 70%, var(--text));
+}
+
+.dangerButton:hover:not(:disabled) {
+  border-color: color-mix(in oklab, var(--danger) 38%, var(--border));
+  background: color-mix(in oklab, var(--danger) 8%, transparent);
+  color: var(--danger);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.dangerButton:disabled,
+.iconButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.iconButton {
+  width: 31px;
+  padding: 0;
+}
+
+.unsaved {
+  display: inline-flex;
+  min-height: 22px;
+  align-items: center;
+  padding: 0 7px;
+  border: 1px solid color-mix(in oklab, var(--warning) 35%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--warning) 8%, transparent);
+  color: color-mix(in oklab, var(--warning) 72%, var(--text));
+  font-size: 0.62rem;
+  font-weight: 620;
+}
+
+.notice,
+.error {
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.notice {
+  border-color: color-mix(in oklab, var(--success) 28%, var(--border));
+  background: color-mix(in oklab, var(--success) 7%, transparent);
+  color: color-mix(in oklab, var(--success) 64%, var(--text));
+}
+
+.error {
+  border-color: color-mix(in oklab, var(--danger) 30%, var(--border));
+  background: color-mix(in oklab, var(--danger) 7%, transparent);
+  color: color-mix(in oklab, var(--danger) 68%, var(--text));
+}
+
+.list,
+.cardGrid {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+}
+
+.cardGrid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.row,
+.card {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--surface-raised) 58%, transparent);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 11px;
+}
+
+.card {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  padding: 11px;
+}
+
+.rowMain,
+.cardMain {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.rowMain strong,
+.cardMain strong,
+.card h3,
+.rowMain p,
+.cardMain p,
+.rowMain small,
+.cardMain small {
+  margin: 0;
+}
+
+.rowMain strong,
+.cardMain strong,
+.card h3 {
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: 0.75rem;
+  font-weight: 580;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowMain p,
+.cardMain p {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  line-height: 1.48;
+  white-space: pre-wrap;
+}
+
+.rowMain small,
+.cardMain small {
+  color: var(--text-faint);
+  font-size: 0.64rem;
+}
+
+.badges {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.badge {
+  display: inline-flex;
+  min-height: 19px;
+  align-items: center;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-faint);
+  font-size: 0.59rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.successBadge {
+  border-color: color-mix(in oklab, var(--success) 30%, var(--border));
+  color: color-mix(in oklab, var(--success) 70%, var(--text));
+}
+
+.warningBadge {
+  border-color: color-mix(in oklab, var(--warning) 30%, var(--border));
+  color: color-mix(in oklab, var(--warning) 72%, var(--text));
+}
+
+.dangerBadge {
+  border-color: color-mix(in oklab, var(--danger) 30%, var(--border));
+  color: color-mix(in oklab, var(--danger) 72%, var(--text));
+}
+
+.empty {
+  display: grid;
+  min-height: 96px;
+  place-items: center;
+  padding: 18px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-faint);
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+.advanced {
+  overflow: hidden;
+}
+
+.advancedToggle {
+  width: 100%;
+  border: 0;
+  border-bottom: 0;
+  color: inherit;
+  text-align: left;
+}
+
+.advancedToggle:hover {
+  background: var(--surface-hover);
+}
+
+.advancedChevron {
+  color: var(--text-faint);
+  font-size: 0.7rem;
+  transition: transform var(--duration-default) var(--ease-standard);
+}
+
+.advancedChevronOpen {
+  transform: rotate(90deg);
+}
+
+.advancedBody {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .formGrid,
+  .row {
+    grid-template-columns: 1fr;
+  }
+
+  .wideField {
+    grid-column: auto;
+  }
+
+  .sectionHeader,
+  .advancedToggle {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .actions {
+    justify-content: stretch;
+  }
+
+  .actions > button,
+  .inlineControl > button,
+  .inlineControl > select {
+    flex: 1 1 auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .sectionBody {
+    padding: 13px;
+  }
+
+  .tab,
+  .primaryButton,
+  .secondaryButton,
+  .dangerButton,
+  .field input,
+  .field select,
+  .wideField input,
+  .wideField select,
+  .checkboxField {
+    min-height: var(--control-touch);
+  }
+
+  .iconButton {
+    width: var(--control-touch);
+    min-height: var(--control-touch);
+  }
+}
