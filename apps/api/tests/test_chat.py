@@ -10,6 +10,18 @@ from app.models import (
     PersonaPreferences,
 )
 from app.openai_compatible import ModelEndpointError
+from app.prompt_library import CHAT_SYSTEM_PROMPT
+
+
+def persona_instruction() -> str:
+    return (
+        "[USER_DEFINED_PERSONA]\n"
+        "The owner defined this persona for identity, tone, style, and response preferences.\n"
+        "Name: Assistant\n\n"
+        "Instructions:\n"
+        "Be direct.\n"
+        "[/USER_DEFINED_PERSONA]"
+    )
 
 
 async def configure_primary(session_factory: async_sessionmaker[AsyncSession]) -> None:
@@ -53,15 +65,8 @@ async def test_chat_persists_streamed_messages_and_uses_primary_model(api_client
     assert "event: done" in response.text
     assert fake_client.received_chat_model == "chat-model"
     assert fake_client.received_chat_messages == [
-        {
-            "role": "developer",
-            "content": (
-                "[USER_DEFINED_PERSONA]\n"
-                "Your name is Assistant.\n\n"
-                "Be direct.\n"
-                "[/USER_DEFINED_PERSONA]"
-            ),
-        },
+        {"role": "system", "content": CHAT_SYSTEM_PROMPT},
+        {"role": "developer", "content": persona_instruction()},
         {"role": "user", "content": "  Keep my spacing  "},
     ]
 
@@ -89,15 +94,8 @@ async def test_chat_includes_completed_history_in_order(api_client: tuple) -> No
     )
 
     assert fake_client.received_chat_messages == [
-        {
-            "role": "developer",
-            "content": (
-                "[USER_DEFINED_PERSONA]\n"
-                "Your name is Assistant.\n\n"
-                "Be direct.\n"
-                "[/USER_DEFINED_PERSONA]"
-            ),
-        },
+        {"role": "system", "content": CHAT_SYSTEM_PROMPT},
+        {"role": "developer", "content": persona_instruction()},
         {"role": "user", "content": "First"},
         {"role": "assistant", "content": "Hello from Aster"},
         {"role": "user", "content": "Second"},
