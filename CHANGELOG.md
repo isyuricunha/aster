@@ -6,6 +6,7 @@ All notable changes to Aster are documented in this file.
 
 ### Added
 
+- Versioned centralized model prompts, documented instruction hierarchy, explicit trust boundaries, and prompt contract tests.
 - Movable, minimizable floating settings window with a compact internal menu and full-page fallback.
 - Sandboxed rich email rendering with scripts, forms, navigation, and remote content blocked by default.
 - Bounded AI-assisted email and Discord reply drafts that remain editable and are never sent automatically.
@@ -98,6 +99,7 @@ All notable changes to Aster are documented in this file.
 
 ### Changed
 
+- Chat, title generation, memory extraction, communication drafts, automations, and agents now share a system-first reliability policy and explicit untrusted-data boundaries.
 - The automation worker now also claims and synchronizes due communication accounts without adding another broker or worker service.
 - Receiving a communication message persists it before any matching automation is queued.
 - Communication automations require a separate enabled allowlist rule and receive bounded message snapshots as untrusted trigger data.
