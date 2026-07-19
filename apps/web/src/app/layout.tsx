@@ -11,7 +11,7 @@ import "./chat-content.css";
 import "./interface-refinement.css";
 import "./settings-window.css";
 import "./email-reader.css";
-import { SettingsWindowHost } from "./ui/settings-window-host";
+import { WorkspaceWindowHost } from "./ui/workspace-window-host";
 
 export const metadata: Metadata = {
   title: {
@@ -26,7 +26,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     <html lang="en">
       <body>
         {children}
-        <SettingsWindowHost />
+        <WorkspaceWindowHost />
       </body>
     </html>
   );

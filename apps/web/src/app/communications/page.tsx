@@ -23,6 +23,8 @@ type InitialCommunicationData = {
   error: string | null;
 };
 
+type WorkspacePageSearchParams = Promise<{ embedded?: string | string[] }>;
+
 async function getInitialData(): Promise<InitialCommunicationData> {
   try {
     const responses = await Promise.all([
@@ -58,15 +60,20 @@ async function getInitialData(): Promise<InitialCommunicationData> {
   }
 }
 
-export default async function CommunicationsPage() {
+export default async function CommunicationsPage({
+  searchParams,
+}: {
+  searchParams: WorkspacePageSearchParams;
+}) {
   await requireServerAuth();
-  const initial = await getInitialData();
+  const [initial, params] = await Promise.all([getInitialData(), searchParams]);
   return (
     <AppFrame
       active="communications"
       kicker="Connected channels"
       title="Communications"
       description="Read email and Discord messages, reply manually, and route explicitly allowed events into automations."
+      embedded={params.embedded === "1"}
     >
       <CommunicationWorkspace
         initialAccounts={initial.accounts}

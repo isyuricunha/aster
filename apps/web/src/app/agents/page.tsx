@@ -50,6 +50,8 @@ export type InitialAgentData = {
   error: string | null;
 };
 
+type WorkspacePageSearchParams = Promise<{ embedded?: string | string[] }>;
+
 async function getInitialData(): Promise<InitialAgentData> {
   try {
     const responses = await Promise.all([
@@ -114,15 +116,20 @@ async function getInitialData(): Promise<InitialAgentData> {
   }
 }
 
-export default async function AgentsPage() {
+export default async function AgentsPage({
+  searchParams,
+}: {
+  searchParams: WorkspacePageSearchParams;
+}) {
   await requireServerAuth();
-  const initial = await getInitialData();
+  const [initial, params] = await Promise.all([getInitialData(), searchParams]);
   return (
     <AppFrame
       active="agents"
       kicker="Bounded autonomy"
       title="Agents"
       description="Define persistent goals, explicit permissions, hard budgets, approval boundaries, and fully auditable execution runs."
+      embedded={params.embedded === "1"}
     >
       <AgentWorkspace initial={initial} />
     </AppFrame>

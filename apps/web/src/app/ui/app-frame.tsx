@@ -26,7 +26,11 @@ export function AppFrame({
 }) {
   if (embedded) {
     return (
-      <main className="embedded-settings-page" id="main-content" tabIndex={-1}>
+      <main
+        className="embedded-workspace-page embedded-settings-page"
+        id="main-content"
+        tabIndex={-1}
+      >
         <header className="settings-hero">
           <p>{kicker}</p>
           <h1 className="shimmer-text">{title}</h1>
