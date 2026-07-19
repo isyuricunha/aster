@@ -115,12 +115,34 @@ function clampPosition(position: WindowPosition): WindowPosition {
   };
 }
 
+function initialSection(): SettingsSection {
+  if (typeof window === "undefined") return "models";
+  const saved = window.localStorage.getItem(SECTION_STORAGE_KEY);
+  return isSettingsSection(saved) ? saved : "models";
+}
+
+function initialPosition(): WindowPosition {
+  const fallback = { x: 190, y: 82 };
+  if (typeof window === "undefined") return fallback;
+  const saved = window.localStorage.getItem(POSITION_STORAGE_KEY);
+  if (!saved) return clampPosition(fallback);
+  try {
+    const parsed = JSON.parse(saved) as Partial<WindowPosition>;
+    if (typeof parsed.x === "number" && typeof parsed.y === "number") {
+      return clampPosition({ x: parsed.x, y: parsed.y });
+    }
+  } catch {
+    window.localStorage.removeItem(POSITION_STORAGE_KEY);
+  }
+  return clampPosition(fallback);
+}
+
 export function SettingsWindowHost() {
   const dragState = useRef<DragState | null>(null);
   const [open, setOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
-  const [section, setSection] = useState<SettingsSection>("models");
-  const [position, setPosition] = useState<WindowPosition>({ x: 190, y: 82 });
+  const [section, setSection] = useState<SettingsSection>(initialSection);
+  const [position, setPosition] = useState<WindowPosition>(initialPosition);
   const [loading, setLoading] = useState(false);
 
   const activeItem = useMemo(
@@ -129,21 +151,6 @@ export function SettingsWindowHost() {
   );
 
   useEffect(() => {
-    const savedSection = window.localStorage.getItem(SECTION_STORAGE_KEY);
-    if (isSettingsSection(savedSection)) setSection(savedSection);
-
-    const savedPosition = window.localStorage.getItem(POSITION_STORAGE_KEY);
-    if (savedPosition) {
-      try {
-        const parsed = JSON.parse(savedPosition) as Partial<WindowPosition>;
-        if (typeof parsed.x === "number" && typeof parsed.y === "number") {
-          setPosition(clampPosition({ x: parsed.x, y: parsed.y }));
-        }
-      } catch {
-        window.localStorage.removeItem(POSITION_STORAGE_KEY);
-      }
-    }
-
     const handleOpen = (event: Event) => {
       const requestedSection = (event as CustomEvent<{ section?: unknown }>).detail?.section;
       if (isSettingsSection(requestedSection)) {
@@ -201,7 +208,9 @@ export function SettingsWindowHost() {
   function finishDrag(event: ReactPointerEvent<HTMLDivElement>) {
     if (dragState.current?.pointerId !== event.pointerId) return;
     dragState.current = null;
-    event.currentTarget.releasePointerCapture(event.pointerId);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
     setPosition((current) => {
       const next = clampPosition(current);
       window.localStorage.setItem(POSITION_STORAGE_KEY, JSON.stringify(next));
@@ -300,7 +309,9 @@ export function SettingsWindowHost() {
           </nav>
 
           <div className="settings-window-content">
-            {loading ? <div className="settings-window-loading">Loading {activeItem.label}…</div> : null}
+            {loading ? (
+              <div className="settings-window-loading">Loading {activeItem.label}…</div>
+            ) : null}
             <iframe
               key={section}
               onLoad={() => setLoading(false)}
