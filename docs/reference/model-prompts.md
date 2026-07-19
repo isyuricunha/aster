@@ -1,6 +1,6 @@
 # Model prompt architecture
 
-Aster keeps application-owned model instructions centralized in
+Aster keeps stable application-owned model instructions centralized in
 `apps/api/app/prompt_library.py`. Prompt text is part of the runtime contract and should be reviewed
 with the same care as API schemas, database migrations, and tool authorization.
 
@@ -58,7 +58,7 @@ boundaries so a model can distinguish the task from surrounding payloads.
 
 ## Flow-specific prompts
 
-The shared library defines prompts for:
+The shared library defines stable prompts and renderers for:
 
 - interactive chat;
 - conversation-title generation;
@@ -66,12 +66,19 @@ The shared library defines prompts for:
 - communication reply drafts;
 - unattended automations;
 - autonomous agents;
-- tool-use safety;
-- chat and agent retrieval context.
+- persona snapshots;
+- autonomous-agent retrieval context.
 
-Flow modules should import these definitions or rendering helpers instead of embedding a new base
+`retrieval_service.py` and `tool_generation.py` retain narrowly scoped protocol instructions tied to
+the exact source and tool-result structures they construct. Those instructions run after the shared
+chat policy and use the same untrusted-data model. They are not alternative base policies.
+
+Image generation and editing send the bounded prompt authored by the owner. Aster does not prepend a
+hidden image system prompt.
+
+Flow modules should import shared definitions or rendering helpers instead of embedding a new base
 policy. A narrowly scoped local instruction is acceptable when it is inseparable from a specific
-protocol, such as the exact structure of a tool result, but it must not contradict the shared policy.
+protocol, but it must not contradict the shared policy.
 
 ## Output contracts
 
