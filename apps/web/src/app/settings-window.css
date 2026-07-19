@@ -1,18 +1,16 @@
-.settings-window-layer {
+.workspace-window-layer {
   position: fixed;
   z-index: 90;
   inset: 0;
   pointer-events: none;
 }
 
-.settings-floating-window {
+.workspace-floating-window {
   position: fixed;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  width: min(980px, calc(100vw - 40px));
-  height: min(720px, calc(100vh - 40px));
   min-width: 680px;
   min-height: 460px;
+  grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
   resize: both;
   border: 1px solid var(--border-strong);
@@ -23,10 +21,14 @@
     0 0 0 1px rgb(255 255 255 / 2%) inset;
   pointer-events: auto;
   backdrop-filter: blur(18px);
-  animation: settings-window-enter 160ms var(--ease-out, ease-out) both;
+  animation: workspace-window-enter 160ms var(--ease-out, ease-out) both;
 }
 
-.settings-window-titlebar {
+.workspace-floating-window:focus-within {
+  border-color: color-mix(in srgb, var(--accent-border) 76%, var(--border-strong));
+}
+
+.workspace-window-titlebar {
   display: flex;
   min-height: 50px;
   align-items: stretch;
@@ -35,7 +37,7 @@
   background: var(--surface-base);
 }
 
-.settings-window-drag-handle {
+.workspace-window-drag-handle {
   display: flex;
   min-width: 0;
   flex: 1;
@@ -48,23 +50,23 @@
   user-select: none;
 }
 
-.settings-window-drag-handle:active {
+.workspace-window-drag-handle:active {
   cursor: grabbing;
 }
 
-.settings-window-drag-handle > div {
+.workspace-window-drag-handle > div {
   display: flex;
   min-width: 0;
   align-items: baseline;
   gap: 8px;
 }
 
-.settings-window-drag-handle strong {
+.workspace-window-drag-handle strong {
   color: var(--text-primary);
   font-size: 13px;
 }
 
-.settings-window-drag-handle span {
+.workspace-window-drag-handle span {
   overflow: hidden;
   color: var(--text-muted);
   font-size: 12px;
@@ -72,15 +74,15 @@
   white-space: nowrap;
 }
 
-.settings-window-controls {
+.workspace-window-controls {
   display: flex;
   align-items: center;
   gap: 5px;
   padding: 7px;
 }
 
-.settings-window-controls a,
-.settings-window-controls button {
+.workspace-window-controls a,
+.workspace-window-controls button {
   display: inline-flex;
   min-height: 32px;
   align-items: center;
@@ -94,22 +96,47 @@
   cursor: pointer;
 }
 
-.settings-window-controls a {
+.workspace-window-controls a {
   padding: 0 10px;
   font-size: 11px;
 }
 
-.settings-window-controls button {
+.workspace-window-controls button {
   width: 32px;
   padding: 0;
   font-size: 18px;
 }
 
-.settings-window-controls a:hover,
-.settings-window-controls button:hover {
+.workspace-window-controls a:hover,
+.workspace-window-controls button:hover {
   border-color: var(--accent-border);
   background: var(--surface-selected);
   color: var(--text-primary);
+}
+
+.workspace-window-content {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface-raised);
+}
+
+.workspace-window-content iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--surface-raised);
+}
+
+.workspace-window-loading {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  inset: 0;
+  place-items: center;
+  background: color-mix(in srgb, var(--surface-raised) 92%, transparent);
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .settings-window-body {
@@ -196,47 +223,32 @@
   line-height: 1.35;
 }
 
-.settings-window-content {
-  position: relative;
-  min-width: 0;
-  min-height: 0;
-  background: var(--surface-raised);
-}
-
-.settings-window-content iframe {
-  width: 100%;
-  height: 100%;
-  border: 0;
-  background: var(--surface-raised);
-}
-
-.settings-window-loading {
-  position: absolute;
-  z-index: 2;
-  display: grid;
-  inset: 0;
-  place-items: center;
-  background: color-mix(in srgb, var(--surface-raised) 92%, transparent);
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.settings-window-minimized {
+.workspace-window-dock {
   position: fixed;
-  z-index: 91;
+  z-index: 220;
   right: 18px;
   bottom: 18px;
   display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 5px;
-  border: 1px solid var(--border-strong);
-  border-radius: 9px;
-  background: var(--surface-base);
-  box-shadow: 0 18px 46px rgb(0 0 0 / 42%);
+  max-width: calc(100vw - 36px);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+  pointer-events: auto;
 }
 
-.settings-window-minimized button {
+.workspace-window-dock > div {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--surface-base) 96%, transparent);
+  box-shadow: 0 18px 46px rgb(0 0 0 / 42%);
+  backdrop-filter: blur(16px);
+}
+
+.workspace-window-dock button {
   display: inline-flex;
   min-height: 34px;
   align-items: center;
@@ -250,38 +262,52 @@
   cursor: pointer;
 }
 
-.settings-window-minimized button:first-child:hover {
+.workspace-window-dock button:first-child:hover {
   background: var(--surface-selected);
   color: var(--text-primary);
 }
 
-.settings-window-minimized button:last-child {
-  width: 34px;
+.workspace-window-dock button:last-child {
+  width: 32px;
   justify-content: center;
   padding: 0;
 }
 
+.workspace-window-dock button:last-child:hover {
+  background: var(--surface-soft);
+  color: var(--text-primary);
+}
+
+.workspace-window-dock small {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.embedded-workspace-page,
 .embedded-settings-page {
   min-height: 100vh;
   padding: 22px;
   background: var(--surface-raised);
 }
 
+.embedded-workspace-page .settings-hero,
 .embedded-settings-page .settings-hero {
   margin: 0 0 18px;
   padding: 0 0 16px;
   border-bottom: 1px solid var(--border-subtle);
 }
 
+.embedded-workspace-page .settings-hero h1,
 .embedded-settings-page .settings-hero h1 {
   font-size: clamp(22px, 3vw, 30px);
 }
 
+.embedded-workspace-page .settings-hero span,
 .embedded-settings-page .settings-hero span {
-  max-width: 720px;
+  max-width: 760px;
 }
 
-@keyframes settings-window-enter {
+@keyframes workspace-window-enter {
   from {
     opacity: 0;
     transform: translateY(8px) scale(0.985);
@@ -294,10 +320,10 @@
 }
 
 @media (max-width: 760px) {
-  .settings-floating-window {
+  .workspace-floating-window {
     inset: 0 !important;
-    width: 100vw;
-    height: 100dvh;
+    width: 100vw !important;
+    height: 100dvh !important;
     min-width: 0;
     min-height: 0;
     resize: none;
@@ -305,11 +331,11 @@
     border-radius: 0;
   }
 
-  .settings-window-drag-handle {
+  .workspace-window-drag-handle {
     cursor: default;
   }
 
-  .settings-window-controls a {
+  .workspace-window-controls a {
     display: none;
   }
 
@@ -353,6 +379,35 @@
     display: block;
   }
 
+  .workspace-window-dock {
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    max-width: none;
+    justify-content: stretch;
+  }
+
+  .workspace-window-dock > div {
+    min-width: 0;
+    flex: 1 1 160px;
+  }
+
+  .workspace-window-dock button:first-child {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .workspace-window-dock button:first-child span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .workspace-window-dock small {
+    display: none;
+  }
+
+  .embedded-workspace-page,
   .embedded-settings-page {
     padding: 16px;
   }
