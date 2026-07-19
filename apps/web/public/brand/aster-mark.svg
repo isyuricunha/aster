@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="290 270 674 660" role="img" aria-labelledby="title description">
+  <title id="title">Aster mark</title>
+  <desc id="description">A geometric silver emblem with a lavender diamond core.</desc>
+  <defs>
+    <linearGradient id="silver" x1="394" y1="305" x2="869" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff"/>
+      <stop offset="0.48" stop-color="#eef0f6"/>
+      <stop offset="1" stop-color="#cdd1dc"/>
+    </linearGradient>
+    <linearGradient id="core" x1="579" y1="694" x2="677" y2="881" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f6f4ff"/>
+      <stop offset="0.5" stop-color="#c9c8ff"/>
+      <stop offset="1" stop-color="#8f97ff"/>
+    </linearGradient>
+  </defs>
+  <path d="M606 305 402 635h111l93-152V305Z" fill="url(#silver)"/>
+  <path d="M648 304v178l91 151 113 2-204-331Z" fill="url(#silver)"/>
+  <path d="m379 678-55 92 76 124 183 2-58-94H415l73-124H379Z" fill="url(#silver)"/>
+  <path d="M875 678H766l73 123-111 1-57 94 182-1 77-126-55-91Z" fill="url(#silver)"/>
+  <path d="m627 681-63 103 63 103 62-102-62-104Z" fill="url(#core)"/>
+</svg>
