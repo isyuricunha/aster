@@ -18,6 +18,8 @@ type InitialImages = {
   error: string | null;
 };
 
+type ImagesPageSearchParams = Promise<{ embedded?: string | string[] }>;
+
 async function getInitialImages(): Promise<InitialImages> {
   try {
     const responses = await Promise.all([
@@ -50,15 +52,20 @@ async function getInitialImages(): Promise<InitialImages> {
   }
 }
 
-export default async function ImagesPage() {
+export default async function ImagesPage({
+  searchParams,
+}: {
+  searchParams: ImagesPageSearchParams;
+}) {
   await requireServerAuth();
-  const initial = await getInitialImages();
+  const [initial, params] = await Promise.all([getInitialImages(), searchParams]);
   return (
     <AppFrame
       active="images"
       kicker="Visual workspace"
       title="Images"
       description="Review private image history and declare provider-specific generation and editing capabilities."
+      embedded={params.embedded === "1"}
     >
       <ImageWorkspace
         initialGallery={initial.gallery}

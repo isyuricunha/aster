@@ -14,7 +14,11 @@ export const OPEN_SETTINGS_EVENT = "aster:open-settings";
 export const OPEN_WORKSPACE_WINDOW_EVENT = "aster:open-workspace-window";
 
 export type SettingsSection = "models" | "persona" | "memory" | "tools" | "account";
-export type WorkspaceWindowKey = "communications" | "agents";
+export type WorkspaceWindowKey =
+  | "communications"
+  | "agents"
+  | "images"
+  | "automations";
 
 type WindowKey = "settings" | WorkspaceWindowKey;
 
@@ -31,6 +35,13 @@ type SettingsGroup = {
   items: readonly SettingsItem[];
 };
 
+type WindowGeometry = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 type WindowDefinition = {
   key: WindowKey;
   label: string;
@@ -38,13 +49,6 @@ type WindowDefinition = {
   icon: IconName;
   href: string;
   defaultGeometry: WindowGeometry;
-};
-
-type WindowGeometry = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
 };
 
 type FloatingWindowState = {
@@ -120,7 +124,13 @@ const SETTINGS_GROUPS: readonly SettingsGroup[] = [
 ];
 
 const SETTINGS_ITEMS = SETTINGS_GROUPS.flatMap((group) => group.items);
-const WINDOW_KEYS: readonly WindowKey[] = ["settings", "communications", "agents"];
+const WORKSPACE_WINDOW_KEYS: readonly WorkspaceWindowKey[] = [
+  "communications",
+  "agents",
+  "images",
+  "automations",
+];
+const WINDOW_KEYS: readonly WindowKey[] = ["settings", ...WORKSPACE_WINDOW_KEYS];
 const SETTINGS_SECTION_STORAGE_KEY = "aster.settings-window-section";
 const WINDOW_GEOMETRY_STORAGE_PREFIX = "aster.workspace-window-geometry.";
 
@@ -149,6 +159,22 @@ const WINDOW_DEFINITIONS: Record<WindowKey, WindowDefinition> = {
     href: "/agents",
     defaultGeometry: { x: 260, y: 106, width: 1200, height: 780 },
   },
+  images: {
+    key: "images",
+    label: "Images",
+    description: "Private gallery, operation details, and model capabilities",
+    icon: "images",
+    href: "/images",
+    defaultGeometry: { x: 295, y: 118, width: 1120, height: 760 },
+  },
+  automations: {
+    key: "automations",
+    label: "Automations",
+    description: "Schedules, runs, integrations, and notifications",
+    icon: "refresh",
+    href: "/automations",
+    defaultGeometry: { x: 330, y: 130, width: 1200, height: 780 },
+  },
 };
 
 function isSettingsSection(value: unknown): value is SettingsSection {
@@ -156,7 +182,7 @@ function isSettingsSection(value: unknown): value is SettingsSection {
 }
 
 function isWorkspaceWindowKey(value: unknown): value is WorkspaceWindowKey {
-  return value === "communications" || value === "agents";
+  return WORKSPACE_WINDOW_KEYS.includes(value as WorkspaceWindowKey);
 }
 
 function isNarrowViewport(): boolean {
@@ -230,26 +256,20 @@ function initialSettingsSection(): SettingsSection {
 }
 
 function initialWindows(): WindowCollection {
-  return {
-    settings: {
+  const entries = WINDOW_KEYS.map((key, index) => [
+    key,
+    {
       open: false,
       minimized: false,
-      zIndex: 101,
-      geometry: readStoredGeometry("settings"),
+      zIndex: 101 + index,
+      geometry: readStoredGeometry(key),
     },
-    communications: {
-      open: false,
-      minimized: false,
-      zIndex: 102,
-      geometry: readStoredGeometry("communications"),
-    },
-    agents: {
-      open: false,
-      minimized: false,
-      zIndex: 103,
-      geometry: readStoredGeometry("agents"),
-    },
-  };
+  ]);
+  return Object.fromEntries(entries) as WindowCollection;
+}
+
+function initialLoading(): LoadingCollection {
+  return Object.fromEntries(WINDOW_KEYS.map((key) => [key, false])) as LoadingCollection;
 }
 
 function highestZIndex(windows: WindowCollection): number {
@@ -260,11 +280,7 @@ export function WorkspaceWindowHost() {
   const dragState = useRef<DragState | null>(null);
   const windowElements = useRef(new Map<WindowKey, HTMLElement>());
   const [windows, setWindows] = useState<WindowCollection>(initialWindows);
-  const [loading, setLoading] = useState<LoadingCollection>({
-    settings: false,
-    communications: false,
-    agents: false,
-  });
+  const [loading, setLoading] = useState<LoadingCollection>(initialLoading);
   const [settingsSection, setSettingsSection] =
     useState<SettingsSection>(initialSettingsSection);
 
@@ -381,7 +397,13 @@ export function WorkspaceWindowHost() {
 
     for (const element of windowElements.current.values()) observer.observe(element);
     return () => observer.disconnect();
-  }, [windows.settings.open, windows.communications.open, windows.agents.open]);
+  }, [
+    windows.settings.open,
+    windows.communications.open,
+    windows.agents.open,
+    windows.images.open,
+    windows.automations.open,
+  ]);
 
   function chooseSettingsSection(nextSection: SettingsSection) {
     setSettingsSection(nextSection);

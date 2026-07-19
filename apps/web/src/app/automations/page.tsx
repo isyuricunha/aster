@@ -25,6 +25,8 @@ type InitialAutomationData = {
   error: string | null;
 };
 
+type AutomationsPageSearchParams = Promise<{ embedded?: string | string[] }>;
+
 async function getInitialData(): Promise<InitialAutomationData> {
   try {
     const responses = await Promise.all([
@@ -62,15 +64,20 @@ async function getInitialData(): Promise<InitialAutomationData> {
   }
 }
 
-export default async function AutomationsPage() {
+export default async function AutomationsPage({
+  searchParams,
+}: {
+  searchParams: AutomationsPageSearchParams;
+}) {
   await requireServerAuth();
-  const initial = await getInitialData();
+  const [initial, params] = await Promise.all([getInitialData(), searchParams]);
   return (
     <AppFrame
       active="automations"
       kicker="Background work"
       title="Automations"
       description="Schedule bounded model runs, deliver results through explicit integrations, and inspect every attempt."
+      embedded={params.embedded === "1"}
     >
       {initial.error ? (
         <div className="banner banner-error" role="alert">
