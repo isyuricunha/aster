@@ -30,8 +30,10 @@ Global command-palette navigation provides keyboard-first access to blank chats,
 
 Progressive settings surfaces keep daily model, persona, memory, knowledge, tool, and account configuration concise while preserving every maintenance and technical control in lazily mounted advanced settings.
 
-Implementation and verification are recorded in [Aster interface redesign checklist](interface-redesign.md), [Floating workspace windows](floating-workspace-windows.md), [Command palette](command-palette.md), and [Simplified settings](simplified-settings.md).
+The unified application sidebar places New chat, Search, expandable conversation history, workspaces, owner identity, and Settings in one persistent navigation surface across chat and full-page workspaces. Desktop collapse and narrow-screen drawer behavior use the same information architecture.
+
+Implementation and verification are recorded in [Aster interface redesign checklist](interface-redesign.md), [Floating workspace windows](floating-workspace-windows.md), [Command palette](command-palette.md), [Simplified settings](simplified-settings.md), and [Unified application sidebar](sidebar-navigation.md).
 
 ## Later stages
 
-Routing analytics, controlled worker concurrency, authoritative provider usage accounting, additional providers, and specialized integrations remain planned improvements. They will be scheduled according to deployment feedback and operational need.
+Further product stages remain intentionally unscheduled. New work should be chosen from deployment feedback and concrete owner workflows instead of adding speculative dashboards, routing policy, portability layers, or integrations without a demonstrated need.
