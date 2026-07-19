@@ -36,14 +36,73 @@ export function normalizeStreamingMarkdown(content: string): string {
   return normalized;
 }
 
-export function MarkdownMessage({ content, streaming }: { content: string; streaming: boolean }) {
+type SplitMessageContent = {
+  answer: string;
+  reasoning: string | null;
+  reasoningStreaming: boolean;
+};
+
+function splitReasoningContent(content: string, streaming: boolean): SplitMessageContent {
+  const answerParts: string[] = [];
+  const reasoningParts: string[] = [];
+  let cursor = 0;
+  let reasoningStreaming = false;
+
+  while (cursor < content.length) {
+    const remaining = content.slice(cursor);
+    const opening = /<(think|analysis|reasoning)>/i.exec(remaining);
+    if (!opening) break;
+
+    const openingStart = cursor + opening.index;
+    const bodyStart = openingStart + opening[0].length;
+    answerParts.push(content.slice(cursor, openingStart));
+
+    const tagName = opening[1];
+    const closing = new RegExp(`</${tagName}>`, "i").exec(content.slice(bodyStart));
+    if (!closing) {
+      if (streaming) {
+        reasoningParts.push(content.slice(bodyStart));
+        reasoningStreaming = true;
+      } else {
+        answerParts.push(content.slice(openingStart));
+      }
+      cursor = content.length;
+      break;
+    }
+
+    reasoningParts.push(content.slice(bodyStart, bodyStart + closing.index));
+    cursor = bodyStart + closing.index + closing[0].length;
+  }
+
+  answerParts.push(content.slice(cursor));
+  const reasoning = reasoningParts
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join("\n\n");
+
+  return {
+    answer: answerParts.join("").replace(/^\s+/, ""),
+    reasoning: reasoning || null,
+    reasoningStreaming,
+  };
+}
+
+function MarkdownBody({
+  className = "",
+  content,
+  streaming,
+}: {
+  className?: string;
+  content: string;
+  streaming: boolean;
+}) {
   const renderedContent = useMemo(
     () => (streaming ? normalizeStreamingMarkdown(content) : content),
     [content, streaming],
   );
 
   return (
-    <div className={`markdown-content ${streaming ? "streaming" : ""}`}>
+    <div className={`markdown-content ${streaming ? "streaming" : ""} ${className}`.trim()}>
       <ReactMarkdown
         components={markdownComponents}
         rehypePlugins={[rehypeHighlight]}
@@ -52,6 +111,35 @@ export function MarkdownMessage({ content, streaming }: { content: string; strea
       >
         {renderedContent || (streaming ? "…" : "")}
       </ReactMarkdown>
+    </div>
+  );
+}
+
+export function MarkdownMessage({ content, streaming }: { content: string; streaming: boolean }) {
+  const splitContent = useMemo(
+    () => splitReasoningContent(content, streaming),
+    [content, streaming],
+  );
+
+  return (
+    <div className="message-rendered-content">
+      {splitContent.reasoning ? (
+        <details className={`reasoning-disclosure ${splitContent.reasoningStreaming ? "streaming" : ""}`}>
+          <summary>
+            <Icon className="reasoning-chevron" name="chevron-right" size={13} />
+            <span>{splitContent.reasoningStreaming ? "Reasoning…" : "Reasoning"}</span>
+            <small>Show details</small>
+          </summary>
+          <MarkdownBody
+            className="reasoning-content"
+            content={splitContent.reasoning}
+            streaming={splitContent.reasoningStreaming}
+          />
+        </details>
+      ) : null}
+      {splitContent.answer ? (
+        <MarkdownBody content={splitContent.answer} streaming={streaming} />
+      ) : null}
     </div>
   );
 }
