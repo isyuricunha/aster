@@ -1,10 +1,10 @@
-# Autonomous Agents
+# Autonomous agents
 
-Stage 17 adds bounded persistent agents to Aster. Agents can plan across multiple model calls, use explicitly selected MCP tools, read explicitly selected communication accounts, propose replies, use approved memory and selected knowledge collections, pause for owner approval, and preserve a complete execution history.
+Aster agents are bounded persistent workers.
+
+They can plan across multiple model calls, use explicitly selected MCP tools, read explicitly selected communication accounts, propose or send approved replies, use approved memory and selected collections, pause for owner approval, and preserve a complete execution history.
 
 ## Runtime configuration
-
-The default values are conservative for one self-hosted worker:
 
 ```env
 ASTER_AGENT_LEASE_SECONDS=180
@@ -17,146 +17,134 @@ ASTER_AGENT_RETRIEVAL_MAX_CHARACTERS=24000
 ASTER_AGENT_LOOP_REPEAT_LIMIT=3
 ```
 
-The worker remains the same Compose service used by durable automations. It schedules automations and agents, synchronizes communication accounts, dispatches communication events, and executes one claimed run at a time.
+The worker is shared with automations and communications. It schedules and claims durable work through PostgreSQL leases.
 
 ## Creating an agent
 
 Open **Agents → Agents** and define:
 
-- a name and persistent goal
-- manual, one-time, interval, daily, weekly, or communication trigger
-- optional model and persona
-- approved memory access
-- selected knowledge collections
-- selected MCP tools and approval policies
-- selected communication accounts with read and optional reply permissions
-- step, model-call, action, runtime, token, and optional cost limits
-- notification preferences
+- name and persistent goal;
+- manual, one-time, interval, daily, weekly, or communication trigger;
+- optional model and persona;
+- approved memory access;
+- selected knowledge collections;
+- selected MCP tools and approval policies;
+- selected communication accounts with read and optional reply permission;
+- step, model-call, action, runtime, token, and optional cost limits;
+- notification preferences.
 
-Saving an agent does not start it. Use **Run now**, configure a schedule, or add a communication dispatch rule.
+Saving an agent does not run it. Use **Run now**, configure a schedule, or add a communication event rule.
 
 ## Immutable run scopes
 
-Every queued run freezes its goal, persona, memory setting, knowledge collections, tools, accounts, approval policies, and budgets. Editing an agent changes future runs only.
+Every queued run freezes its:
 
-This means an active or approval-waiting run cannot gain a newly added tool or communication account.
+- goal;
+- persona;
+- model selection;
+- memory setting;
+- knowledge collections;
+- tools and approval policies;
+- communication accounts and permissions;
+- budgets and deadline.
+
+Editing the reusable agent changes future runs only. An active or approval-waiting run cannot gain a newly added tool or account.
 
 ## Tool approval policies
 
-Each MCP tool has one agent-specific policy:
+Each selected MCP tool has an agent-specific policy:
 
-- **Always approve**: every proposed call pauses for the owner.
-- **Tool default**: the tool's existing confirmation setting decides.
-- **No approval**: the worker may execute the call immediately when it remains inside every other run limit.
+- **Always approve** — every proposed call pauses for the owner.
+- **Tool default** — the tool's global confirmation setting decides.
+- **No approval** — the worker may execute the call when it remains inside every other run limit.
 
-Approval is a queue transition. The web request records the decision and returns the run to the worker. It never performs the tool call itself.
+Approval is a durable queue transition. The web request records the decision and returns the run to the worker; it does not execute the tool itself.
 
 ## Communication access
 
-Communication accounts expose separate permissions:
+Account permissions are separate:
 
 - **Read** permits listing and reading persisted threads.
 - **Reply** permits proposing or sending replies through that account.
 
-Reply access can still require approval for every message. Email replies continue to use the account's linked SMTP integration. Discord replies continue to disable mention parsing.
+Reply access may still require approval for every message.
 
-Communication messages and thread content are untrusted data. They cannot expand the agent's permissions or override its saved goal.
+Email replies use the account's linked SMTP integration. Discord replies keep mention parsing disabled. Communication content remains untrusted and cannot expand permissions.
 
 ## Communication event rules
 
-An agent using the **Communication event** trigger stays idle until a rule is created under **Agents → Event rules**.
+An agent with the **Communication event** trigger remains idle until a rule is created under **Agents → Event rules**.
 
-A rule binds one agent to one readable communication account and can require:
+A rule binds one agent to one readable account and may require:
 
-- a sender glob
-- one or more source IDs
-- body text
-- a Discord bot mention
+- sender glob;
+- one or more source IDs;
+- body text;
+- Discord bot mention.
 
-All configured conditions must match. Rules apply only to messages received after the rule was created. The same message can create at most one run for the same agent.
+All configured conditions must match. Rules apply only to messages received after the rule was created. One message can create at most one run for the same agent.
 
 ## Budgets
 
 Every run enforces:
 
-- maximum persisted steps
-- maximum model calls
-- maximum external or internal actions
-- runtime deadline
-- estimated token limit
-- optional estimated cost limit
+- maximum persisted steps;
+- maximum model calls;
+- maximum actions;
+- runtime deadline;
+- estimated token limit;
+- optional estimated cost limit.
 
-Cost limits require explicit input and output rates in USD per one million tokens. Aster currently estimates tokens from serialized character counts. These values are operational guardrails, not provider billing records.
+Cost limits require explicit input and output rates per one million tokens. Token and cost values are operational estimates, not provider billing records.
 
-## Run history
+## Runs and approvals
 
 **Agents → Runs & approvals** shows:
 
-- trigger and immutable goal snapshot
-- selected model and persona
-- current plan
-- usage counters and deadlines
-- every model decision
-- every action and argument
-- untrusted tool or communication results
-- pending, approved, denied, or cancelled approvals
-- final output or failure
+- trigger and immutable goal snapshot;
+- model and persona;
+- current plan;
+- counters and deadline;
+- model decisions;
+- actions and arguments;
+- tool, retrieval, and communication results;
+- pending, approved, denied, and cancelled approvals;
+- final output or failure.
 
 A denied action remains in the timeline so the next model round can choose a different safe path.
 
-## Pausing, resuming, cancelling, and retrying
+## Lifecycle controls
 
-- **Pause** requests a checkpoint stop. Queued runs pause immediately; running runs pause at the next control boundary.
+- **Pause** requests a checkpoint stop.
 - **Resume** returns a paused run to the durable queue.
-- **Cancel** prevents additional work and cancels pending approvals.
+- **Cancel** blocks additional work and cancels pending approvals.
 - **Retry** creates a new run and audit trail from a failed or cancelled run.
 
 A worker lease that expires during an active run fails the run. Aster does not automatically replay an uncertain external side effect.
 
 ## Emergency stop
 
-The global emergency stop is displayed at the top of the Agents workspace.
+The global emergency stop:
 
-Activating it:
+- cancels queued, running, paused, and approval-waiting runs;
+- cancels pending approvals;
+- blocks manual runs;
+- blocks schedules and communication dispatch;
+- prevents the worker from claiming new agent runs.
 
-- cancels queued, running, paused, and approval-waiting runs
-- cancels pending approvals
-- blocks manual runs
-- blocks schedules and communication dispatches
-- prevents the worker from claiming new agent runs
+Releasing it permits new work but does not resurrect cancelled runs.
 
-Releasing the stop permits new work but does not resurrect cancelled runs.
-
-## Deployment checks
-
-After deployment:
+## Operational checks
 
 ```bash
 docker compose exec -T api alembic current
-docker compose exec -T worker test -f /tmp/aster-worker-ready && echo "Worker ready"
+docker compose exec -T worker test -f /tmp/aster-worker-ready
 ```
 
-Expected migration:
-
-```text
-0016_autonomous_agents (head)
-```
-
-Then verify:
-
-1. `/agents` requires authentication and loads after login.
-2. An agent can be saved with no tools or communication accounts.
-3. **Run now** creates one queued run.
-4. A direct model result completes the run and creates a notification.
-5. A tool with **Always approve** pauses before the MCP call.
-6. Approving returns the run to the worker and executes the action once.
-7. Denying records the decision and allows a different safe path.
-8. Editing the agent does not alter a previously queued run's scopes.
-9. The emergency stop cancels active work and blocks new runs.
-10. A communication rule dispatches only future matching messages.
-
-For failures, inspect the shared worker and API logs:
+For failures:
 
 ```bash
 docker compose logs --tail=300 api worker web postgres
 ```
+
+Validate a direct model run before granting tools or accounts. Then test approval-required tools, denial, immutable scopes, emergency stop, and communication rules independently.

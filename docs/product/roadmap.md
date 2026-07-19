@@ -1,39 +1,53 @@
-# Aster Roadmap
+# Aster roadmap
 
-## Completed foundation
+## Current state
 
-Stages 1 through 16 established the self-hosted application foundation: OpenAI-compatible model endpoints, personas, persistent chat, authentication, model profiles and fallbacks, export and search, interface refinement, persona snapshots, MCP tools, memory and RAG, images, durable automations with outbound integrations, and private inbound email and Discord communication channels.
+The core product foundation is complete:
 
-## Stage 17 — Autonomous Agents
+- single-owner authentication;
+- OpenAI-compatible model configuration and explicit model roles;
+- persistent chat, personas, tools, memory, retrieval, and images;
+- durable automations and external integrations;
+- private IMAP and Discord communications;
+- bounded persistent agents;
+- unified desktop and mobile navigation;
+- floating workspaces, command palette, and progressive settings.
 
-Stage 17 adds bounded persistent agents on top of the existing tools, memory, RAG, automations, and communication events:
+## Current focus
 
-- persistent goals, plans, and subtasks
-- manual, scheduled, and communication-event execution
-- explicit MCP tool, communication account, and knowledge collection scopes
-- immutable permissions and budgets for every queued run
-- owner approvals for sensitive tools and communication replies
-- step, model-call, action, runtime, token, and optional cost limits
-- pause, resume, cancel, retry, and emergency stop controls
-- loop prevention and complete execution history
-- private completion and failure notifications
+Work is selected from real usage and deployment feedback.
 
-Agents never inherit communication reply authority, tools, accounts, knowledge collections, or approval-free side effects implicitly.
+The immediate priorities are:
 
-## Completed interface redesign
+1. improve interaction quality and consistency in daily chat workflows;
+2. simplify repository structure and keep documentation current;
+3. remove obsolete rollout machinery and dead implementation artifacts;
+4. harden existing features before expanding the product surface;
+5. improve recovery, diagnostics, and operator guidance where real failures expose gaps.
 
-The application-wide dark interface and responsive UX redesign consolidates the visual token system, repairs incomplete feature styling, unifies application chrome, and completes mobile and narrow-screen behavior without changing backend contracts.
+## Selection rule
 
-The floating workspace system keeps chat as the primary surface while Settings, Communications, Agents, Images, and Automations can be moved, resized, focused, minimized, restored, or opened as normal full pages.
+A new product area should not be scheduled because it is fashionable or technically possible.
 
-Global command-palette navigation provides keyboard-first access to blank chats, workspaces, settings, and full-history conversation search without duplicating feature interfaces.
+It should begin only when:
 
-Progressive settings surfaces keep daily model, persona, memory, knowledge, tool, and account configuration concise while preserving every maintenance and technical control in lazily mounted advanced settings.
+- the owner workflow is concrete;
+- existing workspaces cannot solve it cleanly;
+- authority and data boundaries are understood;
+- the maintenance cost is acceptable for a self-hosted project;
+- the change can be tested and operated without hidden infrastructure.
 
-The unified application sidebar places New chat, Search, expandable conversation history, workspaces, owner identity, and Settings in one persistent navigation surface across chat and full-page workspaces. Desktop collapse and narrow-screen drawer behavior use the same information architecture.
+## Explicitly unscheduled
 
-Implementation and verification are recorded in [Aster interface redesign checklist](interface-redesign.md), [Floating workspace windows](floating-workspace-windows.md), [Command palette](command-palette.md), [Simplified settings](simplified-settings.md), and [Unified application sidebar](sidebar-navigation.md).
+The following remain intentionally unscheduled:
 
-## Later stages
+- detailed usage and billing dashboards;
+- automatic latency- or cost-based model routing;
+- speculative portability layers;
+- arbitrary workflow graphs;
+- public sharing and social features;
+- broad provider catalogs without a concrete integration need;
+- multi-user tenancy;
+- unrestricted browser automation or web crawling.
 
-Further product stages remain intentionally unscheduled. New work should be chosen from deployment feedback and concrete owner workflows instead of adding speculative dashboards, routing policy, portability layers, or integrations without a demonstrated need.
+Completed rollout notes and interface checklists live in [`docs/archive`](../archive/README.md).
