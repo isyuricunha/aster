@@ -17,6 +17,10 @@ from app.dependencies import get_openai_client, get_secret_cipher
 from app.model_routing import resolve_utility_target
 from app.models import ChatMessage, Conversation
 from app.openai_compatible import ModelEndpointError, OpenAICompatibleClient
+from app.prompt_library import (
+    CONVERSATION_TITLE_SYSTEM_PROMPT,
+    conversation_title_user_prompt,
+)
 from app.security import SecretCipher
 
 logger = logging.getLogger(__name__)
@@ -111,13 +115,7 @@ async def generate_conversation_title(
             temperature=0.2,
         )
 
-    prompt = (
-        "Create a concise title for the conversation started by the user message below. "
-        "Use the same language as the user. Return only the title, with no quotes, prefix, "
-        "Markdown, explanation, or ending punctuation. Prefer 2 to 8 words and never exceed "
-        "80 characters.\n\nUSER MESSAGE:\n"
-        f"{content[:_MAX_SOURCE_CHARACTERS]}"
-    )
+    prompt = conversation_title_user_prompt(content[:_MAX_SOURCE_CHARACTERS])
     chunks: list[str] = []
     output_characters = 0
     parameters = target.parameters
@@ -126,13 +124,7 @@ async def generate_conversation_title(
         api_key=target.api_key,
         model_id=target.provider_model_id,
         messages=[
-            {
-                "role": "developer",
-                "content": (
-                    "You generate short, accurate conversation titles. "
-                    "Output only the title."
-                ),
-            },
+            {"role": "system", "content": CONVERSATION_TITLE_SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
         ],
         temperature=parameters.temperature,
