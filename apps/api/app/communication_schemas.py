@@ -1,4 +1,5 @@
 from datetime import datetime
+from ipaddress import ip_address
 from typing import Literal
 from uuid import UUID
 
@@ -6,6 +7,26 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 CommunicationKind = Literal["imap", "discord"]
 ThreadKind = Literal["email", "discord"]
+
+
+def _normalize_imap_host(value: object) -> str | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    host = value.strip()
+    if "://" in host or any(marker in host for marker in ("/", "\\", "?", "#", "@")):
+        raise ValueError(
+            "IMAP host must be a hostname or IP address without a URL scheme or path"
+        )
+    if ":" in host:
+        candidate = host.removeprefix("[").removesuffix("]")
+        try:
+            ip_address(candidate)
+        except ValueError as error:
+            raise ValueError(
+                "IMAP host must not include a port; use the separate port field"
+            ) from error
+        host = candidate
+    return host
 
 
 class CommunicationAccountCreate(BaseModel):
@@ -20,6 +41,15 @@ class CommunicationAccountCreate(BaseModel):
     @classmethod
     def normalize_name(cls, value: str) -> str:
         return " ".join(value.split())
+
+    @model_validator(mode="after")
+    def normalize_imap_config(self) -> "CommunicationAccountCreate":
+        if self.kind != "imap":
+            return self
+        host = _normalize_imap_host(self.config.get("host"))
+        if host is not None:
+            self.config = {**self.config, "host": host}
+        return self
 
 
 class CommunicationAccountUpdate(CommunicationAccountCreate):
