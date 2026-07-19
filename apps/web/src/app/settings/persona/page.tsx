@@ -20,6 +20,8 @@ type PersonaPageData = {
   error: string | null;
 };
 
+type SettingsPageSearchParams = Promise<{ embedded?: string | string[] }>;
+
 async function getPersonaPageData(): Promise<PersonaPageData> {
   try {
     const [personaResponse, preferenceResponse, conversationResponse] = await Promise.all([
@@ -46,9 +48,13 @@ async function getPersonaPageData(): Promise<PersonaPageData> {
   }
 }
 
-export default async function PersonaSettingsPage() {
+export default async function PersonaSettingsPage({
+  searchParams,
+}: {
+  searchParams: SettingsPageSearchParams;
+}) {
   await requireServerAuth();
-  const data = await getPersonaPageData();
+  const [data, params] = await Promise.all([getPersonaPageData(), searchParams]);
 
   return (
     <AppFrame
@@ -56,6 +62,7 @@ export default async function PersonaSettingsPage() {
       kicker="Configuration"
       title="Personas"
       description="Build reusable assistant identities, choose the default for new chats, and freeze a persona snapshot into each conversation."
+      embedded={params.embedded === "1"}
     >
       <PersonaSettingsForm
         initialConversations={data.conversations}
