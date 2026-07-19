@@ -26,6 +26,7 @@ from app.routes.agents import router as agents_router
 from app.routes.auth import router as auth_router
 from app.routes.automations import private_router as automations_router
 from app.routes.chat import router as chat_router
+from app.routes.communication_drafts import router as communication_drafts_router
 from app.routes.communications import router as communications_router
 from app.routes.health import router as health_router
 from app.routes.images import router as images_router
@@ -75,6 +76,7 @@ app.include_router(knowledge_router, dependencies=private_route_dependencies)
 app.include_router(images_router, dependencies=private_route_dependencies)
 app.include_router(automations_router, dependencies=private_route_dependencies)
 app.include_router(communications_router, dependencies=private_route_dependencies)
+app.include_router(communication_drafts_router, dependencies=private_route_dependencies)
 app.include_router(agents_router, dependencies=private_route_dependencies)
 app.include_router(agent_runs_router, dependencies=private_route_dependencies)
 app.include_router(agent_rules_router, dependencies=private_route_dependencies)
