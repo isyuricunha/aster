@@ -1,4 +1,5 @@
 import type { RetrievalSource } from "../lib/retrieval-api";
+import { Icon } from "./ui/icons";
 import styles from "./chat-retrieval-sources.module.css";
 
 export function RetrievalSourceList({ sources }: { sources: RetrievalSource[] }) {
@@ -7,10 +8,12 @@ export function RetrievalSourceList({ sources }: { sources: RetrievalSource[] })
   return (
     <details className={styles.sources}>
       <summary>
+        <Icon className={styles.icon} name="memory" size={12} />
         <span>
-          {sources.length} memory {sources.length === 1 ? "source" : "sources"}
+          {sources.length} {sources.length === 1 ? "source" : "sources"}
         </span>
         <small>{sources.map((source) => `[${source.label}]`).join(" ")}</small>
+        <Icon className={styles.chevron} name="chevron-right" size={12} />
       </summary>
       <div className={styles.list}>
         {sources.map((source) => (
