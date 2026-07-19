@@ -139,9 +139,9 @@ def memory_suggestion_user_prompt(*, transcript: str, limit: int) -> str:
         "results.\n"
         "- Write each candidate as a concise standalone statement in the owner's language.\n"
         "- Return an empty memories array when nothing qualifies.\n\n"
-        "[CONVERSATION_TRANSCRIPT]\n"
+        "[UNTRUSTED_CONVERSATION_TRANSCRIPT]\n"
         f"{transcript}\n"
-        "[/CONVERSATION_TRANSCRIPT]"
+        "[/UNTRUSTED_CONVERSATION_TRANSCRIPT]"
     )
 
 
