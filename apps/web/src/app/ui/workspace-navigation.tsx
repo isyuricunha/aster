@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { MouseEvent } from "react";
 
+import { OPEN_COMMAND_PALETTE_EVENT } from "./command-palette-host";
 import { AsterMark, Icon, type IconName } from "./icons";
 import {
   OPEN_SETTINGS_EVENT,
@@ -154,6 +155,10 @@ function openOverlay(event: MouseEvent<HTMLAnchorElement>, item: NavigationItem)
   }
 }
 
+function openCommandPalette() {
+  window.dispatchEvent(new CustomEvent(OPEN_COMMAND_PALETTE_EVENT));
+}
+
 export function WorkspaceBrand() {
   return (
     <Link className="workspace-brand" href="/">
@@ -188,7 +193,16 @@ export function WorkspaceChrome({
         <Icon name={activeItem?.icon ?? "chat"} size={14} />
         <span>{title}</span>
       </div>
-      <span className="window-shortcut">Ctrl K</span>
+      <button
+        aria-keyshortcuts="Control+K Meta+K"
+        aria-label="Open command palette"
+        className="window-shortcut"
+        onClick={openCommandPalette}
+        title="Open command palette"
+        type="button"
+      >
+        Ctrl K
+      </button>
     </header>
   );
 }
