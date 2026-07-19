@@ -8,6 +8,36 @@ from app.communication_adapters import ReceivedMessage, SourceSync
 from app.communication_models import CommunicationMessage
 
 
+async def test_imap_host_rejects_http_url(api_client: tuple) -> None:
+    client, _, _ = api_client
+    response = await client.post(
+        "/api/communication-accounts",
+        json={
+            "name": "Invalid inbox",
+            "kind": "imap",
+            "enabled": False,
+            "config": {
+                "host": "http://mail.example.com/",
+                "port": 993,
+                "security": "ssl",
+                "folder": "INBOX",
+            },
+            "credentials": {
+                "username": "owner@example.com",
+                "password": "secret-password",
+            },
+            "poll_interval_seconds": 60,
+        },
+    )
+
+    assert response.status_code == 422
+    assert (
+        "IMAP host must be a hostname or IP address without a URL scheme or path"
+        in response.text
+    )
+    assert (await client.get("/api/communication-accounts")).json() == []
+
+
 async def test_account_credentials_are_never_returned(api_client: tuple) -> None:
     client, _, _ = api_client
     response = await client.post(
