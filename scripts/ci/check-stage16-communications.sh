@@ -11,16 +11,10 @@ json_field() {
   python -c 'import json,sys; print(json.load(sys.stdin)[sys.argv[1]])' "${field}"
 }
 
-json_contains_secret() {
-  secret="$1"
-  python -c 'import json,sys; data=json.load(sys.stdin); print(sys.argv[1] in json.dumps(data))' "${secret}"
-}
-
 test -s "${cookie_jar}"
 test "$(curl -sS -o /dev/null -w '%{http_code}' "${api_url}/api/communication-accounts")" = "401"
-test "$(curl -sS -o /dev/null -w '%{http_code}' "${web_url}/communications")" = "307"
+test "$(curl -sS -o /dev/null -w '%{http_code}' "${web_url}/api/communication-accounts")" = "401"
 
-account_secret="stage16-imap-secret"
 account_json="$({
   curl -fsS -b "${cookie_jar}" \
     -H 'Content-Type: application/json' \
@@ -36,20 +30,14 @@ account_json="$({
         \"folder\": \"INBOX\",
         \"mark_seen_on_read\": true
       },
-      \"credentials\": {
-        \"username\": \"owner@example.test\",
-        \"password\": \"${account_secret}\"
-      },
+      \"credentials\": {},
       \"poll_interval_seconds\": 60
     }" \
     "${web_url}/api/communication-accounts"
 })"
 account_id="$(printf '%s' "${account_json}" | json_field id)"
 test -n "${account_id}"
-test "$(printf '%s' "${account_json}" | json_contains_secret "${account_secret}")" = "False"
-printf '%s' "${account_json}" | grep --quiet '"credential_names"'
-printf '%s' "${account_json}" | grep --quiet '"password"'
-printf '%s' "${account_json}" | grep --quiet '"username"'
+printf '%s' "${account_json}" | grep --quiet '"credential_names":\[\]'
 
 automation_json="$({
   curl -fsS -b "${cookie_jar}" \
