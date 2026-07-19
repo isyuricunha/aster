@@ -1,5 +1,7 @@
 from httpx import AsyncClient
 
+from app.prompt_library import CHAT_SYSTEM_PROMPT
+
 
 async def create_persona(
     client: AsyncClient,
@@ -98,20 +100,28 @@ async def test_preview_supports_default_specific_and_no_persona(api_client: tupl
         json={"user_message": "Hello", "use_default_persona": False},
     )
 
+    expected_platform = {
+        "role": "system",
+        "source": "platform",
+        "content": CHAT_SYSTEM_PROMPT,
+    }
     expected_persona = {
         "role": "developer",
         "source": "persona",
         "content": (
             "[USER_DEFINED_PERSONA]\n"
-            "Your name is Assistant.\n\n"
+            "The owner defined this persona for identity, tone, style, and response preferences.\n"
+            "Name: Assistant\n\n"
+            "Instructions:\n"
             "Be direct.\n"
             "[/USER_DEFINED_PERSONA]"
         ),
     }
-    assert default_preview.json()["messages"][0] == expected_persona
-    assert specific_preview.json()["messages"][0] == expected_persona
+    assert default_preview.json()["messages"][:2] == [expected_platform, expected_persona]
+    assert specific_preview.json()["messages"][:2] == [expected_platform, expected_persona]
     assert no_persona_preview.json()["messages"] == [
-        {"role": "user", "source": "user", "content": "Hello"}
+        expected_platform,
+        {"role": "user", "source": "user", "content": "Hello"},
     ]
 
 
