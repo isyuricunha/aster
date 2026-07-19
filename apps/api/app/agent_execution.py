@@ -36,6 +36,7 @@ from app.config import Settings
 from app.mcp_client import McpClient
 from app.model_routing import can_fallback, resolve_automation_targets
 from app.openai_compatible import ModelEndpointError, OpenAICompatibleClient
+from app.prompt_library import render_persona
 from app.security import SecretCipher
 
 
@@ -45,19 +46,18 @@ async def build_agent_messages(
     run: AgentRun,
     settings: Settings,
 ) -> list[dict[str, object]]:
-    messages: list[dict[str, object]] = []
+    messages: list[dict[str, object]] = [
+        {"role": "system", "content": agent_instruction()}
+    ]
     if run.persona_name and run.persona_instruction_role:
-        messages.append(
-            {
-                "role": run.persona_instruction_role,
-                "content": (
-                    f"Your name is {run.persona_name}.\n\n"
-                    f"[USER_DEFINED_PERSONA]\n{run.persona_instructions or ''}\n"
-                    "[/USER_DEFINED_PERSONA]"
-                ),
-            }
-        )
-    messages.append({"role": "developer", "content": agent_instruction()})
+        persona = render_persona(run.persona_name, run.persona_instructions or "")
+        if persona:
+            messages.append(
+                {
+                    "role": run.persona_instruction_role,
+                    "content": persona,
+                }
+            )
     retrieval = await agent_retrieval_context(
         session,
         run=run,
@@ -66,13 +66,17 @@ async def build_agent_messages(
         document_limit=settings.aster_rag_max_sources,
     )
     if retrieval:
-        messages.append({"role": "developer", "content": retrieval})
+        messages.append({"role": "system", "content": retrieval})
     steps = list(
         await session.scalars(
             select(AgentStep).where(AgentStep.run_id == run.id).order_by(AgentStep.position)
         )
     )
-    content = f"SAVED_GOAL:\n{run.goal_snapshot}"
+    content = (
+        "[OWNER_SAVED_GOAL]\n"
+        f"{run.goal_snapshot}\n"
+        "[/OWNER_SAVED_GOAL]"
+    )
     if run.trigger_payload:
         content += (
             "\n\n[UNTRUSTED_TRIGGER_PAYLOAD]\n"
@@ -80,11 +84,22 @@ async def build_agent_messages(
             "[/UNTRUSTED_TRIGGER_PAYLOAD]"
         )
     if run.plan:
-        content += f"\n\nCURRENT_PLAN:\n{json.dumps(run.plan, ensure_ascii=False, indent=2)}"
+        content += (
+            "\n\n[PERSISTED_PLAN_STATE]\n"
+            f"{json.dumps(run.plan, ensure_ascii=False, indent=2)}\n"
+            "[/PERSISTED_PLAN_STATE]"
+        )
     history = step_history(steps, settings.aster_agent_history_max_characters)
     if history:
-        content += f"\n\nPERSISTED_EXECUTION_HISTORY:\n{history}"
-    content += "\n\nChoose the next bounded action or finish the run."
+        content += (
+            "\n\n[UNTRUSTED_PERSISTED_EXECUTION_HISTORY]\n"
+            f"{history}\n"
+            "[/UNTRUSTED_PERSISTED_EXECUTION_HISTORY]"
+        )
+    content += (
+        "\n\nChoose exactly one next bounded action, update the plan when materially useful, "
+        "or finish the run."
+    )
     messages.append({"role": "user", "content": content})
     return messages
 
