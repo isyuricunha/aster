@@ -46,7 +46,7 @@
 
 .reasoning-disclosure summary small {
   color: var(--text-faint);
-  font-size: var(--text-ui-xs);
+  font-size: 0.65rem;
   font-weight: 500;
 }
 
@@ -84,7 +84,7 @@
 
 .reasoning-disclosure.streaming summary span,
 .chat-transcript[aria-busy="true"] .chat-welcome::after,
-.chat-transcript[aria-busy="true"] .message-stack:has(> .chat-message:last-child.user)::after,
+.chat-transcript[aria-busy="true"] .message-stack::after,
 .chat-transcript[aria-busy="true"]
   .chat-message.assistant
   .message-body:not(:has(.markdown-content:not(.reasoning-content)))::after {
@@ -101,7 +101,7 @@
 }
 
 .chat-transcript[aria-busy="true"] .chat-welcome::after,
-.chat-transcript[aria-busy="true"] .message-stack:has(> .chat-message:last-child.user)::after,
+.chat-transcript[aria-busy="true"] .message-stack::after,
 .chat-transcript[aria-busy="true"]
   .chat-message.assistant
   .message-body:not(:has(.markdown-content:not(.reasoning-content)))::after {
@@ -117,8 +117,13 @@
   margin: 20px auto 0;
 }
 
-.chat-transcript[aria-busy="true"] .message-stack:has(> .chat-message:last-child.user)::after {
+.chat-transcript[aria-busy="true"] .message-stack::after {
   margin: 18px 0 0 42px;
+}
+
+.chat-transcript[aria-busy="true"]
+  .message-stack:has(> .chat-message:last-child.assistant .message-label small)::after {
+  display: none;
 }
 
 .chat-transcript[aria-busy="true"]
@@ -130,7 +135,7 @@
 @media (prefers-reduced-motion: reduce) {
   .reasoning-disclosure.streaming summary span,
   .chat-transcript[aria-busy="true"] .chat-welcome::after,
-  .chat-transcript[aria-busy="true"] .message-stack:has(> .chat-message:last-child.user)::after,
+  .chat-transcript[aria-busy="true"] .message-stack::after,
   .chat-transcript[aria-busy="true"]
     .chat-message.assistant
     .message-body:not(:has(.markdown-content:not(.reasoning-content)))::after {
