@@ -27,6 +27,7 @@ class ToolCallDelta:
 @dataclass(frozen=True, slots=True)
 class ChatCompletionDelta:
     content: str = ""
+    reasoning: str = ""
     tool_calls: tuple[ToolCallDelta, ...] = ()
     finish_reason: str | None = None
 
@@ -277,7 +278,7 @@ class OpenAICompatibleClient:
                                 "The endpoint reported an error while streaming the response.",
                             )
                         delta = self._extract_completion_delta(event)
-                        if delta.content or delta.tool_calls or delta.finish_reason:
+                        if delta.content or delta.reasoning or delta.tool_calls or delta.finish_reason:
                             yield delta
         except httpx.TimeoutException as error:
             raise ModelEndpointError(
@@ -343,25 +344,62 @@ class OpenAICompatibleClient:
         if not isinstance(delta, dict):
             return ChatCompletionDelta(finish_reason=finish_reason)
         return ChatCompletionDelta(
-            content=cls._extract_content(delta.get("content")),
+            content=cls._extract_content(delta.get("content"), reasoning=False),
+            reasoning=cls._extract_reasoning(delta),
             tool_calls=cls._extract_tool_call_deltas(delta.get("tool_calls")),
             finish_reason=finish_reason,
         )
 
-    @staticmethod
-    def _extract_content(content: object) -> str:
+    @classmethod
+    def _extract_reasoning(cls, delta: dict[str, object]) -> str:
+        for key in ("reasoning_content", "reasoning", "thinking", "analysis"):
+            value = delta.get(key)
+            extracted = cls._extract_text_value(value)
+            if extracted:
+                return extracted
+        return cls._extract_content(delta.get("content"), reasoning=True)
+
+    @classmethod
+    def _extract_content(cls, content: object, *, reasoning: bool) -> str:
         if isinstance(content, str):
-            return content
+            return "" if reasoning else content
         if not isinstance(content, list):
             return ""
         parts: list[str] = []
+        reasoning_types = {
+            "analysis",
+            "reasoning",
+            "reasoning_content",
+            "reasoning_text",
+            "thinking",
+        }
         for item in content:
             if not isinstance(item, dict):
                 continue
-            text = item.get("text")
-            if isinstance(text, str):
-                parts.append(text)
+            item_type = item.get("type")
+            is_reasoning = isinstance(item_type, str) and item_type.casefold() in reasoning_types
+            if is_reasoning != reasoning:
+                continue
+            extracted = cls._extract_text_value(item)
+            if extracted:
+                parts.append(extracted)
         return "".join(parts)
+
+    @classmethod
+    def _extract_text_value(cls, value: object) -> str:
+        if isinstance(value, str):
+            return value
+        if not isinstance(value, dict):
+            return ""
+        for key in ("text", "content", "value"):
+            candidate = value.get(key)
+            if isinstance(candidate, str):
+                return candidate
+            if isinstance(candidate, dict):
+                nested = cls._extract_text_value(candidate)
+                if nested:
+                    return nested
+        return ""
 
     @staticmethod
     def _extract_tool_call_deltas(value: object) -> tuple[ToolCallDelta, ...]:
