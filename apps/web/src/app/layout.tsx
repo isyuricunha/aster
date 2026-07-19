@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import "./globals.css";
 import "./shell.css";
@@ -12,6 +12,8 @@ import "./interface-refinement.css";
 import "./settings-window.css";
 import "./email-reader.css";
 import "./command-palette.css";
+import "./application-sidebar.css";
+import { ApplicationSidebarHost } from "./ui/application-sidebar-host";
 import { CommandPaletteHost } from "./ui/command-palette-host";
 import { WorkspaceWindowHost } from "./ui/workspace-window-host";
 
@@ -28,6 +30,9 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     <html lang="en">
       <body>
         {children}
+        <Suspense fallback={null}>
+          <ApplicationSidebarHost />
+        </Suspense>
         <WorkspaceWindowHost />
         <CommandPaletteHost />
       </body>

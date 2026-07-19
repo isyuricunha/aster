@@ -66,5 +66,6 @@ export default async function Home({
     typeof params.conversation === "string" ? params.conversation : undefined;
   const startNewConversation = params.new === "1";
   const initialData = await getInitialChatData(preferredConversationId, startNewConversation);
-  return <ChatShell {...initialData} />;
+  const chatKey = startNewConversation ? "new" : (initialData.activeConversation?.id ?? "empty");
+  return <ChatShell key={chatKey} {...initialData} />;
 }
