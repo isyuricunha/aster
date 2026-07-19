@@ -20,7 +20,8 @@ async def _configure_primary_model(client) -> None:
             },
         )
     ).json()
-    assert (await client.post(f"/api/model-endpoints/{endpoint['id']}/sync")).status_code == 200
+    sync_response = await client.post(f"/api/model-endpoints/{endpoint['id']}/sync")
+    assert sync_response.status_code == 200
     models = (await client.get("/api/models")).json()
     preferences = await client.put(
         "/api/model-preferences",
@@ -29,7 +30,9 @@ async def _configure_primary_model(client) -> None:
     assert preferences.status_code == 200
 
 
-async def test_reply_draft_uses_bounded_untrusted_thread_context(api_client: tuple) -> None:
+async def test_reply_draft_uses_bounded_untrusted_thread_context(
+    api_client: tuple,
+) -> None:
     client, fake_client, session_factory = api_client
     await _configure_primary_model(client)
     account = (
@@ -88,7 +91,10 @@ async def test_reply_draft_uses_bounded_untrusted_thread_context(api_client: tup
         await session.commit()
         thread_id = thread.id
 
-    fake_client.chat_chunks = ["Tuesday works.", " I will send the final time shortly."]
+    fake_client.chat_chunks = [
+        "Tuesday works.",
+        " I will send the final time shortly.",
+    ]
     response = await client.post(
         f"/api/communication-threads/{thread_id}/draft-reply",
         json={"instruction": "Confirm Tuesday without inventing a time."},
