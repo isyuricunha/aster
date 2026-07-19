@@ -66,7 +66,7 @@ curl --fail --silent --show-error --cookie "${cookie_jar}" \
   --header "Origin: ${origin}" \
   --data "{\"user_message\":\"Hello\",\"persona_id\":\"${persona_id}\",\"use_default_persona\":false}" \
   "${web_url}/api/message-composition/preview" \
-  | grep --quiet 'Your name is CI Persona'
+  | grep --quiet 'Name: CI Persona'
 
 conversation_id="$(curl --fail --silent --show-error \
   --cookie "${cookie_jar}" \
