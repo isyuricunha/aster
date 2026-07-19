@@ -85,9 +85,9 @@ async def build_agent_messages(
         )
     if run.plan:
         content += (
-            "\n\n[PERSISTED_PLAN_STATE]\n"
+            "\n\n[UNTRUSTED_PERSISTED_PLAN_STATE]\n"
             f"{json.dumps(run.plan, ensure_ascii=False, indent=2)}\n"
-            "[/PERSISTED_PLAN_STATE]"
+            "[/UNTRUSTED_PERSISTED_PLAN_STATE]"
         )
     history = step_history(steps, settings.aster_agent_history_max_characters)
     if history:
