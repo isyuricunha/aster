@@ -302,6 +302,14 @@ export function apiUrl(path: string): string {
   return path;
 }
 
+function notifyConversationChange(path: string, init: RequestInit | undefined): void {
+  if (typeof window === "undefined") return;
+  const method = init?.method?.toUpperCase() ?? "GET";
+  if (method === "POST" && path === "/api/conversations") {
+    window.dispatchEvent(new CustomEvent("aster:conversations-changed"));
+  }
+}
+
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   if (init?.body !== undefined) {
@@ -314,6 +322,7 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     headers,
   });
   if (response.status === 204) {
+    notifyConversationChange(path, init);
     return undefined as T;
   }
 
@@ -328,5 +337,6 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     throw new Error(message);
   }
 
+  notifyConversationChange(path, init);
   return payload as T;
 }

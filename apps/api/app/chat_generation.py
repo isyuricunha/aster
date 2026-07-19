@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 from collections.abc import AsyncIterator, Sequence
 from contextlib import suppress
 from dataclasses import dataclass, field
@@ -22,7 +23,11 @@ from app.message_composition import (
 )
 from app.model_routing import ModelTarget, can_fallback, resolve_chat_targets
 from app.models import ChatMessage, Conversation
-from app.openai_compatible import ModelEndpointError, OpenAICompatibleClient
+from app.openai_compatible import (
+    ChatCompletionDelta,
+    ModelEndpointError,
+    OpenAICompatibleClient,
+)
 from app.schemas import (
     ChatMessageResponse,
     ConversationPersonaResponse,
@@ -31,6 +36,10 @@ from app.schemas import (
 from app.security import SecretCipher
 
 GenerationOperation = Literal["send", "edit", "regenerate"]
+_REASONING_BLOCK_PATTERN = re.compile(
+    r"<(think|analysis|reasoning)>.*?</\1>\s*",
+    flags=re.IGNORECASE | re.DOTALL,
+)
 
 
 @dataclass(slots=True)
@@ -134,6 +143,10 @@ def _persona_configuration(conversation: Conversation) -> PersonaConfiguration:
     )
 
 
+def _answer_without_reasoning(content: str) -> str:
+    return _REASONING_BLOCK_PATTERN.sub("", content).lstrip()
+
+
 def _canonical_history(messages: Sequence[ChatMessage]) -> list[CanonicalMessage]:
     history: list[CanonicalMessage] = []
     for message in messages:
@@ -152,7 +165,7 @@ def _canonical_history(messages: Sequence[ChatMessage]) -> list[CanonicalMessage
                 CanonicalMessage(
                     role=MessageRole.ASSISTANT,
                     source=MessageSource.ASSISTANT,
-                    content=message.content,
+                    content=_answer_without_reasoning(message.content),
                 )
             )
     return history
@@ -387,9 +400,9 @@ async def prepare_regeneration(
 
 
 async def next_delta_or_stop(
-    iterator: AsyncIterator[str],
+    iterator: AsyncIterator[ChatCompletionDelta],
     stop_event: asyncio.Event,
-) -> tuple[str | None, bool, bool]:
+) -> tuple[ChatCompletionDelta | None, bool, bool]:
     next_task = asyncio.create_task(anext(iterator))
     stop_task = asyncio.create_task(stop_event.wait())
     done, _ = await asyncio.wait({next_task, stop_task}, return_when=asyncio.FIRST_COMPLETED)
@@ -409,6 +422,20 @@ async def next_delta_or_stop(
         return next_task.result(), False, False
     except StopAsyncIteration:
         return None, False, True
+
+
+def _combined_content(
+    reasoning_chunks: Sequence[str],
+    answer_chunks: Sequence[str],
+    *,
+    close_reasoning: bool,
+) -> str:
+    reasoning = "".join(reasoning_chunks)
+    answer = "".join(answer_chunks)
+    if not reasoning:
+        return answer
+    closing = "</reasoning>\n\n" if close_reasoning or answer else ""
+    return f"<reasoning>{reasoning}{closing}{answer}"
 
 
 async def _persist_progress(
@@ -482,7 +509,9 @@ def stream_response(
                 "retrieval_sources": prepared.retrieval_sources,
             },
         )
-        chunks: list[str] = []
+        answer_chunks: list[str] = []
+        reasoning_chunks: list[str] = []
+        reasoning_closed = False
         persisted_length = 0
         last_checkpoint = asyncio.get_running_loop().time()
         last_error: ModelEndpointError | None = None
@@ -518,7 +547,7 @@ def stream_response(
                     )
 
                 parameters = target.parameters
-                iterator = client.stream_chat_completion(
+                iterator = client.stream_chat_completion_events(
                     base_url=target.base_url,
                     api_key=target.api_key,
                     model_id=target.provider_model_id,
@@ -535,7 +564,11 @@ def stream_response(
                             iterator, prepared.stop_event
                         )
                         if stopped:
-                            content = "".join(chunks)
+                            content = _combined_content(
+                                reasoning_chunks,
+                                answer_chunks,
+                                close_reasoning=True,
+                            )
                             await _finalize_message(
                                 session=session,
                                 conversation=prepared.conversation,
@@ -558,16 +591,35 @@ def stream_response(
                         if delta is None:
                             continue
 
-                        chunks.append(delta)
-                        yield _sse("delta", {"content": delta})
-                        content = "".join(chunks)
+                        streamed_parts: list[str] = []
+                        if delta.reasoning:
+                            if not reasoning_chunks:
+                                streamed_parts.append("<reasoning>")
+                            reasoning_chunks.append(delta.reasoning)
+                            streamed_parts.append(delta.reasoning)
+                        if delta.content:
+                            if reasoning_chunks and not reasoning_closed:
+                                streamed_parts.append("</reasoning>\n\n")
+                                reasoning_closed = True
+                            answer_chunks.append(delta.content)
+                            streamed_parts.append(delta.content)
+
+                        if not streamed_parts:
+                            continue
+                        streamed_content = "".join(streamed_parts)
+                        yield _sse("delta", {"content": streamed_content})
+                        content = _combined_content(
+                            reasoning_chunks,
+                            answer_chunks,
+                            close_reasoning=reasoning_closed,
+                        )
                         now = asyncio.get_running_loop().time()
                         if len(content) - persisted_length >= 512 or now - last_checkpoint >= 0.5:
                             await _persist_progress(session, prepared.assistant_message, content)
                             persisted_length = len(content)
                             last_checkpoint = now
 
-                    if not chunks:
+                    if not answer_chunks and not reasoning_chunks:
                         raise ModelEndpointError(
                             "empty_response",
                             "The endpoint completed without returning any content.",
@@ -575,12 +627,17 @@ def stream_response(
                     break
                 except ModelEndpointError as error:
                     has_next_target = target_index + 1 < len(prepared.model_targets)
-                    if not chunks and has_next_target and can_fallback(error):
+                    has_output = bool(answer_chunks or reasoning_chunks)
+                    if not has_output and has_next_target and can_fallback(error):
                         last_error = error
                         continue
                     raise
 
-            content = "".join(chunks)
+            content = _combined_content(
+                reasoning_chunks,
+                answer_chunks,
+                close_reasoning=True,
+            )
             await _finalize_message(
                 session=session,
                 conversation=prepared.conversation,
@@ -598,11 +655,16 @@ def stream_response(
                 },
             )
         except ModelEndpointError as error:
+            content = _combined_content(
+                reasoning_chunks,
+                answer_chunks,
+                close_reasoning=True,
+            )
             await _finalize_message(
                 session=session,
                 conversation=prepared.conversation,
                 message=prepared.assistant_message,
-                content="".join(chunks),
+                content=content,
                 status_value="failed",
                 error_message=error.message[:500],
             )
@@ -617,7 +679,11 @@ def stream_response(
                     session=session,
                     conversation=prepared.conversation,
                     message=prepared.assistant_message,
-                    content="".join(chunks),
+                    content=_combined_content(
+                        reasoning_chunks,
+                        answer_chunks,
+                        close_reasoning=True,
+                    ),
                     status_value=status_value,
                     error_message=error_message,
                 )
@@ -628,7 +694,11 @@ def stream_response(
                     session=session,
                     conversation=prepared.conversation,
                     message=prepared.assistant_message,
-                    content="".join(chunks),
+                    content=_combined_content(
+                        reasoning_chunks,
+                        answer_chunks,
+                        close_reasoning=True,
+                    ),
                     status_value="failed",
                     error_message="The response stream failed.",
                 )
