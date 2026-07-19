@@ -16,6 +16,8 @@ type InitialToolSettings = {
   error: string | null;
 };
 
+type SettingsPageSearchParams = Promise<{ embedded?: string | string[] }>;
+
 async function getInitialToolSettings(): Promise<InitialToolSettings> {
   try {
     const [serverResponse, toolResponse, conversationResponse] = await Promise.all([
@@ -42,9 +44,13 @@ async function getInitialToolSettings(): Promise<InitialToolSettings> {
   }
 }
 
-export default async function ToolsSettingsPage() {
+export default async function ToolsSettingsPage({
+  searchParams,
+}: {
+  searchParams: SettingsPageSearchParams;
+}) {
   await requireServerAuth();
-  const initialData = await getInitialToolSettings();
+  const [initialData, params] = await Promise.all([getInitialToolSettings(), searchParams]);
 
   return (
     <AppFrame
@@ -52,6 +58,7 @@ export default async function ToolsSettingsPage() {
       kicker="Configuration"
       title="Tools"
       description="Connect MCP servers, control tool permissions, and decide which conversations may use them."
+      embedded={params.embedded === "1"}
     >
       <ToolSettings
         initialServers={initialData.servers}
