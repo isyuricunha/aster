@@ -16,6 +16,7 @@ import "./command-palette.css";
 import "./application-sidebar.css";
 import { ApplicationSidebarHost } from "./ui/application-sidebar-host";
 import { CommandPaletteHost } from "./ui/command-palette-host";
+import { ConversationRouteSync } from "./ui/conversation-route-sync";
 import { WorkspaceWindowHost } from "./ui/workspace-window-host";
 
 export const metadata: Metadata = {
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     <html lang="en">
       <body>
         {children}
+        <ConversationRouteSync />
         <Suspense fallback={null}>
           <ApplicationSidebarHost />
         </Suspense>
