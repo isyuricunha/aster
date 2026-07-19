@@ -181,11 +181,7 @@ export function WorkspaceChrome({
 
   return (
     <header className="workspace-window-bar">
-      <div aria-hidden="true" className="window-controls">
-        <span />
-        <span />
-        <span />
-      </div>
+      <div aria-hidden="true" className="window-controls" />
       <Link aria-label="Open chat" className="window-home" href="/">
         <AsterMark size={16} />
       </Link>
