@@ -14,7 +14,9 @@ import type {
 } from "../../../lib/retrieval-api";
 import { requireServerAuth, serverApiFetch } from "../../../lib/server-api";
 import { AppFrame } from "../../ui/app-frame";
+import { AdvancedSettings } from "../settings-primitives";
 import { MemorySettings } from "./memory-settings";
+import { SimpleMemorySettings } from "./simple-memory-settings";
 
 export const metadata: Metadata = { title: "Memory settings" };
 
@@ -98,20 +100,33 @@ export default async function MemorySettingsPage({
       active="memory"
       kicker="Context"
       title="Memory & Knowledge"
-      description="Control approved memory, private document retrieval, embeddings, and conversation scope."
+      description="Manage approved memory and private documents through focused sections. Maintenance and per-chat overrides stay advanced."
       embedded={params.embedded === "1"}
     >
-      <MemorySettings
-        initialMemories={initialData.memories}
-        initialSuggestions={initialData.suggestions}
+      <SimpleMemorySettings
         initialCollections={initialData.collections}
         initialDocuments={initialData.documents}
-        initialPreferences={initialData.preferences}
+        initialError={initialData.error}
+        initialMemories={initialData.memories}
         initialModels={initialData.models}
         initialPersonas={initialData.personas}
-        initialConversations={initialData.conversations}
-        initialError={initialData.error}
+        initialPreferences={initialData.preferences}
       />
+      <AdvancedSettings
+        description="Memory suggestions, import and export, bulk reindexing, embedding maintenance, and per-conversation retrieval scope."
+      >
+        <MemorySettings
+          initialMemories={initialData.memories}
+          initialSuggestions={initialData.suggestions}
+          initialCollections={initialData.collections}
+          initialDocuments={initialData.documents}
+          initialPreferences={initialData.preferences}
+          initialModels={initialData.models}
+          initialPersonas={initialData.personas}
+          initialConversations={initialData.conversations}
+          initialError={initialData.error}
+        />
+      </AdvancedSettings>
     </AppFrame>
   );
 }
