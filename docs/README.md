@@ -21,6 +21,7 @@ The root [README](../README.md) is intentionally short. Detailed procedures and 
 
 - [Architecture](reference/architecture.md)
 - [Environment variables](reference/environment.md)
+- [Model prompt architecture](reference/model-prompts.md)
 - [Security](reference/security.md)
 
 Reference documents describe the current implementation. When behavior changes, update the reference in the same commit.
