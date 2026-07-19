@@ -8,6 +8,7 @@ import "./chat.css";
 import "./chat-controls.css";
 import "./auth.css";
 import "./chat-content.css";
+import "./chat-generation-experience.css";
 import "./interface-refinement.css";
 import "./settings-window.css";
 import "./email-reader.css";
