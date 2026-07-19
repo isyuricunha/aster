@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -164,7 +165,7 @@ function normalize(value: string): string {
 }
 
 function itemDomId(item: PaletteItem): string {
-  return `command-palette-item-${item.id.replaceAll(/[^a-zA-Z0-9_-]/g, "-")}`;
+  return `command-palette-item-${item.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }
 
 function conversationMeta(conversation: ConversationSummary): string {
@@ -213,9 +214,12 @@ export function CommandPaletteHost() {
     })).filter((group) => group.items.length > 0);
   }, [conversations, normalizedQuery]);
   const flatItems = useMemo(() => groups.flatMap((group) => group.items), [groups]);
-  const selectedItem = flatItems[selectedIndex] ?? null;
+  const boundedSelectedIndex = flatItems.length
+    ? Math.min(selectedIndex, flatItems.length - 1)
+    : 0;
+  const selectedItem = flatItems[boundedSelectedIndex] ?? null;
 
-  function closePalette(restoreFocus = true) {
+  const closePalette = useCallback((restoreFocus = true) => {
     requestRef.current += 1;
     setOpen(false);
     setQuery("");
@@ -225,16 +229,17 @@ export function CommandPaletteHost() {
     if (restoreFocus) {
       requestAnimationFrame(() => lastFocusedRef.current?.focus());
     }
-  }
+  }, []);
 
-  function openPalette() {
+  const openPalette = useCallback(() => {
     if (!available) return;
     lastFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setOpen(true);
     setQuery("");
     setConversationError(null);
+    setLoadingConversations(true);
     setSelectedIndex(0);
-  }
+  }, [available]);
 
   useEffect(() => {
     const handleOpen = () => openPalette();
@@ -267,26 +272,22 @@ export function CommandPaletteHost() {
       window.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, handleOpen);
       window.removeEventListener("keydown", handleKeyDown, true);
     };
-  }, [available, open]);
+  }, [available, closePalette, open, openPalette]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !available) {
+      document.body.classList.remove("command-palette-open");
+      return;
+    }
     document.body.classList.add("command-palette-open");
     requestAnimationFrame(() => inputRef.current?.focus());
     return () => document.body.classList.remove("command-palette-open");
-  }, [open]);
-
-  useEffect(() => {
-    if (open && !available) closePalette(false);
   }, [available, open]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !available) return;
     const requestId = ++requestRef.current;
     const search = query.trim();
-    setLoadingConversations(true);
-    setConversationError(null);
-
     const timer = window.setTimeout(
       () => {
         const path = search
@@ -311,13 +312,7 @@ export function CommandPaletteHost() {
     );
 
     return () => window.clearTimeout(timer);
-  }, [open, query]);
-
-  useEffect(() => setSelectedIndex(0), [query]);
-
-  useEffect(() => {
-    setSelectedIndex((current) => Math.min(current, Math.max(flatItems.length - 1, 0)));
-  }, [flatItems.length]);
+  }, [available, open, query]);
 
   useEffect(() => {
     if (!open || !selectedItem) return;
@@ -351,16 +346,23 @@ export function CommandPaletteHost() {
     });
   }
 
+  function updateQuery(value: string) {
+    setQuery(value);
+    setConversationError(null);
+    setLoadingConversations(true);
+    setSelectedIndex(0);
+  }
+
   function handleInputKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
     if (flatItems.length === 0) return;
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setSelectedIndex((current) => (current + 1) % flatItems.length);
+      setSelectedIndex((boundedSelectedIndex + 1) % flatItems.length);
       return;
     }
     if (event.key === "ArrowUp") {
       event.preventDefault();
-      setSelectedIndex((current) => (current - 1 + flatItems.length) % flatItems.length);
+      setSelectedIndex((boundedSelectedIndex - 1 + flatItems.length) % flatItems.length);
       return;
     }
     if (event.key === "Home") {
@@ -401,7 +403,7 @@ export function CommandPaletteHost() {
             aria-controls="command-palette-results"
             aria-expanded="true"
             aria-label="Search commands and conversations"
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => updateQuery(event.target.value)}
             onKeyDown={handleInputKeyDown}
             placeholder="Search commands or conversations…"
             ref={inputRef}
@@ -419,7 +421,7 @@ export function CommandPaletteHost() {
               <div>
                 {group.items.map((item) => {
                   const index = flatItems.findIndex((candidate) => candidate.id === item.id);
-                  const selected = index === selectedIndex;
+                  const selected = index === boundedSelectedIndex;
                   return (
                     <button
                       aria-selected={selected}
@@ -427,7 +429,7 @@ export function CommandPaletteHost() {
                       id={itemDomId(item)}
                       key={item.id}
                       onClick={() => execute(item)}
-                      onMouseMove={() => setSelectedIndex(index)}
+                      onMouseEnter={() => setSelectedIndex(index)}
                       role="option"
                       type="button"
                     >
