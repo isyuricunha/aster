@@ -41,6 +41,7 @@ This preserves a single internal hierarchy without assuming that every provider 
 Content supplied by external or persisted sources must remain visibly delimited. Current boundaries
 include:
 
+- `UNTRUSTED_CONVERSATION_TRANSCRIPT`;
 - `UNTRUSTED_MEMORY_AND_RETRIEVAL_CONTEXT`;
 - `UNTRUSTED_AGENT_MEMORY_AND_RETRIEVAL_CONTEXT`;
 - `UNTRUSTED_COMMUNICATION_THREAD`;
