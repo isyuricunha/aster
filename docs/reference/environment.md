@@ -1,24 +1,74 @@
 # Environment reference
 
-`.env.example` is the canonical machine-readable list. This document explains each setting by area.
+[`.env.example`](../../.env.example) is the canonical deployment template. It groups settings by responsibility and includes the defaults used by the application and Docker Compose.
 
-## Core deployment
+## Required settings
+
+Only one variable is required for every deployment:
+
+| Variable | Requirement | Purpose |
+| --- | --- | --- |
+| `ASTER_ENCRYPTION_KEY` | At least 32 characters | Encrypts endpoint, MCP, communication, and integration credentials before storage. |
+
+Generate a key with:
+
+```bash
+openssl rand -hex 32
+```
+
+Keep the value stable and back it up securely. Changing it after credentials have been stored makes those encrypted values unreadable.
+
+## Database mode
+
+Choose one database mode.
+
+### Bundled PostgreSQL
+
+The example file enables the bundled PostgreSQL service:
+
+```env
+COMPOSE_PROFILES=local-db
+POSTGRES_DB=aster
+POSTGRES_USER=aster
+POSTGRES_PASSWORD=replace-with-a-strong-database-password
+DATABASE_URL=
+```
+
+`POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` are required for this mode. The API constructs its internal async PostgreSQL URL from those values.
+
+### External PostgreSQL
+
+Disable the bundled profile and provide an async SQLAlchemy URL:
+
+```env
+COMPOSE_PROFILES=
+DATABASE_URL=postgresql+asyncpg://user:password@database-host:5432/aster
+```
+
+`DATABASE_URL` is required for this mode. The bundled PostgreSQL variables are ignored by the API when a non-empty URL is present.
+
+## Optional settings
+
+Every setting below is optional. Removing one from `.env` uses the default shown here.
+
+### Application and networking
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `APP_ENVIRONMENT` | `development` | Enables development behavior. Use `production` for public deployments. |
-| `COMPOSE_PROFILES` | `local-db` | Enables the bundled PostgreSQL service. Set empty for an external database. |
-| `POSTGRES_DB` | `aster` | Bundled database name. |
-| `POSTGRES_USER` | `aster` | Bundled database user. |
-| `POSTGRES_PASSWORD` | `aster` | Bundled database password. Replace outside disposable local use. |
-| `DATABASE_URL` | empty | Async SQLAlchemy PostgreSQL URL for an external database. |
-| `API_PORT` | `8000` | Host port published for FastAPI. |
+| `APP_ENVIRONMENT` | `development` | Use `production` for public deployments and production behavior. |
+| `API_PORT` | `8000` | Host port published for FastAPI. Do not expose it publicly when the web proxy is available. |
 | `WEB_PORT` | `3000` | Host port published for Next.js. |
-| `ASTER_API_INTERNAL_URL` | `http://api:8000` | Internal API origin used by the web service. |
-| `ASTER_CORS_ORIGINS` | `http://localhost:3000` | Allowed browser origins. |
-| `ASTER_ENCRYPTION_KEY` | required | Encrypts stored credentials. Use at least 32 characters and preserve it. |
+| `ASTER_CORS_ORIGINS` | `http://localhost:3000` | Comma-separated browser origins allowed to call the API. |
+| `ASTER_API_INTERNAL_URL` | `http://api:8000` | Internal API origin used by the web container. |
 
-## Sessions and login
+### Model requests
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `ASTER_ENDPOINT_TIMEOUT_SECONDS` | `30` | Timeout for non-streaming model and endpoint requests. |
+| `ASTER_STREAM_TIMEOUT_SECONDS` | `120` | Timeout for streamed chat responses. |
+
+### Sessions and login protection
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -30,24 +80,19 @@
 | `ASTER_LOGIN_ATTEMPTS` | `5` | Login attempts allowed inside the rate-limit window. |
 | `ASTER_LOGIN_WINDOW_SECONDS` | `300` | Login rate-limit window. |
 
-## Model requests
+Set `ASTER_SESSION_SECURE=true` when Aster is served exclusively through HTTPS.
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `ASTER_ENDPOINT_TIMEOUT_SECONDS` | `30` | Non-streaming model and endpoint request timeout. |
-| `ASTER_STREAM_TIMEOUT_SECONDS` | `120` | Streaming chat timeout. |
-
-## MCP and tools
+### MCP and interactive tools
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `ASTER_MCP_STDIO_ENABLED` | `false` | Allows configured MCP stdio processes inside the API container. |
 | `ASTER_MCP_TIMEOUT_SECONDS` | `30` | MCP connection and execution timeout. |
-| `ASTER_TOOL_MAX_ROUNDS` | `8` | Maximum tool/model rounds in one interactive turn. |
+| `ASTER_TOOL_MAX_ROUNDS` | `8` | Maximum model/tool rounds in one interactive turn. |
 | `ASTER_TOOL_ARGUMENT_MAX_CHARACTERS` | `100000` | Maximum serialized tool arguments. |
 | `ASTER_TOOL_RESULT_MAX_CHARACTERS` | `100000` | Maximum stored tool result. |
 
-## Memory, documents, and retrieval
+### Memory, documents, and retrieval
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -59,11 +104,11 @@
 | `ASTER_DOCUMENT_MAX_BYTES` | `5000000` | Maximum uploaded document size. |
 | `ASTER_DOCUMENT_MAX_CHARACTERS` | `2000000` | Maximum extracted text size. |
 | `ASTER_DOCUMENT_CHUNK_CHARACTERS` | `1600` | Deterministic chunk target size. |
-| `ASTER_DOCUMENT_CHUNK_OVERLAP` | `200` | Character overlap between chunks. |
+| `ASTER_DOCUMENT_CHUNK_OVERLAP` | `200` | Character overlap between chunks. Must remain smaller than the chunk size. |
 | `ASTER_DOCUMENT_MAX_CHUNKS` | `2000` | Maximum chunks per document. |
-| `ASTER_EMBEDDING_BATCH_SIZE` | `64` | Maximum embedding batch size. |
+| `ASTER_EMBEDDING_BATCH_SIZE` | `64` | Maximum inputs sent in one embedding request. |
 
-## Media and images
+### Private media and images
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -75,19 +120,21 @@
 | `ASTER_IMAGE_MAX_INPUTS` | `8` | Maximum images in one edit operation. |
 | `ASTER_IMAGE_MAX_OUTPUTS` | `4` | Maximum outputs in one generation operation. |
 
-## Automations and integrations
+### Automations and integrations
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `ASTER_AUTOMATION_POLL_SECONDS` | `2` | Worker automation polling interval. |
+| `ASTER_AUTOMATION_POLL_SECONDS` | `2` | Worker polling interval for due automation work. |
 | `ASTER_AUTOMATION_LEASE_SECONDS` | `120` | Automation run lease duration. |
-| `ASTER_AUTOMATION_HEARTBEAT_SECONDS` | `30` | Automation lease renewal interval. Must remain below half the lease duration. |
+| `ASTER_AUTOMATION_HEARTBEAT_SECONDS` | `30` | Automation lease renewal interval. |
 | `ASTER_AUTOMATION_SCHEDULER_BATCH_SIZE` | `25` | Maximum definitions scheduled per cycle. |
 | `ASTER_AUTOMATION_OUTPUT_MAX_CHARACTERS` | `100000` | Maximum stored automation model output. |
 | `ASTER_INTEGRATION_TIMEOUT_SECONDS` | `30` | SMTP, CalDAV, webhook, IMAP, and Discord request timeout. |
 | `ASTER_WEBHOOK_MAX_BYTES` | `1000000` | Maximum inbound webhook body size. |
 
-## Communications
+`ASTER_AUTOMATION_HEARTBEAT_SECONDS` must remain less than half of `ASTER_AUTOMATION_LEASE_SECONDS`.
+
+### Communications
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -96,7 +143,7 @@
 | `ASTER_COMMUNICATION_ATTACHMENT_MAX_BYTES` | `15000000` | Maximum individual attachment size. |
 | `ASTER_COMMUNICATION_MAX_ATTACHMENTS` | `16` | Maximum attachments per inbound message. |
 
-## Agents
+### Autonomous agents
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -109,21 +156,23 @@
 | `ASTER_AGENT_RETRIEVAL_MAX_CHARACTERS` | `24000` | Maximum retrieval context for an agent run. |
 | `ASTER_AGENT_LOOP_REPEAT_LIMIT` | `3` | Repeated-decision threshold used by loop protection. |
 
+`ASTER_AGENT_HEARTBEAT_SECONDS` must remain less than half of `ASTER_AGENT_LEASE_SECONDS`.
+
 ## Applying changes
 
-Validate the Compose configuration:
+Validate the Compose configuration after editing `.env`:
 
 ```bash
 docker compose config --quiet
 ```
 
-Recreate services after changing runtime values:
+Recreate services after changing application runtime values:
 
 ```bash
 docker compose up -d --force-recreate api worker web
 ```
 
-Changes to database profile, ports, mounts, or images may require a normal rebuild:
+Changes to database mode, published ports, mounts, or images may require a normal rebuild:
 
 ```bash
 docker compose up -d --build
