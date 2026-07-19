@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef } from "react";
 
 import {
   apiRequest,
-  type Conversation,
   type ConversationSummary,
   type PersonaPreferences,
 } from "../../lib/api";
@@ -37,20 +36,15 @@ export function ChatDocumentTitle() {
         let personaName: string | null = null;
 
         if (!startNewConversation) {
-          let activeConversationId = conversationId;
-          if (!activeConversationId) {
-            const conversations = await apiRequest<ConversationSummary[]>("/api/conversations");
-            if (requestId !== requestIdRef.current) return;
-            activeConversationId = conversations[0]?.id ?? null;
-          }
+          const conversations = await apiRequest<ConversationSummary[]>("/api/conversations");
+          if (requestId !== requestIdRef.current) return;
 
-          if (activeConversationId) {
-            const conversation = await apiRequest<Conversation>(
-              `/api/conversations/${encodeURIComponent(activeConversationId)}`,
-            );
-            if (requestId !== requestIdRef.current) return;
+          const activeConversation = conversationId
+            ? conversations.find((conversation) => conversation.id === conversationId)
+            : conversations[0];
+          if (activeConversation) {
             resolvedConversation = true;
-            personaName = normalizedPersonaName(conversation.persona?.name);
+            personaName = normalizedPersonaName(activeConversation.persona_name);
           }
         }
 
