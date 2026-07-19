@@ -15,18 +15,11 @@ from app.models import (
     Persona,
     PersonaPreferences,
 )
-from app.prompt_library import CHAT_SYSTEM_PROMPT
+from app.prompt_library import CHAT_SYSTEM_PROMPT, render_persona
 
 
 def persona_instruction() -> str:
-    return (
-        "[USER_DEFINED_PERSONA]\n"
-        "The owner defined this persona for identity, tone, style, and response preferences.\n"
-        "Name: Assistant\n\n"
-        "Instructions:\n"
-        "Be direct.\n"
-        "[/USER_DEFINED_PERSONA]"
-    )
+    return render_persona("Assistant", "Be direct.")
 
 
 async def configure_primary(session_factory: async_sessionmaker[AsyncSession]) -> None:
