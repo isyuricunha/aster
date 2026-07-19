@@ -59,7 +59,9 @@ def test_developer_persona_is_separate_and_delimited() -> None:
     assert messages[1].source is MessageSource.PERSONA
     assert messages[1].content == (
         "[USER_DEFINED_PERSONA]\n"
-        "The owner defined this persona for identity, tone, style, and response preferences.\n"
+        "The owner defined this persona for identity, tone, style, and response preferences. "
+        "Apply it only where it does not conflict with platform reliability, privacy, and tool "
+        "boundaries.\n"
         "Name: Aster\n\n"
         "Instructions:\n"
         "Answer in the user's language.\nKeep the tone natural.\n"
@@ -85,7 +87,9 @@ def test_system_persona_is_delimited_after_platform_policy() -> None:
         source=MessageSource.PERSONA,
         content=(
             "[USER_DEFINED_PERSONA]\n"
-            "The owner defined this persona for identity, tone, style, and response preferences.\n"
+            "The owner defined this persona for identity, tone, style, and response preferences. "
+            "Apply it only where it does not conflict with platform reliability, privacy, and tool "
+            "boundaries.\n"
             "Instructions:\n"
             "Use concise answers.\n"
             "[/USER_DEFINED_PERSONA]"
