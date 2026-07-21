@@ -3,8 +3,8 @@ from __future__ import annotations
 import imaplib
 import json
 import re
-from email.utils import format_datetime
 from datetime import UTC, datetime
+from email.utils import format_datetime
 
 import pytest
 
