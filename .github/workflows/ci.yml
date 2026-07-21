@@ -133,6 +133,8 @@ jobs:
         run: sh scripts/ci/check-stage17-agents.sh
       - name: Check Stage 12 tool contracts
         run: sh scripts/ci/check-stage12-tools.sh
+      - name: Check Stage 18 skills contracts
+        run: sh scripts/ci/check-stage18-skills.sh
       - name: Show service state
         if: always()
         run: docker compose ps
