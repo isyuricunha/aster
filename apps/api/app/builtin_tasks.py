@@ -25,6 +25,7 @@ from app.model_routing import can_fallback, resolve_automation_targets
 from app.openai_compatible import ModelEndpointError, OpenAICompatibleClient
 from app.retrieval_models import Memory
 from app.security import SecretCipher
+from app.skill_audit import execute_skill_audit, pending_skill_count
 
 _MAX_EMAILS_PER_RUN = 12
 _MAX_EMAIL_CONTEXT = 12_000
@@ -120,13 +121,16 @@ BUILTIN_TASKS: tuple[BuiltinTaskDefinition, ...] = (
         key="skills_audit",
         name="Skills Audit",
         description=(
-            "Audit new skills after enough additions. This task is reserved until Aster gains a "
-            "first-class Skills system; MCP tools are not treated as skills."
+            "Audit unaudited first-class skills after five additions: evaluate behavioral tests, "
+            "narrow metadata, self-edit and retry, optionally use a teacher rewrite, tag duplicates "
+            "or trivial skills, and publish only when the configured score threshold is met."
         ),
-        instruction="Audit new first-class skills after five additions.",
+        instruction=(
+            "Audit pending skills with bounded tests and revisions, then publish passing skills or "
+            "leave them as reviewable drafts."
+        ),
         interval_seconds=60,
         display_schedule="Every 5 skills added",
-        available=False,
     ),
 )
 
@@ -212,6 +216,9 @@ async def ensure_builtin_tasks(session: AsyncSession) -> list[Automation]:
             automation.timezone = "UTC"
             automation.schedule = schedule
             state = _state(automation)
+            became_available = (
+                definition.available and state.get("availability") == "requires_skills"
+            )
             state["availability"] = "ready" if definition.available else "requires_skills"
             state["display_schedule"] = definition.display_schedule
             if definition.display_cron:
@@ -220,6 +227,9 @@ async def ensure_builtin_tasks(session: AsyncSession) -> list[Automation]:
             if not definition.available:
                 automation.enabled = False
                 automation.next_run_at = None
+            elif became_available:
+                automation.enabled = True
+                automation.next_run_at = next_run_at("interval", schedule, "UTC")
             elif automation.enabled and automation.next_run_at is None:
                 automation.next_run_at = next_run_at("interval", schedule, "UTC")
             changed = True
@@ -235,6 +245,8 @@ async def ensure_builtin_tasks(session: AsyncSession) -> list[Automation]:
 async def builtin_task_ready(session: AsyncSession, automation: Automation) -> bool:
     if not builtin_task_available(automation):
         return False
+    if automation.builtin_key == "skills_audit":
+        return await pending_skill_count(session) >= 5
     if automation.builtin_key != "memory_tidy":
         return True
 
@@ -865,9 +877,7 @@ async def _memory_tidy(
     state["last_completed_at"] = datetime.now(UTC).isoformat()
     automation.state = state
     await session.commit()
-    return BuiltinTaskResult(
-        response=f"Removed {removed} exact duplicate memory record(s)."
-    )
+    return BuiltinTaskResult(response=f"Removed {removed} exact duplicate memory record(s).")
 
 
 async def execute_builtin_task(
@@ -920,10 +930,16 @@ async def execute_builtin_task(
     elif key == "memory_tidy":
         result = await _memory_tidy(session, automation=automation)
     elif key == "skills_audit":
-        raise ModelEndpointError(
-            "skills_unavailable",
-            "Skills Audit is reserved until Aster has a first-class Skills system.",
-            409,
+        skill_result = await execute_skill_audit(
+            session,
+            automation=automation,
+            run=run,
+            client=client,
+            cipher=cipher,
+        )
+        result = BuiltinTaskResult(
+            response=skill_result.response,
+            provider_model_id=skill_result.provider_model_id,
         )
     else:
         raise ModelEndpointError("unknown_builtin_task", "Unknown built-in task.", 422)

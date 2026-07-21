@@ -78,7 +78,7 @@ curl --fail --silent --show-error --cookie "${cookie_jar}" \
 
 curl --fail --silent --show-error --cookie "${cookie_jar}" \
   "${web_url}/api/tasks" \
-  | python -c 'import json, sys; items=json.load(sys.stdin); builtins=[item for item in items if item["builtin_key"]]; assert len(builtins) == 7; assert any(item["builtin_key"] == "memory_tidy" for item in builtins); assert any(item["builtin_key"] == "skills_audit" and not item["enabled"] for item in builtins)'
+  | python -c 'import json, sys; items=json.load(sys.stdin); builtins=[item for item in items if item["builtin_key"]]; assert len(builtins) == 7; assert any(item["builtin_key"] == "memory_tidy" for item in builtins); assert any(item["builtin_key"] == "skills_audit" and item["enabled"] for item in builtins)'
 
 curl --fail --silent --show-error --cookie "${cookie_jar}" \
   "${web_url}/api/notifications" \

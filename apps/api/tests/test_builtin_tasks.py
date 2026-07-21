@@ -55,12 +55,14 @@ async def test_builtin_tasks_are_seeded_with_stable_defaults(api_client: tuple) 
     )
 
     skills = by_key["skills_audit"]
-    assert skills["enabled"] is False
-    assert skills["next_run_at"] is None
-    assert skills["state"]["availability"] == "requires_skills"
+    assert skills["enabled"] is True
+    assert skills["next_run_at"] is not None
+    assert skills["state"]["availability"] == "ready"
 
 
-async def test_builtin_tasks_can_be_paused_run_and_cannot_fake_skills(api_client: tuple) -> None:
+async def test_builtin_tasks_can_be_paused_run_and_protect_builtin_definitions(
+    api_client: tuple,
+) -> None:
     client, _, _ = api_client
     tasks = (await client.get("/api/tasks")).json()
     by_key = {item["builtin_key"]: item for item in tasks}
@@ -98,14 +100,23 @@ async def test_builtin_tasks_can_be_paused_run_and_cannot_fake_skills(api_client
     assert queued.json()["automation_name"] == "Memory Tidy"
 
     skills = by_key["skills_audit"]
-    enable_skills = await client.post(
+    paused_skills = await client.post(
+        f"/api/tasks/{skills['id']}/enabled",
+        json={"enabled": False},
+    )
+    assert paused_skills.status_code == 200, paused_skills.text
+    assert paused_skills.json()["enabled"] is False
+
+    activated_skills = await client.post(
         f"/api/tasks/{skills['id']}/enabled",
         json={"enabled": True},
     )
-    assert enable_skills.status_code == 409
+    assert activated_skills.status_code == 200, activated_skills.text
+    assert activated_skills.json()["enabled"] is True
 
     run_skills = await client.post(f"/api/tasks/{skills['id']}/run")
-    assert run_skills.status_code == 409
+    assert run_skills.status_code == 202, run_skills.text
+    assert run_skills.json()["automation_name"] == "Skills Audit"
 
     legacy_run_skills = await client.post(f"/api/automations/{skills['id']}/run")
     assert legacy_run_skills.status_code == 409

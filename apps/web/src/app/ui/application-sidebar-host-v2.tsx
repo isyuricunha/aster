@@ -25,7 +25,7 @@ const CHATS_OPEN_STORAGE_KEY = "aster.application-sidebar-chats-open";
 const INITIAL_CONVERSATION_LIMIT = 8;
 const CONVERSATION_LIMIT_STEP = 8;
 
-type RouteWorkspaceKey = "email" | "discord";
+type RouteWorkspaceKey = "email" | "discord" | "skills";
 type WorkspaceKey = RouteWorkspaceKey | WorkspaceWindowKey;
 type ActiveKey = "chat" | WorkspaceKey | "settings" | null;
 
@@ -40,6 +40,7 @@ type WorkspaceItem = {
 const WORKSPACE_ITEMS: readonly WorkspaceItem[] = [
   { key: "email", href: "/email", icon: "email", label: "Email" },
   { key: "discord", href: "/discord", icon: "discord", label: "Discord" },
+  { key: "skills", href: "/skills", icon: "skills", label: "Skills" },
   { key: "agents", href: "/agents", icon: "tools", label: "Agents", window: "agents" },
   { key: "images", href: "/images", icon: "images", label: "Images", window: "images" },
   {
@@ -61,6 +62,7 @@ function activeKey(pathname: string): ActiveKey {
   if (pathname === "/") return "chat";
   if (pathname.startsWith("/email")) return "email";
   if (pathname.startsWith("/discord")) return "discord";
+  if (pathname.startsWith("/skills")) return "skills";
   if (pathname.startsWith("/agents")) return "agents";
   if (pathname.startsWith("/images")) return "images";
   if (pathname.startsWith("/tasks") || pathname.startsWith("/automations")) {
