@@ -85,6 +85,8 @@ class CommunicationSyncResponse(BaseModel):
     status: Literal["ok"]
     messages_added: int
     automations_enqueued: int
+    backfill_pending: bool = False
+    backfill_remaining: int = 0
 
 
 class CommunicationAttachmentResponse(BaseModel):
