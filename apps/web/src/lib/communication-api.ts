@@ -1,5 +1,8 @@
 import { apiRequest } from "./api";
 
+const EMAIL_THREAD_PAGE_SIZE = 100;
+const FOREGROUND_SYNC_BATCH_LIMIT = 10;
+
 export type CommunicationKind = "imap" | "discord";
 export type CommunicationThreadKind = "email" | "discord";
 
@@ -34,8 +37,8 @@ export type CommunicationSyncResult = {
   status: "ok";
   messages_added: number;
   automations_enqueued: number;
-  backfill_pending: boolean;
-  backfill_remaining: number;
+  backfill_pending?: boolean;
+  backfill_remaining?: number;
 };
 
 export type CommunicationAttachment = {
@@ -156,23 +159,59 @@ export function testCommunicationAccount(
   return apiRequest(`/api/communication-accounts/${id}/test`, { method: "POST" });
 }
 
-export function syncCommunicationAccount(id: string): Promise<CommunicationSyncResult> {
-  return apiRequest(`/api/communication-accounts/${id}/sync`, { method: "POST" });
+export async function syncCommunicationAccount(id: string): Promise<CommunicationSyncResult> {
+  const aggregate: CommunicationSyncResult = {
+    status: "ok",
+    messages_added: 0,
+    automations_enqueued: 0,
+    backfill_pending: false,
+    backfill_remaining: 0,
+  };
+
+  for (let batchIndex = 0; batchIndex < FOREGROUND_SYNC_BATCH_LIMIT; batchIndex += 1) {
+    const batch = await apiRequest<CommunicationSyncResult>(
+      `/api/communication-accounts/${id}/sync`,
+      { method: "POST" },
+    );
+    aggregate.messages_added += batch.messages_added;
+    aggregate.automations_enqueued += batch.automations_enqueued;
+    aggregate.backfill_pending = batch.backfill_pending ?? false;
+    aggregate.backfill_remaining = batch.backfill_remaining ?? 0;
+    if (!aggregate.backfill_pending) break;
+  }
+
+  return aggregate;
 }
 
-export function listCommunicationThreads(params: {
+export async function listCommunicationThreads(params: {
   accountId?: string;
   kind?: CommunicationThreadKind | "";
   unreadOnly?: boolean;
   query?: string;
 } = {}): Promise<CommunicationThread[]> {
-  const query = new URLSearchParams();
-  if (params.accountId) query.set("account_id", params.accountId);
-  if (params.kind) query.set("kind", params.kind);
-  if (params.unreadOnly) query.set("unread_only", "true");
-  if (params.query?.trim()) query.set("query", params.query.trim());
-  const suffix = query.size ? `?${query.toString()}` : "";
-  return apiRequest<CommunicationThread[]>(`/api/communication-threads${suffix}`);
+  const loadCompleteEmailHistory = params.kind === "email";
+  const threads: CommunicationThread[] = [];
+  let offset = 0;
+
+  while (true) {
+    const query = new URLSearchParams();
+    if (params.accountId) query.set("account_id", params.accountId);
+    if (params.kind) query.set("kind", params.kind);
+    if (params.unreadOnly) query.set("unread_only", "true");
+    if (params.query?.trim()) query.set("query", params.query.trim());
+    if (loadCompleteEmailHistory) {
+      query.set("offset", String(offset));
+      query.set("limit", String(EMAIL_THREAD_PAGE_SIZE));
+    }
+    const suffix = query.size ? `?${query.toString()}` : "";
+    const page = await apiRequest<CommunicationThread[]>(`/api/communication-threads${suffix}`);
+    threads.push(...page);
+
+    if (!loadCompleteEmailHistory || page.length < EMAIL_THREAD_PAGE_SIZE) break;
+    offset += page.length;
+  }
+
+  return threads;
 }
 
 export function readCommunicationThread(id: string): Promise<CommunicationThreadDetail> {
