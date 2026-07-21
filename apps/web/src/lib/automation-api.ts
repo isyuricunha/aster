@@ -60,6 +60,8 @@ export type AutomationDeliveryWrite = {
 
 export type Automation = {
   id: string;
+  builtin_key: string | null;
+  state: Record<string, unknown>;
   name: string;
   description: string;
   instruction: string;
@@ -168,6 +170,10 @@ export function listAutomations(): Promise<Automation[]> {
   return apiRequest<Automation[]>("/api/automations");
 }
 
+export function listTasks(): Promise<Automation[]> {
+  return apiRequest<Automation[]>("/api/tasks");
+}
+
 export function createAutomation(payload: AutomationWrite): Promise<Automation> {
   return apiRequest<Automation>("/api/automations", {
     method: "POST",
@@ -186,8 +192,19 @@ export function deleteAutomation(id: string): Promise<void> {
   return apiRequest<void>(`/api/automations/${id}`, { method: "DELETE" });
 }
 
+export function setTaskEnabled(id: string, enabled: boolean): Promise<Automation> {
+  return apiRequest<Automation>(`/api/tasks/${id}/enabled`, {
+    method: "POST",
+    body: JSON.stringify({ enabled }),
+  });
+}
+
 export function runAutomation(id: string): Promise<AutomationRun> {
   return apiRequest<AutomationRun>(`/api/automations/${id}/run`, { method: "POST" });
+}
+
+export function runTask(id: string): Promise<AutomationRun> {
+  return apiRequest<AutomationRun>(`/api/tasks/${id}/run`, { method: "POST" });
 }
 
 export function rotateWebhookToken(id: string): Promise<Automation> {
