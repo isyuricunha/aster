@@ -88,7 +88,7 @@ def upgrade() -> None:
             {_sql_json(SKILL_TRIGGERS)},
             {_sql_json(SKILL_TEST_CASES)},
             'pending',
-            {_sql_json({"template": True})},
+            {_sql_json({})},
             1
         WHERE NOT EXISTS (
             SELECT 1 FROM skills WHERE name = 'Concise Summarizer'
