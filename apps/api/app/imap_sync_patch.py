@@ -135,7 +135,11 @@ def _select_mailbox(
             "sync_failed",
             f"IMAP could not open {mailbox.display_name}{suffix}",
         )
-    logger.warning("Skipping IMAP mailbox %s after SELECT returned %s", mailbox.display_name, status)
+    logger.warning(
+        "Skipping IMAP mailbox %s after SELECT returned %s",
+        mailbox.display_name,
+        status,
+    )
     return False
 
 
