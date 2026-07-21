@@ -190,6 +190,10 @@ function formatDate(value: string | null): string {
   }).format(new Date(value));
 }
 
+function customAutomations(items: Automation[]): Automation[] {
+  return items.filter((item) => !item.builtin_key);
+}
+
 export function AutomationPanel({
   automations,
   runs,
@@ -243,10 +247,11 @@ export function AutomationPanel({
   }
 
   async function refresh(selectId?: string) {
-    const [nextAutomations, nextRuns] = await Promise.all([
+    const [allAutomations, nextRuns] = await Promise.all([
       listAutomations(),
       listAutomationRuns(),
     ]);
+    const nextAutomations = customAutomations(allAutomations);
     onAutomationsChange(nextAutomations);
     onRunsChange(nextRuns);
     const target = nextAutomations.find((item) => item.id === selectId);
@@ -264,9 +269,9 @@ export function AutomationPanel({
         ? await createAutomation(payload)
         : await updateAutomation(selectedId as string, payload);
       await refresh(saved.id);
-      setNotice(creating ? "Automation created." : "Automation updated.");
+      setNotice(creating ? "Task created." : "Task updated.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The automation could not be saved.");
+      setError(caught instanceof Error ? caught.message : "The task could not be saved.");
     } finally {
       setBusy(null);
     }
@@ -297,12 +302,12 @@ export function AutomationPanel({
         );
       } else {
         await deleteAutomation(selected.id);
-        const next = await listAutomations();
+        const next = customAutomations(await listAutomations());
         onAutomationsChange(next);
         onRunsChange(await listAutomationRuns());
         if (next[0]) choose(next[0]);
         else beginCreate();
-        setNotice("Automation deleted.");
+        setNotice("Task deleted.");
       }
       if (name !== "delete") await refresh(selected.id);
     } catch (caught) {
@@ -360,9 +365,9 @@ export function AutomationPanel({
 
   return (
     <div className={styles.twoPanel}>
-      <aside aria-label="Automations" className={styles.sideList}>
+      <aside aria-label="Custom tasks" className={styles.sideList}>
         <button className={styles.newButton} onClick={beginCreate} type="button">
-          New automation
+          New task
         </button>
         {automations.map((automation) => (
           <button
@@ -389,8 +394,8 @@ export function AutomationPanel({
       <form className={styles.editor} onSubmit={(event) => void save(event)}>
         <header className={styles.editorHeader}>
           <div>
-            <p>{creating ? "New automation" : "Automation editor"}</p>
-            <h2>{draft.name || "Untitled automation"}</h2>
+            <p>{creating ? "New task" : "Task editor"}</p>
+            <h2>{draft.name || "Untitled task"}</h2>
             <span>Scheduled model output with explicit, auditable delivery.</span>
           </div>
           <div className={styles.headerActions}>
@@ -561,8 +566,8 @@ export function AutomationPanel({
           {draft.triggerType === "communication" ? (
             <div className={styles.webhookCard}>
               <span>
-                Save this automation, then add an explicit allowlist rule in Communications.
-                Receiving a message by itself never queues the run.
+                Save this task, then add an explicit allowlist rule in Communications. Receiving a
+                message by itself never queues the run.
               </span>
             </div>
           ) : null}
@@ -699,7 +704,7 @@ export function AutomationPanel({
                           onChange={(event) =>
                             updateDelivery(index, { subject: event.target.value })
                           }
-                          placeholder="Automation completed"
+                          placeholder="Task completed"
                           value={delivery.subject}
                         />
                       </label>
@@ -752,7 +757,7 @@ export function AutomationPanel({
           <section className={styles.runSection}>
             <div className={styles.sectionTitle}>
               <p>Recent history</p>
-              <h3>Runs for this automation</h3>
+              <h3>Runs for this task</h3>
             </div>
             <div className={styles.runList}>
               {runs
