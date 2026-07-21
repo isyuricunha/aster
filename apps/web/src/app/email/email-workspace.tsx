@@ -18,10 +18,11 @@ import { EmailMessageBody } from "../communications/email-message-body";
 import { Icon, type IconName } from "../ui/icons";
 import styles from "./email-workspace.module.css";
 
-type MailboxKey = "inbox" | "sent" | "spam" | "junk" | "trash" | "all";
+type SystemMailboxKey = "inbox" | "sent" | "spam" | "junk" | "trash";
+type MailboxKey = SystemMailboxKey | "all";
 
 type MailboxDefinition = {
-  key: MailboxKey;
+  key: SystemMailboxKey;
   label: string;
   icon: IconName;
 };
@@ -51,9 +52,10 @@ function formatDate(value: string): string {
     date.getFullYear() === now.getFullYear() &&
     date.getMonth() === now.getMonth() &&
     date.getDate() === now.getDate();
-  return new Intl.DateTimeFormat(undefined, sameDay ? { timeStyle: "short" } : { dateStyle: "medium" }).format(
-    date,
-  );
+  return new Intl.DateTimeFormat(
+    undefined,
+    sameDay ? { timeStyle: "short" } : { dateStyle: "medium" },
+  ).format(date);
 }
 
 function senderLabel(message: CommunicationThreadDetail["messages"][number]): string {
@@ -76,20 +78,21 @@ function sourceId(thread: CommunicationThread): string {
 }
 
 function normalizedSource(thread: CommunicationThread): string {
-  return sourceId(thread).toLocaleLowerCase();
+  return sourceId(thread)
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase();
 }
 
-function mailboxForThread(thread: CommunicationThread): MailboxKey {
+function systemMailboxForThread(thread: CommunicationThread): SystemMailboxKey | null {
   const source = normalizedSource(thread);
-  if (/sent|enviad/.test(source)) return "sent";
+  if (!source) return "inbox";
+  if (/sent|enviad|outbox/.test(source)) return "sent";
   if (/spam/.test(source)) return "spam";
-  if (/junk|indesejad/.test(source)) return "junk";
+  if (/junk|indesejad|bulk/.test(source)) return "junk";
   if (/trash|deleted|bin|lixeira/.test(source)) return "trash";
-  return "inbox";
-}
-
-function isSystemFolder(thread: CommunicationThread): boolean {
-  return MAILBOXES.some((mailbox) => mailboxForThread(thread) === mailbox.key);
+  if (/inbox|entrada|received/.test(source)) return "inbox";
+  return null;
 }
 
 export function EmailWorkspace({
@@ -103,7 +106,9 @@ export function EmailWorkspace({
 }) {
   const [accounts] = useState(initialAccounts);
   const [threads, setThreads] = useState(initialThreads);
-  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(initialThreads[0]?.id ?? null);
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(
+    initialThreads[0]?.id ?? null,
+  );
   const [thread, setThread] = useState<CommunicationThreadDetail | null>(null);
   const [threadLoading, setThreadLoading] = useState(Boolean(initialThreads[0]));
   const [mailbox, setMailbox] = useState<MailboxKey>("inbox");
@@ -117,7 +122,9 @@ export function EmailWorkspace({
   const [mailboxesOpen, setMailboxesOpen] = useState(() =>
     storedBoolean(MAILBOXES_STORAGE_KEY, true),
   );
-  const [foldersOpen, setFoldersOpen] = useState(() => storedBoolean(FOLDERS_STORAGE_KEY, true));
+  const [foldersOpen, setFoldersOpen] = useState(() =>
+    storedBoolean(FOLDERS_STORAGE_KEY, true),
+  );
   const [reply, setReply] = useState("");
   const [draftInstruction, setDraftInstruction] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -126,19 +133,25 @@ export function EmailWorkspace({
 
   const folderNames = useMemo(() => {
     const values = threads
+      .filter((item) => systemMailboxForThread(item) === null)
       .map(sourceId)
-      .filter(Boolean)
-      .filter((folder) => {
-        const sample = threads.find((item) => sourceId(item) === folder);
-        return sample ? !isSystemFolder(sample) : false;
-      });
+      .filter(Boolean);
     return Array.from(new Set(values)).sort((left, right) => left.localeCompare(right));
   }, [threads]);
 
   const mailboxCounts = useMemo(() => {
-    const counts = Object.fromEntries(MAILBOXES.map((item) => [item.key, 0])) as Record<MailboxKey, number>;
-    counts.all = threads.length;
-    for (const item of threads) counts[mailboxForThread(item)] += 1;
+    const counts: Record<MailboxKey, number> = {
+      inbox: 0,
+      sent: 0,
+      spam: 0,
+      junk: 0,
+      trash: 0,
+      all: threads.length,
+    };
+    for (const item of threads) {
+      const systemMailbox = systemMailboxForThread(item);
+      if (systemMailbox) counts[systemMailbox] += 1;
+    }
     return counts;
   }, [threads]);
 
@@ -149,11 +162,13 @@ export function EmailWorkspace({
       if (unreadOnly && item.unread_count === 0) return false;
       if (customFolder) {
         if (sourceId(item) !== customFolder) return false;
-      } else if (mailbox !== "all" && mailboxForThread(item) !== mailbox) {
+      } else if (mailbox !== "all" && systemMailboxForThread(item) !== mailbox) {
         return false;
       }
       if (!needle) return true;
-      return `${item.title} ${item.preview} ${item.account_name}`.toLocaleLowerCase().includes(needle);
+      return `${item.title} ${item.preview} ${item.account_name}`
+        .toLocaleLowerCase()
+        .includes(needle);
     });
   }, [accountFilter, customFolder, mailbox, query, threads, unreadOnly]);
 
@@ -179,7 +194,9 @@ export function EmailWorkspace({
         if (active) setThread(detail);
       })
       .catch((caught) => {
-        if (active) setError(caught instanceof Error ? caught.message : "Could not load the email thread.");
+        if (active) {
+          setError(caught instanceof Error ? caught.message : "Could not load the email thread.");
+        }
       })
       .finally(() => {
         if (active) setThreadLoading(false);
@@ -190,8 +207,7 @@ export function EmailWorkspace({
   }, [selectedThreadId]);
 
   async function refreshThreads() {
-    const next = await listCommunicationThreads({ kind: "email" });
-    setThreads(next);
+    setThreads(await listCommunicationThreads({ kind: "email" }));
   }
 
   function selectMailbox(nextMailbox: MailboxKey) {
@@ -270,8 +286,7 @@ export function EmailWorkspace({
     setBusy("read");
     setError(null);
     try {
-      const updated = await markCommunicationThreadRead(thread.id);
-      setThread(updated);
+      setThread(await markCommunicationThreadRead(thread.id));
       await refreshThreads();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not mark the thread read.");
@@ -324,10 +339,10 @@ export function EmailWorkspace({
 
   return (
     <div
-      className={`${styles.workspace} ${navigationCollapsed ? styles.navigationCollapsed : ""}`}
       aria-busy={Boolean(busy) || threadLoading}
+      className={`${styles.workspace} ${navigationCollapsed ? styles.navigationCollapsed : ""}`}
     >
-      <aside className={styles.mailNavigation} aria-label="Email mailboxes">
+      <aside aria-label="Email mailboxes" className={styles.mailNavigation}>
         <div className={styles.navigationHeader}>
           <strong>Email</strong>
           <button aria-label="Collapse mailbox navigation" onClick={toggleNavigation} type="button">
@@ -342,7 +357,11 @@ export function EmailWorkspace({
             onClick={toggleMailboxes}
             type="button"
           >
-            <Icon className={mailboxesOpen ? styles.chevronOpen : ""} name="chevron-right" size={13} />
+            <Icon
+              className={mailboxesOpen ? styles.chevronOpen : ""}
+              name="chevron-right"
+              size={13}
+            />
             <span>Mailboxes</span>
           </button>
           {mailboxesOpen ? (
@@ -381,7 +400,11 @@ export function EmailWorkspace({
             onClick={toggleFolders}
             type="button"
           >
-            <Icon className={foldersOpen ? styles.chevronOpen : ""} name="chevron-right" size={13} />
+            <Icon
+              className={foldersOpen ? styles.chevronOpen : ""}
+              name="chevron-right"
+              size={13}
+            />
             <span>Folders</span>
           </button>
           {foldersOpen ? (
@@ -436,7 +459,7 @@ export function EmailWorkspace({
         </Link>
       </aside>
 
-      <section className={styles.threadColumn} aria-label={`${currentMailboxLabel} messages`}>
+      <section aria-label={`${currentMailboxLabel} messages`} className={styles.threadColumn}>
         <header className={styles.threadToolbar}>
           {navigationCollapsed ? (
             <button aria-label="Expand mailbox navigation" onClick={toggleNavigation} type="button">
@@ -447,7 +470,11 @@ export function EmailWorkspace({
             <strong>{currentMailboxLabel}</strong>
             <span>{visibleThreads.length} conversation(s)</span>
           </div>
-          <button disabled={!accounts.length || Boolean(busy)} onClick={() => void syncAccounts()} type="button">
+          <button
+            disabled={!accounts.length || Boolean(busy)}
+            onClick={() => void syncAccounts()}
+            type="button"
+          >
             <Icon name="refresh" size={14} />
             <span>{busy === "sync" ? "Syncing…" : "Sync"}</span>
           </button>
@@ -548,7 +575,9 @@ export function EmailWorkspace({
                   {message.recipients.length ? (
                     <p>To: {message.recipients.map(recipientLabel).join(", ")}</p>
                   ) : null}
-                  {message.subject && message.subject !== thread.title ? <h2>{message.subject}</h2> : null}
+                  {message.subject && message.subject !== thread.title ? (
+                    <h2>{message.subject}</h2>
+                  ) : null}
                   <EmailMessageBody message={message} threadKind="email" />
                   {message.attachments.length ? (
                     <div className={styles.attachments}>
@@ -571,7 +600,11 @@ export function EmailWorkspace({
                   placeholder="Optional AI guidance"
                   value={draftInstruction}
                 />
-                <button disabled={Boolean(busy)} onClick={() => void generateDraft()} type="button">
+                <button
+                  disabled={Boolean(busy)}
+                  onClick={() => void generateDraft()}
+                  type="button"
+                >
                   {busy === "draft" ? "Drafting…" : reply.trim() ? "Rewrite" : "Draft with AI"}
                 </button>
               </div>
