@@ -1,5 +1,7 @@
 import asyncio
+import base64
 import imaplib
+import json
 import re
 import ssl
 from dataclasses import dataclass
@@ -207,6 +209,115 @@ def _imap_connect(
     return client
 
 
+def _decode_modified_utf7(value: str) -> str:
+    parts: list[str] = []
+    index = 0
+    while index < len(value):
+        marker = value.find("&", index)
+        if marker < 0:
+            parts.append(value[index:])
+            break
+        parts.append(value[index:marker])
+        end = value.find("-", marker)
+        if end < 0:
+            parts.append(value[marker:])
+            break
+        encoded = value[marker + 1 : end]
+        if not encoded:
+            parts.append("&")
+        else:
+            padded = encoded.replace(",", "/")
+            padded += "=" * (-len(padded) % 4)
+            try:
+                parts.append(base64.b64decode(padded).decode("utf-16-be"))
+            except (ValueError, UnicodeDecodeError):
+                parts.append(value[marker : end + 1])
+        index = end + 1
+    return "".join(parts)
+
+
+def _mailbox_name(raw: bytes) -> str | None:
+    match = re.match(
+        rb'^\((?P<flags>[^)]*)\)\s+(?:NIL|"(?:\\.|[^"])*")\s+(?P<name>.+)$',
+        raw,
+    )
+    if match is None:
+        return None
+    name = match.group("name").strip()
+    if name.startswith(b'"') and name.endswith(b'"'):
+        name = name[1:-1].replace(b'\\"', b'"').replace(b"\\\\", b"\\")
+    return _decode_modified_utf7(name.decode("ascii", errors="replace")).strip()
+
+
+def _mailbox_priority(raw: bytes, name: str, fallback: str) -> int:
+    flags = {flag.casefold() for flag in imaplib.ParseFlags(raw)}
+    if name.casefold() == fallback.casefold() or b"\\inbox" in flags:
+        return 0
+    order = (
+        (b"\\sent", 1),
+        (b"\\drafts", 2),
+        (b"\\archive", 3),
+        (b"\\junk", 4),
+        (b"\\trash", 5),
+    )
+    for flag, priority in order:
+        if flag in flags:
+            return priority
+    normalized = name.casefold()
+    if "sent" in normalized or "enviad" in normalized:
+        return 6
+    if "draft" in normalized or "rascunh" in normalized:
+        return 7
+    if "archive" in normalized or "arquivo" in normalized:
+        return 8
+    if "spam" in normalized or "junk" in normalized or "indesejad" in normalized:
+        return 9
+    if "trash" in normalized or "deleted" in normalized or "lixeira" in normalized:
+        return 10
+    return 20
+
+
+def _selectable_mailboxes(client: imaplib.IMAP4, fallback: str) -> list[str]:
+    status, data = client.list()
+    if status != "OK" or not data:
+        return [fallback]
+    found: list[tuple[int, str]] = []
+    seen: set[str] = set()
+    for item in data:
+        if not isinstance(item, bytes):
+            continue
+        flags = {flag.casefold() for flag in imaplib.ParseFlags(item)}
+        if b"\\noselect" in flags or b"\\all" in flags:
+            continue
+        name = _mailbox_name(item)
+        if not name or name.casefold() in seen:
+            continue
+        seen.add(name.casefold())
+        found.append((_mailbox_priority(item, name, fallback), name))
+    if fallback.casefold() not in seen:
+        found.append((0, fallback))
+    found.sort(key=lambda item: (item[0], item[1].casefold()))
+    return [name for _, name in found[:50]] or [fallback]
+
+
+def _cursor_map(cursor_value: str | None, fallback: str) -> dict[str, str]:
+    if not cursor_value:
+        return {}
+    if cursor_value.isdigit():
+        return {fallback: cursor_value}
+    try:
+        value = json.loads(cursor_value)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(value, dict):
+        return {}
+    return {
+        str(folder): str(uid)
+        for folder, uid in value.items()
+        if str(folder).strip() and str(uid).isdigit()
+    }
+
+
 def _test_imap_sync(
     config: dict[str, object],
     credentials: dict[str, str],
@@ -221,11 +332,13 @@ def _test_imap_sync(
                 f"IMAP could not open {folder}.",
             )
         count = int(data[0]) if data and data[0] else 0
+        mailboxes = _selectable_mailboxes(client, folder)
         return AccountTestResult(
-            message="IMAP connection succeeded.",
+            message=f"IMAP connection succeeded with {len(mailboxes)} selectable mailbox(es).",
             identity={
                 "username": credentials.get("username", ""),
                 "folder": folder,
+                "mailboxes": mailboxes,
                 "message_count": count,
             },
         )
@@ -248,9 +361,7 @@ def _parse_imap_message(
     sender_name, sender_address = parseaddr(str(message.get("From") or ""))
     sender_name = _decode_header(sender_name) or None
     sender_address = sender_address.strip() or None
-    recipient_values = [
-        str(message.get(header) or "") for header in ("To", "Cc")
-    ]
+    recipient_values = [str(message.get(header) or "") for header in ("To", "Cc")]
     recipients = [
         {"name": _decode_header(name), "address": address}
         for name, address in getaddresses(recipient_values)
@@ -258,14 +369,13 @@ def _parse_imap_message(
     ]
     content_text, content_html, attachments = _email_content(message)
     header_message_id = str(message.get("Message-ID") or "").strip()
-    external_message_id = header_message_id or f"imap:{folder}:{uid}"
+    folder_key = folder.casefold()
+    base_message_id = header_message_id or f"imap:{uid}"
+    external_message_id = f"imap:{folder_key}:{base_message_id}"
+    thread_id = _email_thread_id(message, subject, base_message_id)
     return ReceivedMessage(
         external_message_id=external_message_id[:512],
-        external_thread_id=_email_thread_id(
-            message,
-            subject,
-            external_message_id,
-        ),
+        external_thread_id=f"{thread_id}:{folder_key}"[:512],
         source_id=folder,
         sender_name=sender_name,
         sender_address=sender_address,
@@ -274,7 +384,7 @@ def _parse_imap_message(
         content_text=content_text,
         content_html=content_html,
         metadata={
-            "imap_uid": uid,
+            "imap_uid": json.dumps({"folder": folder, "uid": uid}, separators=(",", ":")),
             "folder": folder,
             "flags": flags,
             "message_id_header": header_message_id,
@@ -293,66 +403,69 @@ def _sync_imap_sync(
     cursor_value: str | None,
 ) -> SourceSync:
     client = _imap_connect(config, credentials)
-    folder = str(config["folder"])
+    fallback = str(config["folder"])
     limit = int(config.get("max_messages_per_sync", 50))
+    cursors = _cursor_map(cursor_value, fallback)
+    messages: list[ReceivedMessage] = []
     try:
-        status, _ = client.select(folder, readonly=True)
-        if status != "OK":
-            raise CommunicationAdapterError(
-                "sync_failed",
-                f"IMAP could not open {folder}.",
-            )
-        if cursor_value and cursor_value.isdigit():
-            criteria = f"UID {int(cursor_value) + 1}:*"
-        else:
-            criteria = "ALL"
-        status, data = client.uid("search", None, criteria)
-        if status != "OK":
-            raise CommunicationAdapterError(
-                "sync_failed",
-                "IMAP search failed.",
-            )
-        raw_uids = data[0].split() if data and data[0] else []
-        if not cursor_value:
-            raw_uids = raw_uids[-limit:]
-        else:
-            raw_uids = raw_uids[:limit]
-        messages: list[ReceivedMessage] = []
-        last_uid = cursor_value
-        for raw_uid in raw_uids:
-            uid = raw_uid.decode("ascii", errors="ignore")
-            if not uid:
+        folders = _selectable_mailboxes(client, fallback)
+        per_folder_limit = max(1, limit // max(1, len(folders)))
+        for folder in folders:
+            status, _ = client.select(folder, readonly=True)
+            if status != "OK":
+                if folder == fallback:
+                    raise CommunicationAdapterError(
+                        "sync_failed",
+                        f"IMAP could not open {folder}.",
+                    )
                 continue
-            status, fetched = client.uid("fetch", uid, "(RFC822 FLAGS)")
-            if status != "OK" or not fetched:
+            previous_uid = cursors.get(folder)
+            criteria = f"UID {int(previous_uid) + 1}:*" if previous_uid else "ALL"
+            status, data = client.uid("search", None, criteria)
+            if status != "OK":
+                if folder == fallback:
+                    raise CommunicationAdapterError("sync_failed", "IMAP search failed.")
                 continue
-            raw_message = next(
-                (
-                    item[1]
-                    for item in fetched
-                    if isinstance(item, tuple) and isinstance(item[1], bytes)
-                ),
-                None,
-            )
-            if raw_message is None:
-                continue
-            flags = " ".join(
-                item[0].decode("utf-8", errors="replace")
-                for item in fetched
-                if isinstance(item, tuple) and isinstance(item[0], bytes)
-            )
-            messages.append(
-                _parse_imap_message(
-                    raw_message,
-                    uid=uid,
-                    folder=folder,
-                    flags=flags,
+            raw_uids = data[0].split() if data and data[0] else []
+            raw_uids = raw_uids[:per_folder_limit] if previous_uid else raw_uids[-per_folder_limit:]
+            last_uid = previous_uid
+            for raw_uid in raw_uids:
+                uid = raw_uid.decode("ascii", errors="ignore")
+                if not uid:
+                    continue
+                status, fetched = client.uid("fetch", uid, "(RFC822 FLAGS)")
+                if status != "OK" or not fetched:
+                    continue
+                raw_message = next(
+                    (
+                        item[1]
+                        for item in fetched
+                        if isinstance(item, tuple) and isinstance(item[1], bytes)
+                    ),
+                    None,
                 )
-            )
-            last_uid = uid
+                if raw_message is None:
+                    continue
+                flags = " ".join(
+                    item[0].decode("utf-8", errors="replace")
+                    for item in fetched
+                    if isinstance(item, tuple) and isinstance(item[0], bytes)
+                )
+                messages.append(
+                    _parse_imap_message(
+                        raw_message,
+                        uid=uid,
+                        folder=folder,
+                        flags=flags,
+                    )
+                )
+                last_uid = uid
+            if last_uid:
+                cursors[folder] = last_uid
+        messages.sort(key=lambda message: message.sent_at)
         return SourceSync(
-            source_key=f"imap:{folder}",
-            cursor_value=last_uid,
+            source_key=f"imap:{fallback}",
+            cursor_value=json.dumps(cursors, ensure_ascii=False, separators=(",", ":")),
             messages=tuple(messages),
         )
     finally:
@@ -362,13 +475,27 @@ def _sync_imap_sync(
             client.shutdown()
 
 
+def _imap_uid_parts(value: str, fallback: str) -> tuple[str, str]:
+    try:
+        payload = json.loads(value)
+    except json.JSONDecodeError:
+        return fallback, value
+    if not isinstance(payload, dict):
+        return fallback, value
+    folder = payload.get("folder")
+    uid = payload.get("uid")
+    if isinstance(folder, str) and isinstance(uid, str) and uid.isdigit():
+        return folder, uid
+    return fallback, value
+
+
 def _mark_imap_seen_sync(
     config: dict[str, object],
     credentials: dict[str, str],
-    uid: str,
+    uid_value: str,
 ) -> None:
     client = _imap_connect(config, credentials)
-    folder = str(config["folder"])
+    folder, uid = _imap_uid_parts(uid_value, str(config["folder"]))
     try:
         status, _ = client.select(folder, readonly=False)
         if status != "OK":
@@ -461,9 +588,7 @@ def _discord_headers(credentials: dict[str, str]) -> dict[str, str]:
 
 
 def _discord_api_base(config: dict[str, object]) -> str:
-    return str(
-        config.get("api_base_url", "https://discord.com/api/v10")
-    ).rstrip("/")
+    return str(config.get("api_base_url", "https://discord.com/api/v10")).rstrip("/")
 
 
 def _discord_datetime(value: object) -> datetime:
@@ -499,10 +624,7 @@ async def test_discord_account(
                 f"Discord returned HTTP {response.status_code}.",
             )
         payload = response.json()
-        if not isinstance(payload, dict) or not isinstance(
-            payload.get("id"),
-            str,
-        ):
+        if not isinstance(payload, dict) or not isinstance(payload.get("id"), str):
             raise CommunicationAdapterError(
                 "invalid_response",
                 "Discord returned an invalid bot identity.",
@@ -585,10 +707,7 @@ async def sync_discord_account(
                 if response.status_code >= 400:
                     raise CommunicationAdapterError(
                         "sync_failed",
-                        (
-                            f"Discord channel {channel_id} returned "
-                            f"HTTP {response.status_code}."
-                        ),
+                        f"Discord channel {channel_id} returned HTTP {response.status_code}.",
                     )
                 payload = response.json()
                 if not isinstance(payload, list):
@@ -629,8 +748,7 @@ async def sync_discord_account(
                         [
                             str(mention.get("id"))
                             for mention in mentions
-                            if isinstance(mention, dict)
-                            and mention.get("id") is not None
+                            if isinstance(mention, dict) and mention.get("id") is not None
                         ]
                         if isinstance(mentions, list)
                         else []
@@ -642,18 +760,14 @@ async def sync_discord_account(
                                 "address": str(mention.get("id")),
                             }
                             for mention in mentions
-                            if isinstance(mention, dict)
-                            and mention.get("id") is not None
+                            if isinstance(mention, dict) and mention.get("id") is not None
                         ]
                         if isinstance(mentions, list)
                         else []
                     )
                     reply_reference = item.get("message_reference")
                     thread_id = str(item.get("channel_id") or channel_id)
-                    title = str(
-                        label_map.get(channel_id)
-                        or f"Discord channel {channel_id}"
-                    )
+                    title = str(label_map.get(channel_id) or f"Discord channel {channel_id}")
                     author_name = str(
                         author.get("global_name")
                         or author.get("username")
@@ -675,13 +789,9 @@ async def sync_discord_account(
                                 "channel_id": channel_id,
                                 "guild_id": item.get("guild_id"),
                                 "author_is_bot": bool(author.get("bot")),
-                                "mentioned_bot": bool(
-                                    bot_id and bot_id in mention_ids
-                                ),
+                                "mentioned_bot": bool(bot_id and bot_id in mention_ids),
                                 "message_reference": (
-                                    reply_reference
-                                    if isinstance(reply_reference, dict)
-                                    else None
+                                    reply_reference if isinstance(reply_reference, dict) else None
                                 ),
                             },
                             sent_at=_discord_datetime(item.get("timestamp")),
