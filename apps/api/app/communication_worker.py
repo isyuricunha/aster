@@ -4,7 +4,8 @@ from uuid import UUID
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.communication_models import CommunicationAccount
+from app.communication_models import CommunicationAccount, CommunicationSourceCursor
+from app.communication_runtime import install_communication_runtime
 from app.communication_service import (
     CommunicationServiceError,
     record_sync_failure,
@@ -12,7 +13,12 @@ from app.communication_service import (
 )
 from app.communication_storage import CommunicationAttachmentStore
 from app.config import Settings
+from app.imap_sync_patch import imap_backfill_progress
 from app.security import SecretCipher
+
+_MAX_BACKFILL_BATCHES_PER_CLAIM = 10
+
+install_communication_runtime()
 
 
 async def claim_due_communication_account(
@@ -48,6 +54,23 @@ async def claim_due_communication_account(
     return account.id
 
 
+async def _imap_backfill_pending(
+    session: AsyncSession,
+    account: CommunicationAccount,
+) -> bool:
+    if account.kind != "imap":
+        return False
+    folder = str(account.config.get("folder") or "INBOX")
+    cursor_value = await session.scalar(
+        select(CommunicationSourceCursor.cursor_value).where(
+            CommunicationSourceCursor.account_id == account.id,
+            CommunicationSourceCursor.source_key == f"imap:{folder}",
+        )
+    )
+    pending, _ = imap_backfill_progress(cursor_value)
+    return pending
+
+
 async def sync_claimed_communication_account(
     session_factory: async_sessionmaker[AsyncSession],
     *,
@@ -61,14 +84,25 @@ async def sync_claimed_communication_account(
         account = await session.get(CommunicationAccount, account_id)
         if account is None or account.sync_lease_owner != worker_id:
             return 0, 0
+        messages_added = 0
+        automations_enqueued = 0
         try:
-            return await sync_communication_account(
-                session,
-                account,
-                cipher=cipher,
-                store=store,
-                settings=settings,
-            )
+            for _ in range(_MAX_BACKFILL_BATCHES_PER_CLAIM):
+                added, enqueued = await sync_communication_account(
+                    session,
+                    account,
+                    cipher=cipher,
+                    store=store,
+                    settings=settings,
+                )
+                messages_added += added
+                automations_enqueued += enqueued
+                if not await _imap_backfill_pending(session, account):
+                    return messages_added, automations_enqueued
+
+            account.next_sync_at = datetime.now(UTC)
+            await session.commit()
+            return messages_added, automations_enqueued
         except CommunicationServiceError as error:
             await record_sync_failure(session, account, error.message)
             return 0, 0
