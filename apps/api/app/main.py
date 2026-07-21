@@ -17,13 +17,14 @@ from app import (  # noqa: F401
 )
 from app.auth_dependencies import require_auth
 from app.communication_route_patch import install_communication_route_patch
+from app.communication_runtime import install_communication_runtime
 from app.config import settings
 from app.conversation_titles import ConversationTitleMiddleware
 from app.db import engine
-from app.imap_sync_patch import install_imap_sync_patch
 from app.middleware import security_middleware
 
 install_communication_route_patch()
+install_communication_runtime()
 
 from app.routes.agent_notifications import router as agent_notifications_router  # noqa: E402
 from app.routes.agent_rules import router as agent_rules_router  # noqa: E402
@@ -45,8 +46,6 @@ from app.routes.skills import router as skills_router  # noqa: E402
 from app.routes.tasks import router as tasks_router  # noqa: E402
 from app.routes.tools import router as tools_router  # noqa: E402
 from app.routes.webhooks import router as webhook_router  # noqa: E402
-
-install_imap_sync_patch()
 
 
 @asynccontextmanager
