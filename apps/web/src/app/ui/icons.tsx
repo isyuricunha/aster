@@ -76,6 +76,7 @@ export type IconName =
   | "search"
   | "sent"
   | "settings"
+  | "skills"
   | "spam"
   | "stop"
   | "tools"
@@ -122,6 +123,7 @@ const ICONS: Record<IconName, LucideIcon> = {
   search: Search,
   sent: Send,
   settings: SlidersHorizontal,
+  skills: Sparkles,
   spam: ShieldX,
   stop: Square,
   tools: Wrench,

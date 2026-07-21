@@ -6,6 +6,10 @@ All notable changes to Aster are documented in this file.
 
 ### Added
 
+- First-class reusable Skills with draft, published, and archived states; explicit triggers; bounded metadata; behavioral test cases; revision tracking; and a private management workspace.
+- Functional Skills Audit built-in task that runs after five pending skills, performs deterministic duplicate checks, uses the Utility model for structured evaluation, self-edits within configured bounds, records every attempt, tags duplicate or trivial skills, and publishes only above the owner-defined threshold.
+- Optional explicit teacher-model rewrites for skills that still need revision after normal audit retries.
+- Migration `0018_skills` with durable skill definitions, audit preferences, reports, duplicate links, and attempt history.
 - Versioned centralized model prompts, documented instruction hierarchy, explicit trust boundaries, and prompt contract tests.
 - Movable, minimizable floating settings window with a compact internal menu and full-page fallback.
 - Sandboxed rich email rendering with scripts, forms, navigation, and remote content blocked by default.

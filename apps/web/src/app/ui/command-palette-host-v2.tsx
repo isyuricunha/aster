@@ -82,6 +82,15 @@ const STATIC_ITEMS: readonly PaletteItem[] = [
     action: { type: "route", href: "/discord" },
   },
   {
+    id: "workspace:skills",
+    group: "Workspace",
+    label: "Skills",
+    description: "Create reusable capabilities and inspect audit results",
+    icon: "skills",
+    keywords: "skills capabilities instruction bundles audit tests reusable",
+    action: { type: "route", href: "/skills" },
+  },
+  {
     id: "workspace:agents",
     group: "Workspace",
     label: "Agents",

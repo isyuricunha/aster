@@ -19,6 +19,7 @@ export type NavigationKey =
   | "communications"
   | "agents"
   | "images"
+  | "skills"
   | "automations"
   | "models"
   | "persona"
@@ -51,6 +52,7 @@ const NAVIGATION_SECTIONS: readonly NavigationSection[] = [
       { key: "chat", href: "/", icon: "chat", label: "Chat" },
       { key: "email", href: "/email", icon: "email", label: "Email" },
       { key: "discord", href: "/discord", icon: "discord", label: "Discord" },
+      { key: "skills", href: "/skills", icon: "skills", label: "Skills" },
       {
         key: "agents",
         href: "/agents",

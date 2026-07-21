@@ -90,7 +90,12 @@ async def enqueue_due_automations(session: AsyncSession, *, limit: int) -> int:
     return created
 
 
-async def enqueue_manual_run(session: AsyncSession, automation: Automation) -> AutomationRun:
+async def enqueue_manual_run(
+    session: AsyncSession,
+    automation: Automation,
+    *,
+    trigger_payload: dict[str, object] | None = None,
+) -> AutomationRun:
     now = datetime.now(UTC)
     run = await enqueue_run(
         session,
@@ -98,6 +103,7 @@ async def enqueue_manual_run(session: AsyncSession, automation: Automation) -> A
         trigger_source="manual",
         occurrence_key=f"manual:{automation.id}:{uuid4()}",
         scheduled_for=now,
+        trigger_payload=trigger_payload,
     )
     if run is None:
         raise HTTPException(status_code=409, detail="The run could not be queued.")

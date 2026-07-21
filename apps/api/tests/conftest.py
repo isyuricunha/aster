@@ -152,6 +152,7 @@ class FakeOpenAICompatibleClient:
         self.error = None
         self.received_api_key: str | None = None
         self.chat_chunks = ["Hello", " from Aster"]
+        self.chat_chunk_rounds: list[list[str]] = []
         self.chat_error = None
         self.chat_chunks_by_model: dict[str, list[str]] = {}
         self.chat_errors_by_model: dict[str, Exception] = {}
@@ -227,7 +228,12 @@ class FakeOpenAICompatibleClient:
             raise model_error
         if self.chat_error is not None:
             raise self.chat_error
-        for chunk in self.chat_chunks_by_model.get(model_id, self.chat_chunks):
+        chunks = (
+            self.chat_chunk_rounds.pop(0)
+            if self.chat_chunk_rounds
+            else self.chat_chunks_by_model.get(model_id, self.chat_chunks)
+        )
+        for chunk in chunks:
             yield chunk
         trailing_error = self.chat_errors_after_chunks_by_model.get(model_id)
         if trailing_error is not None:

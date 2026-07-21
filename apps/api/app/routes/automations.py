@@ -370,7 +370,7 @@ async def run_automation_now(
     session: SessionDep,
 ) -> AutomationRunResponse:
     automation = await _get_automation(session, automation_id)
-    _reject_unavailable_builtin_run(automation)
+    _reject_builtin_mutation(automation)
     run = await enqueue_manual_run(session, automation)
     return await run_response(session, run)
 
