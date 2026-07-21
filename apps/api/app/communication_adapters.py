@@ -240,7 +240,7 @@ def _mailbox_flags(raw: bytes) -> set[bytes]:
     match = re.match(rb"^\((?P<flags>[^)]*)\)", raw)
     if match is None:
         return set()
-    return {flag.casefold() for flag in match.group("flags").split()}
+    return {flag.lower() for flag in match.group("flags").split()}
 
 
 def _mailbox_name(raw: bytes) -> str | None:
