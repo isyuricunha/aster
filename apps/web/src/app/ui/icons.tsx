@@ -1,4 +1,5 @@
 import {
+  ArchiveX,
   ArrowUp,
   Blocks,
   BrainCircuit,
@@ -6,14 +7,23 @@ import {
   ChevronRight,
   Copy,
   Download,
+  Folder,
+  Hash,
   Image,
+  Inbox,
   LockKeyhole,
+  Mail,
   Menu,
+  MessageCircleMore,
   MessageSquareText,
   MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
   PencilLine,
   RefreshCw,
   Search,
+  Send,
+  ShieldX,
   SlidersHorizontal,
   Sparkles,
   Square,
@@ -34,10 +44,18 @@ export type IconName =
   | "check"
   | "chevron-right"
   | "close"
+  | "collapse-panel"
   | "copy"
+  | "discord"
   | "download"
   | "edit"
+  | "email"
+  | "expand-panel"
+  | "folder"
+  | "hash"
   | "images"
+  | "inbox"
+  | "junk"
   | "lock"
   | "memory"
   | "menu"
@@ -47,7 +65,9 @@ export type IconName =
   | "persona"
   | "refresh"
   | "search"
+  | "sent"
   | "settings"
+  | "spam"
   | "stop"
   | "tools"
   | "trash"
@@ -65,10 +85,18 @@ const ICONS: Record<IconName, LucideIcon> = {
   check: Check,
   "chevron-right": ChevronRight,
   close: X,
+  "collapse-panel": PanelLeftClose,
   copy: Copy,
+  discord: MessageCircleMore,
   download: Download,
   edit: PencilLine,
+  email: Mail,
+  "expand-panel": PanelLeftOpen,
+  folder: Folder,
+  hash: Hash,
   images: Image,
+  inbox: Inbox,
+  junk: ArchiveX,
   lock: LockKeyhole,
   memory: BrainCircuit,
   menu: Menu,
@@ -78,7 +106,9 @@ const ICONS: Record<IconName, LucideIcon> = {
   persona: Sparkles,
   refresh: RefreshCw,
   search: Search,
+  sent: Send,
   settings: SlidersHorizontal,
+  spam: ShieldX,
   stop: Square,
   tools: Wrench,
   trash: Trash2,
