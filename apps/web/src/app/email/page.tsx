@@ -8,25 +8,43 @@ import { EmailWorkspace } from "./email-workspace";
 export const metadata: Metadata = { title: "Email" };
 export const dynamic = "force-dynamic";
 
+const EMAIL_THREAD_PAGE_SIZE = 100;
+
 type InitialEmailData = {
   accounts: CommunicationAccount[];
   threads: CommunicationThread[];
   error: string | null;
 };
 
+async function getAllEmailThreads(): Promise<CommunicationThread[]> {
+  const threads: CommunicationThread[] = [];
+  let offset = 0;
+
+  while (true) {
+    const response = await serverApiFetch(
+      `/api/communication-threads?kind=email&offset=${offset}&limit=${EMAIL_THREAD_PAGE_SIZE}`,
+    );
+    if (!response.ok) throw new Error("The email API returned an error.");
+    const page = (await response.json()) as CommunicationThread[];
+    threads.push(...page);
+    if (page.length < EMAIL_THREAD_PAGE_SIZE) return threads;
+    offset += page.length;
+  }
+}
+
 async function getInitialData(): Promise<InitialEmailData> {
   try {
-    const [accountResponse, threadResponse] = await Promise.all([
+    const [accountResponse, threads] = await Promise.all([
       serverApiFetch("/api/communication-accounts"),
-      serverApiFetch("/api/communication-threads?kind=email&limit=100"),
+      getAllEmailThreads(),
     ]);
-    if (!accountResponse.ok || !threadResponse.ok) {
+    if (!accountResponse.ok) {
       throw new Error("The email API returned an error.");
     }
     const accounts = (await accountResponse.json()) as CommunicationAccount[];
     return {
       accounts: accounts.filter((account) => account.kind === "imap"),
-      threads: (await threadResponse.json()) as CommunicationThread[],
+      threads,
       error: null,
     };
   } catch (error) {
