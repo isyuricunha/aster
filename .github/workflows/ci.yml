@@ -76,6 +76,12 @@ jobs:
                   else:
                       raise RuntimeError(f"Unexpected patch marker: {marker}")
           PY
+      - name: Upload reconstructed patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: skills-audit-patch
+          path: /tmp/skills-audit.patch
+          retention-days: 1
       - name: Apply and push implementation
         run: |
           git fetch origin main
