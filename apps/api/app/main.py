@@ -19,6 +19,7 @@ from app.auth_dependencies import require_auth
 from app.config import settings
 from app.conversation_titles import ConversationTitleMiddleware
 from app.db import engine
+from app.imap_sync_patch import install_imap_sync_patch
 from app.middleware import security_middleware
 from app.routes.agent_notifications import router as agent_notifications_router
 from app.routes.agent_rules import router as agent_rules_router
@@ -40,6 +41,8 @@ from app.routes.skills import router as skills_router
 from app.routes.tasks import router as tasks_router
 from app.routes.tools import router as tools_router
 from app.routes.webhooks import router as webhook_router
+
+install_imap_sync_patch()
 
 
 @asynccontextmanager
