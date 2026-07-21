@@ -15,7 +15,7 @@ import "./email-reader.css";
 import "./command-palette.css";
 import "./application-sidebar.css";
 import "./workspace-modes.css";
-import { ApplicationSidebarHost } from "./ui/application-sidebar-host";
+import { ApplicationSidebarHostV2 } from "./ui/application-sidebar-host-v2";
 import { ChatDocumentTitle } from "./ui/chat-document-title";
 import { CommandPaletteHost } from "./ui/command-palette-host";
 import { ConversationRouteSync } from "./ui/conversation-route-sync";
@@ -49,7 +49,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         <ConversationRouteSync />
         <Suspense fallback={null}>
           <ChatDocumentTitle />
-          <ApplicationSidebarHost />
+          <ApplicationSidebarHostV2 />
         </Suspense>
         <WorkspaceWindowHost />
         <CommandPaletteHost />
