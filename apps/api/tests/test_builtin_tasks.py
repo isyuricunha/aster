@@ -30,6 +30,10 @@ def automation_update_payload(task: dict[str, object]) -> dict[str, object]:
     }
 
 
+def normalized_memory(value: str) -> str:
+    return " ".join(value.casefold().split())
+
+
 async def test_builtin_tasks_are_seeded_with_stable_defaults(api_client: tuple) -> None:
     client, _, _ = api_client
 
@@ -144,5 +148,7 @@ async def test_memory_tidy_removes_only_exact_scope_duplicates(api_client: tuple
         assert int(await session.scalar(select(func.count(Memory.id))) or 0) == 5
 
         remaining = list(await session.scalars(select(Memory).order_by(Memory.created_at)))
-        assert sum(item.content == "Keep PostgreSQL backups" for item in remaining) == 1
-        assert all(item.content.strip() != "keep postgresql   backups" for item in remaining)
+        normalized = [normalized_memory(item.content) for item in remaining]
+        assert normalized.count("keep postgresql backups") == 1
+        assert normalized.count("use pnpm") == 1
+        assert normalized.count("prefer android") == 1
