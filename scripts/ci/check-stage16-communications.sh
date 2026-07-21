@@ -95,8 +95,10 @@ curl -fsS -b "${cookie_jar}" "${web_url}/email/settings" \
   | grep --quiet 'Email settings'
 curl -fsS -b "${cookie_jar}" "${web_url}/connections" \
   | grep --quiet 'Connections'
-test "$(curl -sS -o /dev/null -w '%{http_code}' -b "${cookie_jar}" \
-  "${web_url}/communications")" = "307"
+curl -fsSL -b "${cookie_jar}" "${web_url}/communications" \
+  | grep --quiet 'Connections'
+curl -fsSL -b "${cookie_jar}" "${web_url}/discord" \
+  | grep --quiet 'Connections'
 
 docker compose exec -T api alembic history | grep --quiet '0015_communication_hub'
 docker compose config | grep --quiet 'ASTER_COMMUNICATION_LEASE_SECONDS'
