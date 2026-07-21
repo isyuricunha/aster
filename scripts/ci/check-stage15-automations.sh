@@ -6,9 +6,11 @@ api_url="${ASTER_CI_API_URL:-http://localhost:8000}"
 cookie_jar="${ASTER_CI_COOKIE_JAR:-/tmp/aster.cookies}"
 origin="${ASTER_CI_ORIGIN:-http://localhost:3000}"
 
-# Private automation surfaces must remain authenticated.
+# Private task and automation surfaces must remain authenticated.
 test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
   "${web_url}/api/automations")" = "401"
+test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+  "${web_url}/api/tasks")" = "401"
 
 docker compose exec -T worker test -f /tmp/aster-worker-ready
 
@@ -72,14 +74,20 @@ curl --fail --silent --show-error --cookie "${cookie_jar}" \
 
 curl --fail --silent --show-error --cookie "${cookie_jar}" \
   "${web_url}/api/automations" \
-  | python -c 'import json, sys; items=json.load(sys.stdin); assert len(items) == 1; assert items[0]["webhook_token"] is None'
+  | AUTOMATION_ID="${automation_id}" python -c 'import json, os, sys; items=json.load(sys.stdin); custom=[item for item in items if item["id"] == os.environ["AUTOMATION_ID"]]; assert len(custom) == 1; assert custom[0]["builtin_key"] is None; assert custom[0]["webhook_token"] is None; assert all(item["webhook_token"] is None for item in items)'
+
+curl --fail --silent --show-error --cookie "${cookie_jar}" \
+  "${web_url}/api/tasks" \
+  | python -c 'import json, sys; items=json.load(sys.stdin); builtins=[item for item in items if item["builtin_key"]]; assert len(builtins) == 7; assert any(item["builtin_key"] == "memory_tidy" for item in builtins); assert any(item["builtin_key"] == "skills_audit" and not item["enabled"] for item in builtins)'
 
 curl --fail --silent --show-error --cookie "${cookie_jar}" \
   "${web_url}/api/notifications" \
   | python -c 'import json, sys; payload=json.load(sys.stdin); assert "items" in payload; assert "unread_count" in payload'
 
 curl --fail --silent --show-error --cookie "${cookie_jar}" \
+  "${web_url}/tasks" >/dev/null
+curl --fail --silent --show-error --cookie "${cookie_jar}" \
   "${web_url}/automations" >/dev/null
 
 curl --fail --silent --show-error "${api_url}/openapi.json" \
-  | python -c 'import json, sys; paths=json.load(sys.stdin)["paths"]; required=["/api/integrations", "/api/integrations/{integration_id}/test", "/api/automations", "/api/automations/{automation_id}/run", "/api/automation-runs", "/api/automation-runs/{run_id}/cancel", "/api/automation-runs/{run_id}/retry", "/api/notifications", "/api/webhooks/{automation_id}"]; assert all(path in paths for path in required); assert "/api/webhooks/{token}" not in paths'
+  | python -c 'import json, sys; paths=json.load(sys.stdin)["paths"]; required=["/api/integrations", "/api/integrations/{integration_id}/test", "/api/automations", "/api/automations/{automation_id}/run", "/api/tasks", "/api/tasks/{task_id}/enabled", "/api/tasks/{task_id}/run", "/api/automation-runs", "/api/automation-runs/{run_id}/cancel", "/api/automation-runs/{run_id}/retry", "/api/notifications", "/api/webhooks/{automation_id}"]; assert all(path in paths for path in required); assert "/api/webhooks/{token}" not in paths'
