@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from sqlalchemy import func, select
 
 from app.automation_models import Automation, AutomationRun
@@ -125,8 +127,8 @@ async def test_memory_tidy_removes_only_exact_scope_duplicates(api_client: tuple
         )
         await session.commit()
 
-        automation = await session.get(Automation, memory_task["id"])
-        run = await session.get(AutomationRun, queued.json()["id"])
+        automation = await session.get(Automation, UUID(memory_task["id"]))
+        run = await session.get(AutomationRun, UUID(queued.json()["id"]))
         assert automation is not None
         assert run is not None
 
