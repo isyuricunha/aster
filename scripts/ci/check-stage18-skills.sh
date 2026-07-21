@@ -65,4 +65,4 @@ curl -fsS -b "${cookie_jar}" "${web_url}/skills" | grep --quiet 'Skills'
 curl -fsS "${api_url}/openapi.json" | python -c \
   'import json,sys; paths=json.load(sys.stdin)["paths"]; required=["/api/skills","/api/skills/{skill_id}","/api/skills/{skill_id}/audit","/api/skill-audit-attempts","/api/skill-audit-preferences"]; assert all(path in paths for path in required)'
 
-docker compose exec -T api alembic current | grep --quiet '0019_product_templates'
+docker compose exec -T api alembic current | grep --quiet '0020_communication_subject_text'
