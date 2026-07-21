@@ -22,27 +22,28 @@ import {
 
 const COLLAPSED_STORAGE_KEY = "aster.application-sidebar-collapsed";
 const CHATS_OPEN_STORAGE_KEY = "aster.application-sidebar-chats-open";
+const TOOLS_OPEN_STORAGE_KEY = "aster.application-sidebar-tools-open";
 const INITIAL_CONVERSATION_LIMIT = 8;
 const CONVERSATION_LIMIT_STEP = 8;
+const CONVERSATIONS_CHANGED_EVENT = "aster:conversations-changed";
 
-type RouteWorkspaceKey = "email" | "discord" | "skills";
-type WorkspaceKey = RouteWorkspaceKey | WorkspaceWindowKey;
-type ActiveKey = "chat" | WorkspaceKey | "settings" | null;
+type ToolKey = "connections" | "skills" | "agents" | "automations" | "images";
+type ActiveKey = "chat" | "email" | ToolKey | "settings" | null;
 
-type WorkspaceItem = {
-  key: WorkspaceKey;
+type ToolItem = {
+  key: ToolKey;
   href: string;
   icon: IconName;
   label: string;
   window?: WorkspaceWindowKey;
 };
 
-const WORKSPACE_ITEMS: readonly WorkspaceItem[] = [
-  { key: "email", href: "/email", icon: "email", label: "Email" },
-  { key: "discord", href: "/discord", icon: "discord", label: "Discord" },
+type ConversationChangeEvent = CustomEvent<{ conversationId?: string }>;
+
+const TOOL_ITEMS: readonly ToolItem[] = [
+  { key: "connections", href: "/connections", icon: "tools", label: "Connections" },
   { key: "skills", href: "/skills", icon: "skills", label: "Skills" },
   { key: "agents", href: "/agents", icon: "tools", label: "Agents", window: "agents" },
-  { key: "images", href: "/images", icon: "images", label: "Images", window: "images" },
   {
     key: "automations",
     href: "/tasks",
@@ -50,6 +51,7 @@ const WORKSPACE_ITEMS: readonly WorkspaceItem[] = [
     label: "Tasks",
     window: "automations",
   },
+  { key: "images", href: "/images", icon: "images", label: "Images", window: "images" },
 ];
 
 function storedBoolean(key: string, fallback: boolean): boolean {
@@ -61,16 +63,20 @@ function storedBoolean(key: string, fallback: boolean): boolean {
 function activeKey(pathname: string): ActiveKey {
   if (pathname === "/") return "chat";
   if (pathname.startsWith("/email")) return "email";
-  if (pathname.startsWith("/discord")) return "discord";
+  if (
+    pathname.startsWith("/connections") ||
+    pathname.startsWith("/discord") ||
+    pathname.startsWith("/communications")
+  ) {
+    return "connections";
+  }
   if (pathname.startsWith("/skills")) return "skills";
   if (pathname.startsWith("/agents")) return "agents";
   if (pathname.startsWith("/images")) return "images";
   if (pathname.startsWith("/tasks") || pathname.startsWith("/automations")) {
     return "automations";
   }
-  if (pathname.startsWith("/settings") || pathname.startsWith("/communications")) {
-    return "settings";
-  }
+  if (pathname.startsWith("/settings")) return "settings";
   return null;
 }
 
@@ -108,6 +114,7 @@ export function ApplicationSidebarHostV2() {
 
   const [collapsed, setCollapsed] = useState(() => storedBoolean(COLLAPSED_STORAGE_KEY, false));
   const [chatsOpen, setChatsOpen] = useState(() => storedBoolean(CHATS_OPEN_STORAGE_KEY, true));
+  const [toolsOpen, setToolsOpen] = useState(() => storedBoolean(TOOLS_OPEN_STORAGE_KEY, true));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [username, setUsername] = useState("Owner");
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -117,22 +124,29 @@ export function ApplicationSidebarHostV2() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [createdConversationId, setCreatedConversationId] = useState<string | null>(null);
 
   const sidebarRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const visibleConversations = conversations.slice(0, conversationLimit);
   const remaining = Math.max(0, conversations.length - conversationLimit);
+  const newChatActive = currentKey === "chat" && startingNew && !createdConversationId;
   const activeConversationId =
-    pathname === "/" && !startingNew
-      ? explicitConversationId ?? conversations[0]?.id ?? null
+    pathname === "/"
+      ? createdConversationId ??
+        (!startingNew ? (explicitConversationId ?? conversations[0]?.id ?? null) : null)
       : null;
+  const toolSectionActive = TOOL_ITEMS.some((item) => item.key === currentKey);
 
-  const refreshConversations = useCallback(async () => {
+  const refreshConversations = useCallback(async (): Promise<ConversationSummary[]> => {
     try {
-      setConversations(await apiRequest<ConversationSummary[]>("/api/conversations"));
+      const refreshed = await apiRequest<ConversationSummary[]>("/api/conversations");
+      setConversations(refreshed);
       setError(null);
+      return refreshed;
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load conversations.");
+      return [];
     } finally {
       setLoading(false);
     }
@@ -147,23 +161,37 @@ export function ApplicationSidebarHostV2() {
         if (active) setUsername(owner.username);
       })
       .catch(() => undefined);
+
     const refreshWhenVisible = () => {
       if (document.visibilityState === "visible") void refreshConversations();
     };
-    const refreshFromEvent = () => void refreshConversations();
-    const interval = window.setInterval(refreshFromEvent, pathname === "/" ? 8_000 : 20_000);
+    const refreshFromEvent = (event: Event) => {
+      const detail = (event as ConversationChangeEvent).detail;
+      void refreshConversations().then((items) => {
+        if (pathname !== "/" || !startingNew) return;
+        const createdId =
+          detail?.conversationId ??
+          items.find((item) => item.title === "New chat" && item.message_count === 0)?.id;
+        if (createdId) setCreatedConversationId(createdId);
+      });
+    };
+    const interval = window.setInterval(() => void refreshConversations(), pathname === "/" ? 8_000 : 20_000);
     document.addEventListener("visibilitychange", refreshWhenVisible);
-    window.addEventListener("focus", refreshFromEvent);
-    window.addEventListener("aster:conversations-changed", refreshFromEvent);
+    window.addEventListener("focus", refreshWhenVisible);
+    window.addEventListener(CONVERSATIONS_CHANGED_EVENT, refreshFromEvent);
     return () => {
       active = false;
       window.clearTimeout(initialRefresh);
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
-      window.removeEventListener("focus", refreshFromEvent);
-      window.removeEventListener("aster:conversations-changed", refreshFromEvent);
+      window.removeEventListener("focus", refreshWhenVisible);
+      window.removeEventListener(CONVERSATIONS_CHANGED_EVENT, refreshFromEvent);
     };
-  }, [hidden, pathname, refreshConversations]);
+  }, [hidden, pathname, refreshConversations, startingNew]);
+
+  useEffect(() => {
+    if (pathname !== "/" || !startingNew) setCreatedConversationId(null);
+  }, [pathname, routeSearch, startingNew]);
 
   useEffect(() => {
     if (hidden) {
@@ -248,16 +276,20 @@ export function ApplicationSidebarHostV2() {
     setCollapsed((value) => !value);
   }
 
-  function toggleChats() {
+  function toggleSection(
+    open: boolean,
+    setOpen: (value: boolean | ((current: boolean) => boolean)) => void,
+    storageKey: string,
+  ) {
     if (collapsed) {
       setCollapsed(false);
-      setChatsOpen(true);
-      window.localStorage.setItem(CHATS_OPEN_STORAGE_KEY, "true");
+      setOpen(true);
+      window.localStorage.setItem(storageKey, "true");
       return;
     }
-    setChatsOpen((value) => {
+    setOpen((value) => {
       const next = !value;
-      window.localStorage.setItem(CHATS_OPEN_STORAGE_KEY, String(next));
+      window.localStorage.setItem(storageKey, String(next));
       return next;
     });
   }
@@ -272,7 +304,7 @@ export function ApplicationSidebarHostV2() {
     closeMobile();
   }
 
-  function openWorkspace(event: MouseEvent<HTMLAnchorElement>, item: WorkspaceItem) {
+  function openWorkspace(event: MouseEvent<HTMLAnchorElement>, item: ToolItem) {
     if (!item.window || isModifiedClick(event)) {
       closeMobile();
       return;
@@ -373,12 +405,7 @@ export function ApplicationSidebarHostV2() {
         role={mobileOpen ? "dialog" : undefined}
       >
         <header className="unified-sidebar-header">
-          <Link
-            aria-label="Open chat"
-            className="unified-sidebar-brand"
-            href="/"
-            onClick={closeMobile}
-          >
+          <Link aria-label="Open chat" className="unified-sidebar-brand" href="/" onClick={closeMobile}>
             <AsterMark size={22} />
             <span className="sidebar-label">Aster</span>
           </Link>
@@ -404,21 +431,19 @@ export function ApplicationSidebarHostV2() {
 
         <nav aria-label="Primary" className="unified-sidebar-primary">
           <Link
-            aria-current={currentKey === "chat" && startingNew ? "page" : undefined}
+            aria-current={newChatActive ? "page" : undefined}
             className="unified-sidebar-row"
             href="/?new=1"
-            onClick={closeMobile}
+            onClick={() => {
+              setCreatedConversationId(null);
+              closeMobile();
+            }}
             title="New chat"
           >
             <Icon name="new-chat" size={15} />
             <span className="sidebar-label">New chat</span>
           </Link>
-          <button
-            className="unified-sidebar-row"
-            onClick={openCommandPalette}
-            title="Search"
-            type="button"
-          >
+          <button className="unified-sidebar-row" onClick={openCommandPalette} title="Search" type="button">
             <Icon name="search" size={15} />
             <span className="sidebar-label">Search</span>
             <kbd className="sidebar-label">Ctrl K</kbd>
@@ -431,9 +456,9 @@ export function ApplicationSidebarHostV2() {
               aria-controls="application-sidebar-conversations"
               aria-expanded={chatsOpen && !collapsed}
               className={`unified-sidebar-row unified-sidebar-section-toggle ${
-                currentKey === "chat" ? "is-active" : ""
+                currentKey === "chat" && !newChatActive ? "is-active" : ""
               }`}
-              onClick={toggleChats}
+              onClick={() => toggleSection(chatsOpen, setChatsOpen, CHATS_OPEN_STORAGE_KEY)}
               title="Chats"
               type="button"
             >
@@ -487,7 +512,10 @@ export function ApplicationSidebarHostV2() {
                           aria-current={isActive ? "page" : undefined}
                           className="unified-conversation-link"
                           href={`/?conversation=${encodeURIComponent(conversation.id)}`}
-                          onClick={closeMobile}
+                          onClick={() => {
+                            setCreatedConversationId(null);
+                            closeMobile();
+                          }}
                           title={conversation.title}
                         >
                           <span className="unified-conversation-dot" />
@@ -542,21 +570,59 @@ export function ApplicationSidebarHostV2() {
           ) : null}
         </section>
 
-        <nav aria-label="Workspaces" className="unified-sidebar-workspaces">
-          {WORKSPACE_ITEMS.map((item) => (
-            <Link
-              aria-current={currentKey === item.key ? "page" : undefined}
-              className={`unified-sidebar-row ${currentKey === item.key ? "is-active" : ""}`}
-              href={item.href}
-              key={item.key}
-              onClick={(event) => openWorkspace(event, item)}
-              title={item.label}
-            >
-              <Icon name={item.icon} size={15} />
-              <span className="sidebar-label">{item.label}</span>
-            </Link>
-          ))}
+        <nav aria-label="Email" className="unified-sidebar-workspaces">
+          <Link
+            aria-current={currentKey === "email" ? "page" : undefined}
+            className={`unified-sidebar-row ${currentKey === "email" ? "is-active" : ""}`}
+            href="/email"
+            onClick={closeMobile}
+            title="Email"
+          >
+            <Icon name="email" size={15} />
+            <span className="sidebar-label">Email</span>
+          </Link>
         </nav>
+
+        <section className="unified-sidebar-tools">
+          <div className="unified-sidebar-section-row">
+            <button
+              aria-controls="application-sidebar-tools"
+              aria-expanded={toolsOpen && !collapsed}
+              className={`unified-sidebar-row unified-sidebar-section-toggle ${
+                toolSectionActive ? "is-active" : ""
+              }`}
+              onClick={() => toggleSection(toolsOpen, setToolsOpen, TOOLS_OPEN_STORAGE_KEY)}
+              title="Tools"
+              type="button"
+            >
+              <Icon name="tools" size={15} />
+              <span className="sidebar-label">Tools</span>
+              <span className="sidebar-label sidebar-section-count">{TOOL_ITEMS.length}</span>
+              <Icon
+                className={`sidebar-label sidebar-chevron ${toolsOpen ? "is-open" : ""}`}
+                name="chevron-right"
+                size={13}
+              />
+            </button>
+          </div>
+          {toolsOpen && !collapsed ? (
+            <div className="unified-sidebar-tool-items" id="application-sidebar-tools">
+              {TOOL_ITEMS.map((item) => (
+                <Link
+                  aria-current={currentKey === item.key ? "page" : undefined}
+                  className={`unified-sidebar-row ${currentKey === item.key ? "is-active" : ""}`}
+                  href={item.href}
+                  key={item.key}
+                  onClick={(event) => openWorkspace(event, item)}
+                  title={item.label}
+                >
+                  <Icon name={item.icon} size={14} />
+                  <span className="sidebar-label">{item.label}</span>
+                </Link>
+              ))}
+            </div>
+          ) : null}
+        </section>
 
         <footer className="unified-sidebar-footer">
           <button
