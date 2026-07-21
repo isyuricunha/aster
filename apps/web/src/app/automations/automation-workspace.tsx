@@ -5,29 +5,20 @@ import { useRef, useState, type KeyboardEvent } from "react";
 import type { CachedModel, Persona } from "../../lib/api";
 import {
   cancelAutomationRun,
-  deleteNotification,
   listAutomationRuns,
-  listNotifications,
-  markAllNotificationsRead,
-  markNotificationRead,
   retryAutomationRun,
   type Automation,
-  type AutomationNotification,
   type AutomationRun,
   type IntegrationConnection,
-  type NotificationList,
 } from "../../lib/automation-api";
 import styles from "./automations.module.css";
-import { IntegrationPanel } from "./integration-panel";
 import { TaskPanel } from "./task-panel";
 
-type WorkspaceTab = "tasks" | "runs" | "integrations" | "notifications";
+type WorkspaceTab = "tasks" | "runs";
 
 const TABS: Array<{ id: WorkspaceTab; label: string }> = [
   { id: "tasks", label: "Tasks" },
   { id: "runs", label: "Runs" },
-  { id: "integrations", label: "Integrations" },
-  { id: "notifications", label: "Notifications" },
 ];
 
 function formatDate(value: string | null): string {
@@ -42,7 +33,6 @@ export function AutomationWorkspace({
   initialAutomations,
   initialRuns,
   initialIntegrations,
-  initialNotifications,
   models,
   personas,
   initialAutomationId,
@@ -50,7 +40,6 @@ export function AutomationWorkspace({
   initialAutomations: Automation[];
   initialRuns: AutomationRun[];
   initialIntegrations: IntegrationConnection[];
-  initialNotifications: NotificationList;
   models: CachedModel[];
   personas: Persona[];
   initialAutomationId: string | null;
@@ -60,9 +49,7 @@ export function AutomationWorkspace({
   const [taskToOpen, setTaskToOpen] = useState(initialAutomationId);
   const [automations, setAutomations] = useState(initialAutomations);
   const [runs, setRuns] = useState(initialRuns);
-  const [integrations, setIntegrations] = useState(initialIntegrations);
-  const [notifications, setNotifications] = useState(initialNotifications.items);
-  const [unreadCount, setUnreadCount] = useState(initialNotifications.unread_count);
+  const [integrations] = useState(initialIntegrations);
 
   function selectTab(tab: WorkspaceTab, focus = false) {
     setActiveTab(tab);
@@ -102,9 +89,6 @@ export function AutomationWorkspace({
             type="button"
           >
             {tab.label}
-            {tab.id === "notifications" && unreadCount > 0 ? (
-              <span>{unreadCount}</span>
-            ) : null}
           </button>
         ))}
       </div>
@@ -145,39 +129,6 @@ export function AutomationWorkspace({
               setTaskToOpen(taskId);
               selectTab("tasks", true);
               window.history.replaceState(null, "", `/tasks?task=${taskId}`);
-            }}
-          />
-        </section>
-      ) : null}
-
-      {activeTab === "integrations" ? (
-        <section
-          aria-labelledby="task-tab-integrations"
-          className={styles.tabPanel}
-          id="task-panel-integrations"
-          role="tabpanel"
-          tabIndex={0}
-        >
-          <IntegrationPanel
-            integrations={integrations}
-            onIntegrationsChange={setIntegrations}
-          />
-        </section>
-      ) : null}
-
-      {activeTab === "notifications" ? (
-        <section
-          aria-labelledby="task-tab-notifications"
-          className={styles.tabPanel}
-          id="task-panel-notifications"
-          role="tabpanel"
-          tabIndex={0}
-        >
-          <NotificationsPanel
-            notifications={notifications}
-            onNotificationsChange={(items, count) => {
-              setNotifications(items);
-              setUnreadCount(count);
             }}
           />
         </section>
@@ -328,104 +279,6 @@ function RunsPanel({
         )}
       </section>
     </div>
-  );
-}
-
-function NotificationsPanel({
-  notifications,
-  onNotificationsChange,
-}: {
-  notifications: AutomationNotification[];
-  onNotificationsChange: (items: AutomationNotification[], unreadCount: number) => void;
-}) {
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function refresh() {
-    const result = await listNotifications();
-    onNotificationsChange(result.items, result.unread_count);
-  }
-
-  async function act(name: "read" | "delete" | "read-all", id?: string) {
-    setBusy(`${name}-${id ?? "all"}`);
-    setError(null);
-    try {
-      if (name === "read-all") await markAllNotificationsRead();
-      else if (name === "read" && id) await markNotificationRead(id);
-      else if (name === "delete" && id) await deleteNotification(id);
-      await refresh();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The notification action failed.");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  return (
-    <section className={styles.singlePanel}>
-      <header className={styles.detailHeader}>
-        <div>
-          <p>Private inbox</p>
-          <h2>Task notifications</h2>
-          <span>Success, failure, and fast-reply notices stay inside Aster.</span>
-        </div>
-        <div className={styles.headerActions}>
-          <button onClick={() => void refresh()} type="button">
-            Refresh
-          </button>
-          <button disabled={Boolean(busy)} onClick={() => void act("read-all")} type="button">
-            Mark all read
-          </button>
-        </div>
-      </header>
-      {error ? (
-        <div className={styles.error} role="alert">
-          {error}
-        </div>
-      ) : null}
-      <div className={styles.notificationList}>
-        {notifications.length === 0 ? (
-          <div className={styles.emptyState}>No notifications.</div>
-        ) : (
-          notifications.map((notification) => (
-            <article
-              className={notification.read_at ? styles.readNotification : ""}
-              key={notification.id}
-            >
-              <span
-                aria-hidden="true"
-                className={`${styles.notificationLevel} ${styles[notification.level]}`}
-              />
-              <div>
-                <header>
-                  <strong>{notification.title}</strong>
-                  <time>{formatDate(notification.created_at)}</time>
-                </header>
-                <p>{notification.body}</p>
-                <div className={styles.notificationActions}>
-                  {!notification.read_at ? (
-                    <button
-                      disabled={Boolean(busy)}
-                      onClick={() => void act("read", notification.id)}
-                      type="button"
-                    >
-                      Mark read
-                    </button>
-                  ) : null}
-                  <button
-                    disabled={Boolean(busy)}
-                    onClick={() => void act("delete", notification.id)}
-                    type="button"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            </article>
-          ))
-        )}
-      </div>
-    </section>
   );
 }
 
