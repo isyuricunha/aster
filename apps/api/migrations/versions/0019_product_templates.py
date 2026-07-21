@@ -21,6 +21,7 @@ AGENT_ID = UUID("00000000-0000-4000-8000-00000000001a")
 
 
 def upgrade() -> None:
+    connection = op.get_bind()
     skills = sa.table(
         "skills",
         sa.column("id", sa.Uuid()),
@@ -36,31 +37,33 @@ def upgrade() -> None:
         sa.column("audit_report", sa.JSON()),
         sa.column("content_revision", sa.Integer()),
     )
-    op.bulk_insert(
-        skills,
-        [
-            {
-                "id": SKILL_ID,
-                "name": "Concise Summarizer",
-                "description": (
+    skill_exists = connection.scalar(
+        sa.select(sa.literal(True)).where(skills.c.name == "Concise Summarizer").limit(1)
+    )
+    if not skill_exists:
+        connection.execute(
+            skills.insert().values(
+                id=SKILL_ID,
+                name="Concise Summarizer",
+                description=(
                     "Turn supplied text into a short factual summary while preserving important "
                     "names, numbers, dates, decisions, and caveats."
                 ),
-                "instructions": (
+                instructions=(
                     "Summarize the supplied content into concise bullet points. Preserve names, "
                     "numbers, dates, decisions, requirements, and material caveats exactly. Do not "
                     "invent facts, recommendations, or conclusions. Separate confirmed facts from "
                     "uncertainty. When the input has no usable content, say so plainly."
                 ),
-                "status": "draft",
-                "source_type": "generated",
-                "tags": ["summary", "writing", "starter-template"],
-                "trigger_phrases": [
+                status="draft",
+                source_type="generated",
+                tags=["summary", "writing", "starter-template"],
+                trigger_phrases=[
                     "summarize this",
                     "give me the key points",
                     "resuma isso",
                 ],
-                "test_cases": [
+                test_cases=[
                     {
                         "input": "The maintenance starts Friday at 22:00 UTC and lasts two hours.",
                         "expected": "Friday, 22:00 UTC, two-hour maintenance window",
@@ -70,12 +73,11 @@ def upgrade() -> None:
                         "expected": "Preserve both the 8% increase and the 4% churn caveat",
                     },
                 ],
-                "audit_status": "pending",
-                "audit_report": {"template": True},
-                "content_revision": 1,
-            }
-        ],
-    )
+                audit_status="pending",
+                audit_report={"template": True},
+                content_revision=1,
+            )
+        )
 
     agents = sa.table(
         "agents",
@@ -98,39 +100,40 @@ def upgrade() -> None:
         sa.column("notify_on_completion", sa.Boolean()),
         sa.column("notify_on_failure", sa.Boolean()),
     )
-    op.bulk_insert(
-        agents,
-        [
-            {
-                "id": AGENT_ID,
-                "name": "Task Planner",
-                "description": (
+    agent_exists = connection.scalar(
+        sa.select(sa.literal(True)).where(agents.c.name == "Task Planner").limit(1)
+    )
+    if not agent_exists:
+        connection.execute(
+            agents.insert().values(
+                id=AGENT_ID,
+                name="Task Planner",
+                description=(
                     "Convert one bounded objective into a clear execution plan without using tools "
                     "or performing external actions."
                 ),
-                "goal": (
+                goal=(
                     "Analyze the owner's objective, identify explicit constraints and missing "
                     "information, then produce an ordered plan with concrete completion criteria. "
                     "Do not call tools or perform external actions. Finish after presenting the "
                     "plan, assumptions, risks, and the strongest next step."
                 ),
-                "enabled": True,
-                "paused": False,
-                "trigger_type": "manual",
-                "timezone": "UTC",
-                "schedule": {},
-                "memory_enabled": False,
-                "rag_enabled": False,
-                "max_steps": 4,
-                "max_model_calls": 4,
-                "max_tool_calls": 0,
-                "max_runtime_seconds": 300,
-                "max_estimated_tokens": 20_000,
-                "notify_on_completion": False,
-                "notify_on_failure": True,
-            }
-        ],
-    )
+                enabled=True,
+                paused=False,
+                trigger_type="manual",
+                timezone="UTC",
+                schedule={},
+                memory_enabled=False,
+                rag_enabled=False,
+                max_steps=4,
+                max_model_calls=4,
+                max_tool_calls=0,
+                max_runtime_seconds=300,
+                max_estimated_tokens=20_000,
+                notify_on_completion=False,
+                notify_on_failure=True,
+            )
+        )
 
 
 def downgrade() -> None:
