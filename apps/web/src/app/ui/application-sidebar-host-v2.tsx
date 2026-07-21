@@ -44,9 +44,9 @@ const WORKSPACE_ITEMS: readonly WorkspaceItem[] = [
   { key: "images", href: "/images", icon: "images", label: "Images", window: "images" },
   {
     key: "automations",
-    href: "/automations",
+    href: "/tasks",
     icon: "refresh",
-    label: "Automations",
+    label: "Tasks",
     window: "automations",
   },
 ];
@@ -63,8 +63,12 @@ function activeKey(pathname: string): ActiveKey {
   if (pathname.startsWith("/discord")) return "discord";
   if (pathname.startsWith("/agents")) return "agents";
   if (pathname.startsWith("/images")) return "images";
-  if (pathname.startsWith("/automations")) return "automations";
-  if (pathname.startsWith("/settings") || pathname.startsWith("/communications")) return "settings";
+  if (pathname.startsWith("/tasks") || pathname.startsWith("/automations")) {
+    return "automations";
+  }
+  if (pathname.startsWith("/settings") || pathname.startsWith("/communications")) {
+    return "settings";
+  }
   return null;
 }
 
@@ -212,7 +216,13 @@ export function ApplicationSidebarHostV2() {
   useEffect(() => {
     if (hidden) return;
     function handleSlash(event: KeyboardEvent) {
-      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) {
+      if (
+        event.key !== "/" ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        isTyping(event.target)
+      ) {
         return;
       }
       event.preventDefault();
@@ -361,7 +371,12 @@ export function ApplicationSidebarHostV2() {
         role={mobileOpen ? "dialog" : undefined}
       >
         <header className="unified-sidebar-header">
-          <Link aria-label="Open chat" className="unified-sidebar-brand" href="/" onClick={closeMobile}>
+          <Link
+            aria-label="Open chat"
+            className="unified-sidebar-brand"
+            href="/"
+            onClick={closeMobile}
+          >
             <AsterMark size={22} />
             <span className="sidebar-label">Aster</span>
           </Link>
@@ -396,7 +411,12 @@ export function ApplicationSidebarHostV2() {
             <Icon name="new-chat" size={15} />
             <span className="sidebar-label">New chat</span>
           </Link>
-          <button className="unified-sidebar-row" onClick={openCommandPalette} title="Search" type="button">
+          <button
+            className="unified-sidebar-row"
+            onClick={openCommandPalette}
+            title="Search"
+            type="button"
+          >
             <Icon name="search" size={15} />
             <span className="sidebar-label">Search</span>
             <kbd className="sidebar-label">Ctrl K</kbd>
