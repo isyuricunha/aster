@@ -111,6 +111,7 @@ jobs:
           git checkout origin/main -- .github/workflows/ci.yml
           git apply --check /tmp/skills-audit.patch
           git apply /tmp/skills-audit.patch
+          git checkout origin/main -- .github/workflows/ci.yml
           chmod +x scripts/ci/check-stage18-skills.sh
           rm -rf .github/skills-patch
           rm -f .github/skills-fix.b64
