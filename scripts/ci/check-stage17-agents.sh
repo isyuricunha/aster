@@ -176,6 +176,6 @@ curl -fsS -b "${cookie_jar}" "${web_url}/api/agent-communication-rules" \
 curl -fsS -b "${cookie_jar}" "${web_url}/agents" \
   | grep --quiet 'Agents'
 
-docker compose exec -T api alembic current | grep --quiet '0020_communication_subject_text'
+docker compose exec -T api alembic current | grep --quiet '0019_product_templates'
 docker compose config | grep --quiet 'ASTER_AGENT_LEASE_SECONDS'
 docker compose config | grep --quiet 'ASTER_AGENT_LOOP_REPEAT_LIMIT'

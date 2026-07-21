@@ -71,19 +71,6 @@ async def _imap_backfill_pending(
     return pending
 
 
-async def _record_sync_failure_after_rollback(
-    session: AsyncSession,
-    *,
-    account_id: UUID,
-    message: str,
-) -> None:
-    await session.rollback()
-    account = await session.get(CommunicationAccount, account_id)
-    if account is None:
-        return
-    await record_sync_failure(session, account, message)
-
-
 async def sync_claimed_communication_account(
     session_factory: async_sessionmaker[AsyncSession],
     *,
@@ -117,19 +104,15 @@ async def sync_claimed_communication_account(
             await session.commit()
             return messages_added, automations_enqueued
         except CommunicationServiceError as error:
-            await _record_sync_failure_after_rollback(
-                session,
-                account_id=account_id,
-                message=error.message,
-            )
+            await record_sync_failure(session, account, error.message)
             return 0, 0
-        except Exception:
-            await _record_sync_failure_after_rollback(
+        except Exception as error:
+            await record_sync_failure(
                 session,
-                account_id=account_id,
-                message="The communication account could not be synchronized.",
+                account,
+                "The communication account could not be synchronized.",
             )
-            raise
+            raise error
 
 
 async def sync_due_communication_account(

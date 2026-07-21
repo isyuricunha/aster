@@ -167,7 +167,7 @@ class CommunicationMessage(CommunicationDetailsMixin, TimestampMixin, Base):
     recipients: Mapped[list[dict[str, str]]] = mapped_column(
         JSON, default=list, nullable=False
     )
-    subject: Mapped[str | None] = mapped_column(Text, nullable=True)
+    subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
     content_text: Mapped[str] = mapped_column(Text, default="", server_default="", nullable=False)
     content_html: Mapped[str | None] = mapped_column(Text, nullable=True)
     details: Mapped[dict[str, object]] = mapped_column(
