@@ -16,31 +16,35 @@ from app import (  # noqa: F401
     skill_models,
 )
 from app.auth_dependencies import require_auth
+from app.communication_route_patch import install_communication_route_patch
 from app.config import settings
 from app.conversation_titles import ConversationTitleMiddleware
 from app.db import engine
 from app.imap_sync_patch import install_imap_sync_patch
 from app.middleware import security_middleware
-from app.routes.agent_notifications import router as agent_notifications_router
-from app.routes.agent_rules import router as agent_rules_router
-from app.routes.agent_runs import router as agent_runs_router
-from app.routes.agents import router as agents_router
-from app.routes.auth import router as auth_router
-from app.routes.automations import private_router as automations_router
-from app.routes.chat import router as chat_router
-from app.routes.communication_drafts import router as communication_drafts_router
-from app.routes.communications import router as communications_router
-from app.routes.health import router as health_router
-from app.routes.images import router as images_router
-from app.routes.knowledge import router as knowledge_router
-from app.routes.memory import router as memory_router
-from app.routes.model_endpoints import router as model_endpoints_router
-from app.routes.model_profiles import router as model_profiles_router
-from app.routes.persona import router as persona_router
-from app.routes.skills import router as skills_router
-from app.routes.tasks import router as tasks_router
-from app.routes.tools import router as tools_router
-from app.routes.webhooks import router as webhook_router
+
+install_communication_route_patch()
+
+from app.routes.agent_notifications import router as agent_notifications_router  # noqa: E402
+from app.routes.agent_rules import router as agent_rules_router  # noqa: E402
+from app.routes.agent_runs import router as agent_runs_router  # noqa: E402
+from app.routes.agents import router as agents_router  # noqa: E402
+from app.routes.auth import router as auth_router  # noqa: E402
+from app.routes.automations import private_router as automations_router  # noqa: E402
+from app.routes.chat import router as chat_router  # noqa: E402
+from app.routes.communication_drafts import router as communication_drafts_router  # noqa: E402
+from app.routes.communications import router as communications_router  # noqa: E402
+from app.routes.health import router as health_router  # noqa: E402
+from app.routes.images import router as images_router  # noqa: E402
+from app.routes.knowledge import router as knowledge_router  # noqa: E402
+from app.routes.memory import router as memory_router  # noqa: E402
+from app.routes.model_endpoints import router as model_endpoints_router  # noqa: E402
+from app.routes.model_profiles import router as model_profiles_router  # noqa: E402
+from app.routes.persona import router as persona_router  # noqa: E402
+from app.routes.skills import router as skills_router  # noqa: E402
+from app.routes.tasks import router as tasks_router  # noqa: E402
+from app.routes.tools import router as tools_router  # noqa: E402
+from app.routes.webhooks import router as webhook_router  # noqa: E402
 
 install_imap_sync_patch()
 
