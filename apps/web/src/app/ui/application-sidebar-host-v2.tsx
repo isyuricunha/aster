@@ -130,10 +130,11 @@ export function ApplicationSidebarHostV2() {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const visibleConversations = conversations.slice(0, conversationLimit);
   const remaining = Math.max(0, conversations.length - conversationLimit);
-  const newChatActive = currentKey === "chat" && startingNew && !createdConversationId;
+  const transientConversationId = pathname === "/" && startingNew ? createdConversationId : null;
+  const newChatActive = currentKey === "chat" && startingNew && !transientConversationId;
   const activeConversationId =
     pathname === "/"
-      ? createdConversationId ??
+      ? transientConversationId ??
         (!startingNew ? (explicitConversationId ?? conversations[0]?.id ?? null) : null)
       : null;
   const toolSectionActive = TOOL_ITEMS.some((item) => item.key === currentKey);
@@ -175,7 +176,10 @@ export function ApplicationSidebarHostV2() {
         if (createdId) setCreatedConversationId(createdId);
       });
     };
-    const interval = window.setInterval(() => void refreshConversations(), pathname === "/" ? 8_000 : 20_000);
+    const interval = window.setInterval(
+      () => void refreshConversations(),
+      pathname === "/" ? 8_000 : 20_000,
+    );
     document.addEventListener("visibilitychange", refreshWhenVisible);
     window.addEventListener("focus", refreshWhenVisible);
     window.addEventListener(CONVERSATIONS_CHANGED_EVENT, refreshFromEvent);
@@ -188,10 +192,6 @@ export function ApplicationSidebarHostV2() {
       window.removeEventListener(CONVERSATIONS_CHANGED_EVENT, refreshFromEvent);
     };
   }, [hidden, pathname, refreshConversations, startingNew]);
-
-  useEffect(() => {
-    if (pathname !== "/" || !startingNew) setCreatedConversationId(null);
-  }, [pathname, routeSearch, startingNew]);
 
   useEffect(() => {
     if (hidden) {
@@ -277,7 +277,6 @@ export function ApplicationSidebarHostV2() {
   }
 
   function toggleSection(
-    open: boolean,
     setOpen: (value: boolean | ((current: boolean) => boolean)) => void,
     storageKey: string,
   ) {
@@ -405,7 +404,12 @@ export function ApplicationSidebarHostV2() {
         role={mobileOpen ? "dialog" : undefined}
       >
         <header className="unified-sidebar-header">
-          <Link aria-label="Open chat" className="unified-sidebar-brand" href="/" onClick={closeMobile}>
+          <Link
+            aria-label="Open chat"
+            className="unified-sidebar-brand"
+            href="/"
+            onClick={closeMobile}
+          >
             <AsterMark size={22} />
             <span className="sidebar-label">Aster</span>
           </Link>
@@ -443,7 +447,12 @@ export function ApplicationSidebarHostV2() {
             <Icon name="new-chat" size={15} />
             <span className="sidebar-label">New chat</span>
           </Link>
-          <button className="unified-sidebar-row" onClick={openCommandPalette} title="Search" type="button">
+          <button
+            className="unified-sidebar-row"
+            onClick={openCommandPalette}
+            title="Search"
+            type="button"
+          >
             <Icon name="search" size={15} />
             <span className="sidebar-label">Search</span>
             <kbd className="sidebar-label">Ctrl K</kbd>
@@ -458,7 +467,7 @@ export function ApplicationSidebarHostV2() {
               className={`unified-sidebar-row unified-sidebar-section-toggle ${
                 currentKey === "chat" && !newChatActive ? "is-active" : ""
               }`}
-              onClick={() => toggleSection(chatsOpen, setChatsOpen, CHATS_OPEN_STORAGE_KEY)}
+              onClick={() => toggleSection(setChatsOpen, CHATS_OPEN_STORAGE_KEY)}
               title="Chats"
               type="button"
             >
@@ -591,7 +600,7 @@ export function ApplicationSidebarHostV2() {
               className={`unified-sidebar-row unified-sidebar-section-toggle ${
                 toolSectionActive ? "is-active" : ""
               }`}
-              onClick={() => toggleSection(toolsOpen, setToolsOpen, TOOLS_OPEN_STORAGE_KEY)}
+              onClick={() => toggleSection(setToolsOpen, TOOLS_OPEN_STORAGE_KEY)}
               title="Tools"
               type="button"
             >
