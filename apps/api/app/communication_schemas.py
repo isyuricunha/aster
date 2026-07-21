@@ -1,9 +1,16 @@
 from datetime import datetime
 from ipaddress import ip_address
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 CommunicationKind = Literal["imap", "discord"]
 ThreadKind = Literal["email", "discord"]
@@ -87,6 +94,14 @@ class CommunicationSyncResponse(BaseModel):
     automations_enqueued: int
     backfill_pending: bool = False
     backfill_remaining: int = 0
+
+    @model_serializer(mode="wrap")
+    def serialize_without_empty_backfill(self, handler: Any) -> dict[str, object]:
+        data = handler(self)
+        if not self.backfill_pending and self.backfill_remaining == 0:
+            data.pop("backfill_pending", None)
+            data.pop("backfill_remaining", None)
+        return data
 
 
 class CommunicationAttachmentResponse(BaseModel):
