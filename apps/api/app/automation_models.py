@@ -56,6 +56,12 @@ class Automation(TimestampMixin, Base):
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    builtin_key: Mapped[str | None] = mapped_column(
+        String(64), unique=True, index=True, nullable=True
+    )
+    state: Mapped[dict[str, object]] = mapped_column(
+        JSON, default=dict, server_default="{}", nullable=False
+    )
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     description: Mapped[str] = mapped_column(
         String(500), default="", server_default="", nullable=False
