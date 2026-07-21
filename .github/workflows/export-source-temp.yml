@@ -1,0 +1,24 @@
+name: Export Source Temp
+
+on:
+  push:
+    branches:
+      - feature/skills-audit
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Package source
+        run: tar --exclude=.git -czf /tmp/aster-source.tgz .
+      - name: Upload source
+        uses: actions/upload-artifact@v4
+        with:
+          name: aster-source
+          path: /tmp/aster-source.tgz
+          retention-days: 1
