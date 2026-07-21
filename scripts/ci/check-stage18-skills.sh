@@ -24,6 +24,10 @@ preferences="$(curl -fsS -b "${cookie_jar}" "${web_url}/api/skill-audit-preferen
 printf '%s' "${preferences}" | python -c \
   'import json,sys; p=json.load(sys.stdin); assert p["auto_approve_threshold"] == 85; assert p["max_self_edit_attempts"] == 2; assert p["max_skills_per_run"] == 10; assert p["teacher_rewrite_enabled"] is False'
 
+starter_skills="$(curl -fsS -b "${cookie_jar}" "${web_url}/api/skills")"
+printf '%s' "${starter_skills}" | python -c \
+  'import json,sys; p=json.load(sys.stdin); s=next(x for x in p if x["name"] == "Concise Summarizer"); assert s["status"] == "draft"; assert len(s["test_cases"]) == 2; assert "starter-template" in s["tags"]'
+
 first_skill_id=""
 index=1
 while [ "${index}" -le 5 ]; do
@@ -61,4 +65,4 @@ curl -fsS -b "${cookie_jar}" "${web_url}/skills" | grep --quiet 'Skills'
 curl -fsS "${api_url}/openapi.json" | python -c \
   'import json,sys; paths=json.load(sys.stdin)["paths"]; required=["/api/skills","/api/skills/{skill_id}","/api/skills/{skill_id}/audit","/api/skill-audit-attempts","/api/skill-audit-preferences"]; assert all(path in paths for path in required)'
 
-docker compose exec -T api alembic current | grep --quiet '0018_skills'
+docker compose exec -T api alembic current | grep --quiet '0019_product_templates'
