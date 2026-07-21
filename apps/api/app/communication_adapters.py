@@ -236,6 +236,13 @@ def _decode_modified_utf7(value: str) -> str:
     return "".join(parts)
 
 
+def _mailbox_flags(raw: bytes) -> set[bytes]:
+    match = re.match(rb"^\((?P<flags>[^)]*)\)", raw)
+    if match is None:
+        return set()
+    return {flag.casefold() for flag in match.group("flags").split()}
+
+
 def _mailbox_name(raw: bytes) -> str | None:
     match = re.match(
         rb'^\((?P<flags>[^)]*)\)\s+(?:NIL|"(?:\\.|[^"])*")\s+(?P<name>.+)$',
@@ -250,7 +257,7 @@ def _mailbox_name(raw: bytes) -> str | None:
 
 
 def _mailbox_priority(raw: bytes, name: str, fallback: str) -> int:
-    flags = {flag.casefold() for flag in imaplib.ParseFlags(raw)}
+    flags = _mailbox_flags(raw)
     if name.casefold() == fallback.casefold() or b"\\inbox" in flags:
         return 0
     order = (
@@ -286,7 +293,7 @@ def _selectable_mailboxes(client: imaplib.IMAP4, fallback: str) -> list[str]:
     for item in data:
         if not isinstance(item, bytes):
             continue
-        flags = {flag.casefold() for flag in imaplib.ParseFlags(item)}
+        flags = _mailbox_flags(item)
         if b"\\noselect" in flags or b"\\all" in flags:
             continue
         name = _mailbox_name(item)
