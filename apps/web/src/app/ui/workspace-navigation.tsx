@@ -14,6 +14,8 @@ import {
 
 export type NavigationKey =
   | "chat"
+  | "email"
+  | "discord"
   | "communications"
   | "agents"
   | "images"
@@ -47,13 +49,8 @@ const NAVIGATION_SECTIONS: readonly NavigationSection[] = [
     label: "Workspace",
     items: [
       { key: "chat", href: "/", icon: "chat", label: "Chat" },
-      {
-        key: "communications",
-        href: "/communications",
-        icon: "chat",
-        label: "Communications",
-        workspaceWindow: "communications",
-      },
+      { key: "email", href: "/email", icon: "email", label: "Email" },
+      { key: "discord", href: "/discord", icon: "discord", label: "Discord" },
       {
         key: "agents",
         href: "/agents",
