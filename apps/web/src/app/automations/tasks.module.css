@@ -1,0 +1,504 @@
+.taskWorkspace {
+  min-height: 620px;
+  display: grid;
+  grid-template-columns: minmax(250px, 300px) minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-md);
+  background: var(--canvas);
+}
+
+.taskList {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--line-subtle);
+  background: #090a0a;
+}
+
+.taskList > header {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  padding: 0 13px;
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.taskList > header > div,
+.taskItems button > div,
+.customTasksButton > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.taskList > header strong,
+.taskItems strong,
+.customTasksButton strong {
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: 0.75rem;
+  font-weight: 640;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taskList > header span,
+.taskItems span,
+.customTasksButton span {
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: 0.62rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taskItems {
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: 8px;
+  overflow: hidden auto;
+}
+
+.taskItems button,
+.customTasksButton {
+  width: 100%;
+  min-height: 51px;
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.taskItems button:hover,
+.customTasksButton:hover,
+.selectedTask {
+  border-color: var(--line-subtle) !important;
+  background: var(--canvas-selected) !important;
+}
+
+.selectedTask {
+  box-shadow: inset 2px 0 var(--accent-strong);
+}
+
+.taskItems small {
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text-faint);
+  font-size: 0.57rem;
+  text-transform: uppercase;
+}
+
+.statusDot,
+.runStatus {
+  width: 7px;
+  height: 7px;
+  display: block;
+  border-radius: 50%;
+}
+
+.activeDot {
+  background: var(--success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 12%, transparent);
+}
+
+.pausedDot {
+  background: var(--text-faint);
+}
+
+.unavailableDot {
+  background: var(--warning, #d2a64a);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--warning, #d2a64a) 12%, transparent);
+}
+
+.customTasksButton {
+  grid-template-columns: 18px minmax(0, 1fr);
+  margin: auto 8px 8px;
+  border-top-color: var(--line-subtle);
+}
+
+.taskDetail {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 18px;
+  overflow: hidden auto;
+  background: #0b0c0c;
+}
+
+.detailHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.detailHeader > div:first-child {
+  min-width: 0;
+}
+
+.detailHeader h2,
+.detailHeader p {
+  margin: 0;
+}
+
+.detailHeader h2 {
+  margin-top: 8px;
+  color: var(--text-strong);
+  font-size: 1.12rem;
+}
+
+.detailHeader p {
+  max-width: 760px;
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.55;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.badges span {
+  padding: 3px 7px;
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text-faint);
+  font-size: 0.58rem;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.badges .activeBadge {
+  border-color: color-mix(in srgb, var(--success) 40%, transparent);
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  color: color-mix(in srgb, var(--success) 76%, white);
+}
+
+.badges .pausedBadge {
+  color: var(--text-muted);
+}
+
+.badges .waitingBadge {
+  border-color: color-mix(in srgb, var(--warning, #d2a64a) 40%, transparent);
+  background: color-mix(in srgb, var(--warning, #d2a64a) 9%, transparent);
+  color: color-mix(in srgb, var(--warning, #d2a64a) 80%, white);
+}
+
+.actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 7px;
+}
+
+.actions button {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--canvas-strong);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.67rem;
+  cursor: pointer;
+}
+
+.actions button:hover:not(:disabled) {
+  color: var(--text-strong);
+}
+
+.actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.actions .runButton {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: 620;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.metrics article {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 11px 12px;
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.metrics span,
+.behaviorPanel > span,
+.recentRuns header span,
+.customTaskHeader p {
+  color: var(--text-faint);
+  font-size: 0.6rem;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.metrics strong {
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: 0.73rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metrics small {
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: 0.58rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.behaviorPanel,
+.waitingPanel,
+.recentRuns {
+  padding: 13px 14px;
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.behaviorPanel p,
+.waitingPanel p {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.55;
+}
+
+.waitingPanel {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border-color: color-mix(in srgb, var(--warning, #d2a64a) 30%, transparent);
+  color: color-mix(in srgb, var(--warning, #d2a64a) 78%, white);
+}
+
+.waitingPanel strong {
+  color: var(--text-strong);
+  font-size: 0.73rem;
+}
+
+.recentRuns {
+  display: grid;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.recentRuns > header {
+  padding: 11px 13px;
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.recentRuns > header > div {
+  display: grid;
+  gap: 2px;
+}
+
+.recentRuns > header strong {
+  color: var(--text-strong);
+  font-size: 0.74rem;
+}
+
+.recentRuns article {
+  display: grid;
+  grid-template-columns: 8px minmax(125px, 0.25fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.recentRuns article:last-child {
+  border-bottom: 0;
+}
+
+.recentRuns article > div {
+  display: grid;
+  gap: 2px;
+}
+
+.recentRuns article strong {
+  color: var(--text-strong);
+  font-size: 0.68rem;
+  text-transform: capitalize;
+}
+
+.recentRuns article span,
+.recentRuns article p {
+  color: var(--text-faint);
+  font-size: 0.61rem;
+}
+
+.recentRuns article p {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run_queued,
+.run_running,
+.run_delivering {
+  background: var(--accent-strong);
+}
+
+.run_completed {
+  background: var(--success);
+}
+
+.run_completed_with_errors,
+.run_failed {
+  background: var(--danger);
+}
+
+.run_cancelled {
+  background: var(--text-faint);
+}
+
+.notice,
+.error {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.68rem;
+}
+
+.notice {
+  border: 1px solid color-mix(in srgb, var(--success) 35%, transparent);
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+  color: var(--text-muted);
+}
+
+.error {
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  color: var(--danger-text);
+}
+
+.emptyState,
+.emptyRuns {
+  display: grid;
+  place-items: center;
+  min-height: 160px;
+  padding: 20px;
+  color: var(--text-faint);
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+.customTaskSurface {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.customTaskHeader {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.customTaskHeader h2,
+.customTaskHeader p,
+.customTaskHeader span {
+  margin: 0;
+}
+
+.customTaskHeader h2 {
+  margin-top: 4px;
+  color: var(--text-strong);
+  font-size: 1rem;
+}
+
+.customTaskHeader > span {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+@media (max-width: 900px) {
+  .taskWorkspace {
+    grid-template-columns: minmax(220px, 270px) minmax(0, 1fr);
+  }
+
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .taskWorkspace {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  .taskList {
+    max-height: 390px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line-subtle);
+  }
+
+  .taskDetail {
+    overflow: visible;
+  }
+
+  .detailHeader {
+    flex-direction: column;
+  }
+
+  .actions {
+    width: 100%;
+  }
+
+  .actions button {
+    flex: 1;
+  }
+
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .recentRuns article {
+    grid-template-columns: 8px minmax(0, 1fr);
+  }
+
+  .recentRuns article p {
+    grid-column: 2;
+  }
+}

@@ -102,10 +102,10 @@ const STATIC_ITEMS: readonly PaletteItem[] = [
   {
     id: "workspace:automations",
     group: "Workspace",
-    label: "Automations",
-    description: "Open schedules, runs, integrations, and notifications",
+    label: "Tasks",
+    description: "Open built-in tasks, custom schedules, runs, and notifications",
     icon: "refresh",
-    keywords: "scheduled jobs workflows integrations notifications",
+    keywords: "tasks scheduled jobs workflows integrations notifications automations",
     action: { type: "workspace", window: "automations" },
   },
   {

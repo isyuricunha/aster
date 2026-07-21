@@ -117,8 +117,14 @@ class AutomationUpdate(AutomationWrite):
     pass
 
 
+class AutomationEnabledUpdate(BaseModel):
+    enabled: bool
+
+
 class AutomationResponse(BaseModel):
     id: UUID
+    builtin_key: str | None
+    state: dict[str, object]
     name: str
     description: str
     instruction: str

@@ -125,6 +125,8 @@ async def automation_response(
 ) -> AutomationResponse:
     return AutomationResponse(
         id=automation.id,
+        builtin_key=automation.builtin_key,
+        state=automation.state,
         name=automation.name,
         description=automation.description,
         instruction=automation.instruction,

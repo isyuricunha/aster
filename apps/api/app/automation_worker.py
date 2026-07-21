@@ -23,6 +23,7 @@ from app.automation_queue import (
     recover_expired_automation_runs,
     renew_run_lease,
 )
+from app.builtin_tasks import ensure_builtin_tasks
 from app.communication_worker import sync_due_communication_account
 from app.config import settings
 from app.db import AsyncSessionFactory, engine
@@ -137,6 +138,7 @@ async def _set_ready(path: Path, ready: bool) -> None:
 
 async def _schedule_background_work() -> None:
     async with AsyncSessionFactory() as session:
+        await ensure_builtin_tasks(session)
         await recover_expired_automation_runs(session)
         await recover_expired_agent_runs(session)
         await enqueue_due_automations(

@@ -169,10 +169,10 @@ const WINDOW_DEFINITIONS: Record<WindowKey, WindowDefinition> = {
   },
   automations: {
     key: "automations",
-    label: "Automations",
-    description: "Schedules, runs, integrations, and notifications",
+    label: "Tasks",
+    description: "Built-in tasks, custom schedules, runs, and notifications",
     icon: "refresh",
-    href: "/automations",
+    href: "/tasks",
     defaultGeometry: { x: 330, y: 130, width: 1200, height: 780 },
   },
 };
@@ -256,16 +256,17 @@ function initialSettingsSection(): SettingsSection {
 }
 
 function initialWindows(): WindowCollection {
-  const entries = WINDOW_KEYS.map((key, index) => [
-    key,
-    {
-      open: false,
-      minimized: false,
-      zIndex: 101 + index,
-      geometry: readStoredGeometry(key),
-    },
-  ]);
-  return Object.fromEntries(entries) as WindowCollection;
+  return Object.fromEntries(
+    WINDOW_KEYS.map((key, index) => [
+      key,
+      {
+        open: false,
+        minimized: false,
+        zIndex: 101 + index,
+        geometry: readStoredGeometry(key),
+      },
+    ]),
+  ) as WindowCollection;
 }
 
 function initialLoading(): LoadingCollection {
@@ -293,7 +294,6 @@ export function WorkspaceWindowHost() {
     function openWindow(key: WindowKey) {
       setLoading((current) => ({ ...current, [key]: true }));
       setWindows((current) => {
-        const nextZIndex = highestZIndex(current) + 1;
         const next = { ...current };
         if (isNarrowViewport()) {
           for (const otherKey of WINDOW_KEYS) {
@@ -306,28 +306,28 @@ export function WorkspaceWindowHost() {
           ...next[key],
           open: true,
           minimized: false,
-          zIndex: nextZIndex,
+          zIndex: highestZIndex(current) + 1,
           geometry: clampGeometry(next[key].geometry),
         };
         return next;
       });
     }
 
-    const handleSettingsOpen = (event: Event) => {
+    function handleSettingsOpen(event: Event) {
       const requestedSection = (event as CustomEvent<{ section?: unknown }>).detail?.section;
       if (isSettingsSection(requestedSection)) {
         setSettingsSection(requestedSection);
         window.localStorage.setItem(SETTINGS_SECTION_STORAGE_KEY, requestedSection);
       }
       openWindow("settings");
-    };
+    }
 
-    const handleWorkspaceOpen = (event: Event) => {
+    function handleWorkspaceOpen(event: Event) {
       const requestedWindow = (event as CustomEvent<{ window?: unknown }>).detail?.window;
       if (isWorkspaceWindowKey(requestedWindow)) openWindow(requestedWindow);
-    };
+    }
 
-    const handleResize = () => {
+    function handleResize() {
       setWindows((current) => {
         const next = { ...current };
         for (const key of WINDOW_KEYS) {
@@ -337,19 +337,18 @@ export function WorkspaceWindowHost() {
         }
         return next;
       });
-    };
+    }
 
-    const handleEscape = (event: KeyboardEvent) => {
+    function handleEscape(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
       setWindows((current) => {
         const visible = WINDOW_KEYS.filter(
           (key) => current[key].open && !current[key].minimized,
         ).sort((left, right) => current[right].zIndex - current[left].zIndex);
         const top = visible[0];
-        if (!top) return current;
-        return { ...current, [top]: { ...current[top], open: false } };
+        return top ? { ...current, [top]: { ...current[top], open: false } } : current;
       });
-    };
+    }
 
     window.addEventListener(OPEN_SETTINGS_EVENT, handleSettingsOpen);
     window.addEventListener(OPEN_WORKSPACE_WINDOW_EVENT, handleWorkspaceOpen);
@@ -365,7 +364,6 @@ export function WorkspaceWindowHost() {
 
   useEffect(() => {
     if (typeof ResizeObserver === "undefined") return;
-
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const key = entry.target.getAttribute("data-window-key");
@@ -394,7 +392,6 @@ export function WorkspaceWindowHost() {
         });
       }
     });
-
     for (const element of windowElements.current.values()) observer.observe(element);
     return () => observer.disconnect();
   }, [

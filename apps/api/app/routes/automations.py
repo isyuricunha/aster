@@ -37,6 +37,7 @@ from app.automation_service import (
     run_response,
     unread_notification_count,
 )
+from app.builtin_tasks import builtin_task_available
 from app.config import settings
 from app.db import get_session
 from app.dependencies import get_secret_cipher
@@ -69,6 +70,22 @@ async def _get_automation(session: AsyncSession, automation_id: UUID) -> Automat
     if automation is None:
         raise HTTPException(status_code=404, detail="Automation not found")
     return automation
+
+
+def _reject_builtin_mutation(automation: Automation) -> None:
+    if automation.builtin_key:
+        raise HTTPException(
+            status_code=409,
+            detail="Built-in tasks can only be paused, activated, or run from the Tasks API.",
+        )
+
+
+def _reject_unavailable_builtin_run(automation: Automation) -> None:
+    if automation.builtin_key and not builtin_task_available(automation):
+        raise HTTPException(
+            status_code=409,
+            detail="This built-in task is waiting for a capability that Aster does not have yet.",
+        )
 
 
 async def _get_run(session: AsyncSession, run_id: UUID) -> AutomationRun:
@@ -294,6 +311,7 @@ async def update_automation(
     session: SessionDep,
 ) -> AutomationResponse:
     automation = await _get_automation(session, automation_id)
+    _reject_builtin_mutation(automation)
     try:
         token = await apply_automation_write(session, automation, payload)
         await session.commit()
@@ -313,6 +331,7 @@ async def delete_automation(
     session: SessionDep,
 ) -> Response:
     automation = await _get_automation(session, automation_id)
+    _reject_builtin_mutation(automation)
     await session.delete(automation)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -327,6 +346,7 @@ async def rotate_webhook_token(
     session: SessionDep,
 ) -> AutomationResponse:
     automation = await _get_automation(session, automation_id)
+    _reject_builtin_mutation(automation)
     if automation.trigger_type != "webhook":
         raise HTTPException(
             status_code=422,
@@ -350,6 +370,7 @@ async def run_automation_now(
     session: SessionDep,
 ) -> AutomationRunResponse:
     automation = await _get_automation(session, automation_id)
+    _reject_unavailable_builtin_run(automation)
     run = await enqueue_manual_run(session, automation)
     return await run_response(session, run)
 
@@ -428,6 +449,7 @@ async def retry_automation_run(
             detail="Only failed runs can be retried.",
         )
     automation = await _get_automation(session, previous.automation_id)
+    _reject_unavailable_builtin_run(automation)
     run = await enqueue_run(
         session,
         automation,

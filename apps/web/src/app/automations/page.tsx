@@ -11,7 +11,7 @@ import { requireServerAuth, serverApiFetch } from "../../lib/server-api";
 import { AppFrame } from "../ui/app-frame";
 import { AutomationWorkspace } from "./automation-workspace";
 
-export const metadata: Metadata = { title: "Automations" };
+export const metadata: Metadata = { title: "Tasks" };
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +30,7 @@ type AutomationsPageSearchParams = Promise<{ embedded?: string | string[] }>;
 async function getInitialData(): Promise<InitialAutomationData> {
   try {
     const responses = await Promise.all([
-      serverApiFetch("/api/automations"),
+      serverApiFetch("/api/tasks"),
       serverApiFetch("/api/automation-runs?limit=100"),
       serverApiFetch("/api/integrations"),
       serverApiFetch("/api/notifications?limit=100"),
@@ -38,7 +38,7 @@ async function getInitialData(): Promise<InitialAutomationData> {
       serverApiFetch("/api/personas"),
     ]);
     if (responses.some((response) => !response.ok)) {
-      throw new Error("The automation API returned an error.");
+      throw new Error("The Tasks API returned an error.");
     }
     const [automations, runs, integrations, notifications, models, personas] =
       await Promise.all(responses.map((response) => response.json()));
@@ -59,7 +59,7 @@ async function getInitialData(): Promise<InitialAutomationData> {
       notifications: { items: [], unread_count: 0, total: 0 },
       models: [],
       personas: [],
-      error: error instanceof Error ? error.message : "Could not load automations.",
+      error: error instanceof Error ? error.message : "Could not load tasks.",
     };
   }
 }
@@ -75,8 +75,8 @@ export default async function AutomationsPage({
     <AppFrame
       active="automations"
       kicker="Background work"
-      title="Automations"
-      description="Schedule bounded model runs, deliver results through explicit integrations, and inspect every attempt."
+      title="Tasks"
+      description="Run built-in maintenance tasks, schedule custom work, and inspect every attempt."
       embedded={params.embedded === "1"}
     >
       {initial.error ? (

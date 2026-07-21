@@ -14,6 +14,7 @@ from app.automation_models import (
     IntegrationConnection,
     Notification,
 )
+from app.builtin_tasks import execute_builtin_task
 from app.config import Settings
 from app.integration_service import (
     IntegrationError,
@@ -230,6 +231,18 @@ async def _notify(
     await session.commit()
 
 
+def _finish_history(run: AutomationRun) -> None:
+    history = list(run.attempt_history)
+    history.append(
+        {
+            "attempt": run.attempt,
+            "status": run.status,
+            "finished_at": run.finished_at.isoformat() if run.finished_at else None,
+        }
+    )
+    run.attempt_history = history
+
+
 async def execute_run(
     session_factory: async_sessionmaker[AsyncSession],
     *,
@@ -252,43 +265,51 @@ async def execute_run(
             await session.commit()
             return
         try:
-            output, model_id = await _generate(
-                session,
-                run=run,
-                client=client,
-                cipher=cipher,
-                output_limit=settings.aster_automation_output_max_characters,
-            )
-            run.response = output
-            run.provider_model_id = model_id
-            run.status = "delivering"
-            run.error_code = None
-            run.error_message = None
-            await session.commit()
-            delivery_error = await _deliver(
-                session,
-                run=run,
-                automation=automation,
-                cipher=cipher,
-                settings=settings,
-            )
-            run.status = "completed_with_errors" if delivery_error else "completed"
-            if delivery_error:
-                run.error_code = "delivery_failed"
-                run.error_message = "One or more integration deliveries failed."
+            if automation.builtin_key:
+                result = await execute_builtin_task(
+                    session,
+                    automation=automation,
+                    run=run,
+                    client=client,
+                    cipher=cipher,
+                    settings=settings,
+                )
+                run.response = result.response
+                run.provider_model_id = result.provider_model_id
+                run.status = "completed"
+                run.error_code = None
+                run.error_message = None
+            else:
+                output, model_id = await _generate(
+                    session,
+                    run=run,
+                    client=client,
+                    cipher=cipher,
+                    output_limit=settings.aster_automation_output_max_characters,
+                )
+                run.response = output
+                run.provider_model_id = model_id
+                run.status = "delivering"
+                run.error_code = None
+                run.error_message = None
+                await session.commit()
+                delivery_error = await _deliver(
+                    session,
+                    run=run,
+                    automation=automation,
+                    cipher=cipher,
+                    settings=settings,
+                )
+                run.status = "completed_with_errors" if delivery_error else "completed"
+                if delivery_error:
+                    run.error_code = "delivery_failed"
+                    run.error_message = "One or more integration deliveries failed."
+
             run.finished_at = datetime.now(UTC)
             run.lease_owner = None
             run.lease_expires_at = None
             automation.last_run_at = run.finished_at
-            history = list(run.attempt_history)
-            history.append(
-                {
-                    "attempt": run.attempt,
-                    "status": run.status,
-                    "finished_at": run.finished_at.isoformat(),
-                }
-            )
-            run.attempt_history = history
+            _finish_history(run)
             await session.commit()
             await _notify(session, automation=automation, run=run)
         except (ModelEndpointError, HTTPException) as error:

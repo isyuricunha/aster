@@ -67,9 +67,9 @@ const NAVIGATION_SECTIONS: readonly NavigationSection[] = [
       },
       {
         key: "automations",
-        href: "/automations",
+        href: "/tasks",
         icon: "refresh",
-        label: "Automations",
+        label: "Tasks",
         workspaceWindow: "automations",
       },
     ],

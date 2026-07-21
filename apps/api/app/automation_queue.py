@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.automation_models import Automation, AutomationRun
 from app.automation_schedule import next_run_at
+from app.builtin_tasks import builtin_task_ready
 
 
 async def enqueue_run(
@@ -67,15 +68,17 @@ async def enqueue_due_automations(session: AsyncSession, *, limit: int) -> int:
         scheduled_for = automation.next_run_at
         if scheduled_for is None:
             continue
-        run = await enqueue_run(
-            session,
-            automation,
-            trigger_source="schedule",
-            occurrence_key=f"schedule:{automation.id}:{scheduled_for.isoformat()}",
-            scheduled_for=scheduled_for,
-        )
-        if run is not None:
-            created += 1
+        ready = not automation.builtin_key or await builtin_task_ready(session, automation)
+        if ready:
+            run = await enqueue_run(
+                session,
+                automation,
+                trigger_source="schedule",
+                occurrence_key=f"schedule:{automation.id}:{scheduled_for.isoformat()}",
+                scheduled_for=scheduled_for,
+            )
+            if run is not None:
+                created += 1
         automation.next_run_at = next_run_at(
             automation.trigger_type,
             automation.schedule,
