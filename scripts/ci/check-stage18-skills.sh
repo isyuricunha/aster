@@ -6,8 +6,19 @@ web_url="${ASTER_CI_WEB_URL:-http://localhost:3000}"
 cookie_jar="${ASTER_CI_COOKIE_JAR:-/tmp/aster.cookies}"
 origin="${ASTER_CI_ORIGIN:-http://localhost:3000}"
 
+# Verify the Skills API remains private even when a prior contract logged out the CI owner.
 test "$(curl -sS -o /dev/null -w '%{http_code}' "${api_url}/api/skills")" = "401"
 test "$(curl -sS -o /dev/null -w '%{http_code}' "${web_url}/api/skills")" = "401"
+
+# Stage 12 deliberately revokes the shared session. Authenticate explicitly so this
+# contract is independent of the order in which the stack checks are executed.
+curl -fsS \
+  -b "${cookie_jar}" \
+  -c "${cookie_jar}" \
+  -H 'Content-Type: application/json' \
+  -H "Origin: ${origin}" \
+  -d '{"username":"owner","password":"correct horse battery staple"}' \
+  "${web_url}/api/auth/login" >/dev/null
 
 preferences="$(curl -fsS -b "${cookie_jar}" "${web_url}/api/skill-audit-preferences")"
 printf '%s' "${preferences}" | python -c \
