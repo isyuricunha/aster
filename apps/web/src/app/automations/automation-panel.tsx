@@ -320,7 +320,7 @@ export function AutomationPanel({
   function addDelivery() {
     const first = integrations.find((item) => item.enabled);
     if (!first) {
-      setError("Add and enable an integration before adding a delivery.");
+      setError("Add and enable a connection before adding a delivery.");
       return;
     }
     const channel =
@@ -396,7 +396,7 @@ export function AutomationPanel({
           <div>
             <p>{creating ? "New task" : "Task editor"}</p>
             <h2>{draft.name || "Untitled task"}</h2>
-            <span>Scheduled model output with explicit, auditable delivery.</span>
+            <span>Scheduled model work with bounded execution and optional delivery.</span>
           </div>
           <div className={styles.headerActions}>
             {!creating ? (
@@ -566,7 +566,7 @@ export function AutomationPanel({
           {draft.triggerType === "communication" ? (
             <div className={styles.webhookCard}>
               <span>
-                Save this task, then add an explicit allowlist rule in Communications. Receiving a
+                Save this task, then add an explicit allowlist rule in Email settings. Receiving a
                 message by itself never queues the run.
               </span>
             </div>
@@ -580,8 +580,8 @@ export function AutomationPanel({
           </div>
           <div className={styles.gridThree}>
             <ModelSelect
-              label="Model"
               emptyLabel="Use Primary and fallbacks"
+              label="Model"
               models={selectableModels}
               onChange={(value) => setDraft({ ...draft, modelId: value })}
               value={draft.modelId}
@@ -630,128 +630,147 @@ export function AutomationPanel({
                 value={draft.retryDelaySeconds}
               />
             </label>
-            <label className={styles.checkLabel}>
-              <input
-                checked={draft.notifyOnSuccess}
-                onChange={(event) =>
-                  setDraft({ ...draft, notifyOnSuccess: event.target.checked })
-                }
-                type="checkbox"
-              />
-              Notify on success
-            </label>
-            <label className={styles.checkLabel}>
-              <input
-                checked={draft.notifyOnFailure}
-                onChange={(event) =>
-                  setDraft({ ...draft, notifyOnFailure: event.target.checked })
-                }
-                type="checkbox"
-              />
-              Notify on failure
-            </label>
           </div>
         </section>
 
-        <section className={styles.formSection}>
-          <div className={styles.sectionTitleRow}>
-            <div className={styles.sectionTitle}>
-              <p>Delivery</p>
-              <h3>External side effects</h3>
+        <details className={styles.advancedSection}>
+          <summary>
+            <div>
+              <strong>Advanced</strong>
+              <span>Notifications and external delivery connections</span>
             </div>
-            <button onClick={addDelivery} type="button">
-              Add delivery
-            </button>
-          </div>
-          {draft.deliveries.length === 0 ? (
-            <div className={styles.emptyDelivery}>
-              The result stays in private run history unless a delivery is added.
-            </div>
-          ) : (
-            <div className={styles.deliveryList}>
-              {draft.deliveries.map((delivery, index) => (
-                <div className={styles.deliveryCard} key={`${delivery.integrationId}-${index}`}>
-                  <label>
-                    Integration
-                    <select
-                      onChange={(event) => changeDeliveryIntegration(index, event.target.value)}
-                      value={delivery.integrationId}
-                    >
-                      {integrations
-                        .filter((item) => item.enabled)
-                        .map((integration) => (
-                          <option key={integration.id} value={integration.id}>
-                            {integration.name} · {integration.kind}
-                          </option>
-                        ))}
-                    </select>
-                  </label>
-                  {delivery.channel === "email" ? (
-                    <>
-                      <label>
-                        Recipients
-                        <input
-                          onChange={(event) =>
-                            updateDelivery(index, { recipients: event.target.value })
-                          }
-                          placeholder="one@example.com, two@example.com"
-                          value={delivery.recipients}
-                        />
-                      </label>
-                      <label>
-                        Subject
-                        <input
-                          onChange={(event) =>
-                            updateDelivery(index, { subject: event.target.value })
-                          }
-                          placeholder="Task completed"
-                          value={delivery.subject}
-                        />
-                      </label>
-                    </>
-                  ) : null}
-                  {delivery.channel === "calendar" ? (
-                    <>
-                      <label>
-                        Event title
-                        <input
-                          onChange={(event) =>
-                            updateDelivery(index, { eventTitle: event.target.value })
-                          }
-                          value={delivery.eventTitle}
-                        />
-                      </label>
-                      <label>
-                        Duration minutes
-                        <input
-                          min={5}
-                          onChange={(event) =>
-                            updateDelivery(index, { durationMinutes: event.target.value })
-                          }
-                          type="number"
-                          value={delivery.durationMinutes}
-                        />
-                      </label>
-                    </>
-                  ) : null}
-                  <button
-                    onClick={() =>
-                      setDraft({
-                        ...draft,
-                        deliveries: draft.deliveries.filter(
-                          (_, itemIndex) => itemIndex !== index,
-                        ),
-                      })
+          </summary>
+          <div className={styles.advancedContent}>
+            <section className={styles.formSection}>
+              <div className={styles.sectionTitle}>
+                <p>Notifications</p>
+                <h3>When should Aster surface a private notice?</h3>
+              </div>
+              <div className={styles.gridTwo}>
+                <label className={styles.checkLabel}>
+                  <input
+                    checked={draft.notifyOnSuccess}
+                    onChange={(event) =>
+                      setDraft({ ...draft, notifyOnSuccess: event.target.checked })
                     }
-                    type="button"
-                  >
-                    Remove
-                  </button>
+                    type="checkbox"
+                  />
+                  Notify on success
+                </label>
+                <label className={styles.checkLabel}>
+                  <input
+                    checked={draft.notifyOnFailure}
+                    onChange={(event) =>
+                      setDraft({ ...draft, notifyOnFailure: event.target.checked })
+                    }
+                    type="checkbox"
+                  />
+                  Notify on failure
+                </label>
+              </div>
+            </section>
+
+            <section className={styles.formSection}>
+              <div className={styles.sectionTitleRow}>
+                <div className={styles.sectionTitle}>
+                  <p>Delivery</p>
+                  <h3>External side effects</h3>
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
+                <button onClick={addDelivery} type="button">
+                  Add delivery
+                </button>
+              </div>
+              {draft.deliveries.length === 0 ? (
+                <div className={styles.emptyDelivery}>
+                  The result stays in private run history unless a delivery is added.
+                </div>
+              ) : (
+                <div className={styles.deliveryList}>
+                  {draft.deliveries.map((delivery, index) => (
+                    <div className={styles.deliveryCard} key={`${delivery.integrationId}-${index}`}>
+                      <label>
+                        Connection
+                        <select
+                          onChange={(event) => changeDeliveryIntegration(index, event.target.value)}
+                          value={delivery.integrationId}
+                        >
+                          {integrations
+                            .filter((item) => item.enabled)
+                            .map((integration) => (
+                              <option key={integration.id} value={integration.id}>
+                                {integration.name} · {integration.kind}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                      {delivery.channel === "email" ? (
+                        <>
+                          <label>
+                            Recipients
+                            <input
+                              onChange={(event) =>
+                                updateDelivery(index, { recipients: event.target.value })
+                              }
+                              placeholder="one@example.com, two@example.com"
+                              value={delivery.recipients}
+                            />
+                          </label>
+                          <label>
+                            Subject
+                            <input
+                              onChange={(event) =>
+                                updateDelivery(index, { subject: event.target.value })
+                              }
+                              placeholder="Task completed"
+                              value={delivery.subject}
+                            />
+                          </label>
+                        </>
+                      ) : null}
+                      {delivery.channel === "calendar" ? (
+                        <>
+                          <label>
+                            Event title
+                            <input
+                              onChange={(event) =>
+                                updateDelivery(index, { eventTitle: event.target.value })
+                              }
+                              value={delivery.eventTitle}
+                            />
+                          </label>
+                          <label>
+                            Duration minutes
+                            <input
+                              min={5}
+                              onChange={(event) =>
+                                updateDelivery(index, { durationMinutes: event.target.value })
+                              }
+                              type="number"
+                              value={delivery.durationMinutes}
+                            />
+                          </label>
+                        </>
+                      ) : null}
+                      <button
+                        onClick={() =>
+                          setDraft({
+                            ...draft,
+                            deliveries: draft.deliveries.filter(
+                              (_, itemIndex) => itemIndex !== index,
+                            ),
+                          })
+                        }
+                        type="button"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+        </details>
 
         {!creating && selected ? (
           <section className={styles.runSection}>

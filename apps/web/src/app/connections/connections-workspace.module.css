@@ -1,0 +1,86 @@
+.workspace {
+  display: grid;
+  gap: 18px;
+}
+
+.overview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.overview article,
+.linkCard {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+  padding: 14px;
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-md);
+  background: var(--canvas-subtle);
+}
+
+.overview header,
+.linkCard header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-strong);
+}
+
+.overview h2,
+.linkCard h2 {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.overview p,
+.linkCard p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.tabs {
+  display: flex;
+  gap: 3px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.tabs button {
+  min-height: 31px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.72rem;
+}
+
+.tabs button:hover,
+.tabs .active {
+  border-color: var(--line-subtle);
+  background: var(--canvas-raised);
+  color: var(--text-strong);
+}
+
+.links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.linkCard:hover {
+  border-color: var(--line-default);
+  background: var(--canvas-raised);
+}
+
+@media (max-width: 850px) {
+  .overview,
+  .links {
+    grid-template-columns: 1fr;
+  }
+}

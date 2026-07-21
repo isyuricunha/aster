@@ -1,0 +1,59 @@
+:root {
+  --window-height: 38px;
+}
+
+.workspace-window-bar {
+  grid-template-columns: minmax(180px, 330px) minmax(0, 1fr) auto;
+  padding-inline: 8px;
+}
+
+.window-tab-spacer {
+  min-width: 0;
+}
+
+.unified-sidebar-tools {
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  margin: 1px 0 3px;
+}
+
+.unified-sidebar-tool-items {
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 1px;
+  margin: 2px 0 4px 18px;
+  padding-left: 5px;
+  border-left: 1px solid var(--line-subtle);
+}
+
+.unified-sidebar-tool-items .unified-sidebar-row {
+  min-height: 27px;
+  grid-template-columns: 17px minmax(0, 1fr);
+  font-size: 0.7rem;
+}
+
+html.aster-sidebar-collapsed .unified-sidebar-tools {
+  justify-items: center;
+}
+
+html.aster-sidebar-collapsed .unified-sidebar-tool-items {
+  display: none !important;
+}
+
+@media (max-width: 780px) {
+  .unified-application-sidebar .unified-sidebar-tool-items,
+  html.aster-sidebar-collapsed .unified-application-sidebar .unified-sidebar-tool-items {
+    width: auto;
+    display: grid !important;
+  }
+
+  .unified-application-sidebar .unified-sidebar-tool-items .unified-sidebar-row,
+  html.aster-sidebar-collapsed
+    .unified-application-sidebar
+    .unified-sidebar-tool-items
+    .unified-sidebar-row {
+    grid-template-columns: 17px minmax(0, 1fr);
+  }
+}

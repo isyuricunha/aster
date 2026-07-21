@@ -302,11 +302,25 @@ export function apiUrl(path: string): string {
   return path;
 }
 
-function notifyConversationChange(path: string, init: RequestInit | undefined): void {
+function conversationIdFromPayload(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const id = (payload as { id?: unknown }).id;
+  return typeof id === "string" && id ? id : undefined;
+}
+
+function notifyConversationChange(
+  path: string,
+  init: RequestInit | undefined,
+  payload?: unknown,
+): void {
   if (typeof window === "undefined") return;
   const method = init?.method?.toUpperCase() ?? "GET";
   if (method === "POST" && path === "/api/conversations") {
-    window.dispatchEvent(new CustomEvent("aster:conversations-changed"));
+    window.dispatchEvent(
+      new CustomEvent("aster:conversations-changed", {
+        detail: { conversationId: conversationIdFromPayload(payload) },
+      }),
+    );
   }
 }
 
@@ -337,6 +351,6 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     throw new Error(message);
   }
 
-  notifyConversationChange(path, init);
+  notifyConversationChange(path, init, payload);
   return payload as T;
 }

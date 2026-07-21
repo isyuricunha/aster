@@ -18,7 +18,14 @@ import { EmailMessageBody } from "../communications/email-message-body";
 import { Icon, type IconName } from "../ui/icons";
 import styles from "./email-workspace.module.css";
 
-type SystemMailboxKey = "inbox" | "sent" | "spam" | "junk" | "trash";
+type SystemMailboxKey =
+  | "inbox"
+  | "sent"
+  | "drafts"
+  | "archive"
+  | "spam"
+  | "junk"
+  | "trash";
 type MailboxKey = SystemMailboxKey | "all";
 type AiReplyTone = "positive" | "neutral" | "negative";
 
@@ -31,6 +38,8 @@ type MailboxDefinition = {
 const MAILBOXES: readonly MailboxDefinition[] = [
   { key: "inbox", label: "Inbox", icon: "inbox" },
   { key: "sent", label: "Sent", icon: "sent" },
+  { key: "drafts", label: "Drafts", icon: "edit" },
+  { key: "archive", label: "Archive", icon: "folder" },
   { key: "spam", label: "Spam", icon: "spam" },
   { key: "junk", label: "Junk", icon: "junk" },
   { key: "trash", label: "Trash", icon: "trash" },
@@ -98,6 +107,8 @@ function systemMailboxForThread(thread: CommunicationThread): SystemMailboxKey |
   const source = normalizedSource(thread);
   if (!source) return "inbox";
   if (/sent|enviad|outbox/.test(source)) return "sent";
+  if (/draft|rascunh/.test(source)) return "drafts";
+  if (/archive|arquivo|all mail|todos os e-?mails/.test(source)) return "archive";
   if (/spam/.test(source)) return "spam";
   if (/junk|indesejad|bulk/.test(source)) return "junk";
   if (/trash|deleted|bin|lixeira/.test(source)) return "trash";
@@ -116,11 +127,9 @@ export function EmailWorkspace({
 }) {
   const [accounts] = useState(initialAccounts);
   const [threads, setThreads] = useState(initialThreads);
-  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(
-    initialThreads[0]?.id ?? null,
-  );
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [thread, setThread] = useState<CommunicationThreadDetail | null>(null);
-  const [threadLoading, setThreadLoading] = useState(Boolean(initialThreads[0]));
+  const [threadLoading, setThreadLoading] = useState(false);
   const [mailbox, setMailbox] = useState<MailboxKey>("inbox");
   const [customFolder, setCustomFolder] = useState("");
   const [accountFilter, setAccountFilter] = useState("");
@@ -159,6 +168,8 @@ export function EmailWorkspace({
     const counts: Record<MailboxKey, number> = {
       inbox: 0,
       sent: 0,
+      drafts: 0,
+      archive: 0,
       spam: 0,
       junk: 0,
       trash: 0,
@@ -189,11 +200,11 @@ export function EmailWorkspace({
   }, [accountFilter, customFolder, mailbox, query, threads, unreadOnly]);
 
   useEffect(() => {
-    if (!selectedThreadId || !visibleThreads.some((item) => item.id === selectedThreadId)) {
-      const nextId = visibleThreads[0]?.id ?? null;
-      setSelectedThreadId(nextId);
+    if (selectedThreadId && !visibleThreads.some((item) => item.id === selectedThreadId)) {
+      setSelectedThreadId(null);
       setThread(null);
-      setThreadLoading(Boolean(nextId));
+      setThreadLoading(false);
+      setComposerOpen(false);
     }
   }, [selectedThreadId, visibleThreads]);
 
@@ -226,7 +237,20 @@ export function EmailWorkspace({
     setThreads(await listCommunicationThreads({ kind: "email" }));
   }
 
+  function clearSelection() {
+    setSelectedThreadId(null);
+    setThread(null);
+    setThreadLoading(false);
+    setReaderFocused(false);
+    setComposerOpen(false);
+    setReply("");
+    setDraftInstruction("");
+    setActiveTone(null);
+    setDraftSource(null);
+  }
+
   function selectMailbox(nextMailbox: MailboxKey) {
+    clearSelection();
     setMailbox(nextMailbox);
     setCustomFolder("");
     setNotice(null);
@@ -234,8 +258,16 @@ export function EmailWorkspace({
   }
 
   function selectFolder(folder: string) {
+    clearSelection();
     setCustomFolder(folder);
     setMailbox("all");
+    setNotice(null);
+    setError(null);
+  }
+
+  function selectAccount(accountId: string) {
+    clearSelection();
+    setAccountFilter(accountId);
     setNotice(null);
     setError(null);
   }
@@ -488,7 +520,7 @@ export function EmailWorkspace({
           <p>Accounts</p>
           <button
             className={!accountFilter ? styles.activeAccount : ""}
-            onClick={() => setAccountFilter("")}
+            onClick={() => selectAccount("")}
             type="button"
           >
             <span>All accounts</span>
@@ -498,7 +530,7 @@ export function EmailWorkspace({
             <button
               className={accountFilter === account.id ? styles.activeAccount : ""}
               key={account.id}
-              onClick={() => setAccountFilter(account.id)}
+              onClick={() => selectAccount(account.id)}
               type="button"
             >
               <span>{account.name}</span>
@@ -507,9 +539,9 @@ export function EmailWorkspace({
           ))}
         </section>
 
-        <Link className={styles.manageLink} href="/communications">
+        <Link className={styles.manageLink} href="/email/settings">
           <Icon name="settings" size={14} />
-          Manage connections and rules
+          Manage email accounts and rules
         </Link>
       </aside>
 
