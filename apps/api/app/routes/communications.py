@@ -13,6 +13,7 @@ from app.communication_models import (
     CommunicationAttachment,
     CommunicationMessage,
     CommunicationRule,
+    CommunicationSourceCursor,
     CommunicationThread,
 )
 from app.communication_schemas import (
@@ -51,6 +52,7 @@ from app.communication_storage import (
 from app.config import settings
 from app.db import get_session
 from app.dependencies import get_communication_store, get_secret_cipher
+from app.imap_sync_patch import imap_backfill_progress
 from app.integration_service import decrypt_credentials
 from app.security import SecretCipher
 
@@ -298,10 +300,26 @@ async def sync_communication_account_route(
         )
         await session.commit()
         raise HTTPException(status_code=502, detail=error.message) from error
+
+    backfill_pending = False
+    backfill_remaining = 0
+    if account.kind == "imap":
+        source_key = f"imap:{account.config.get('folder', 'INBOX')}"
+        cursor = await session.scalar(
+            select(CommunicationSourceCursor).where(
+                CommunicationSourceCursor.account_id == account.id,
+                CommunicationSourceCursor.source_key == source_key,
+            )
+        )
+        backfill_pending, backfill_remaining = imap_backfill_progress(
+            cursor.cursor_value if cursor else None
+        )
     return CommunicationSyncResponse(
         status="ok",
         messages_added=added,
         automations_enqueued=enqueued,
+        backfill_pending=backfill_pending,
+        backfill_remaining=backfill_remaining,
     )
 
 
@@ -318,14 +336,12 @@ async def list_communication_threads(
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> list[CommunicationThreadResponse]:
-    if kind not in {None, "email", "discord"}:
-        raise HTTPException(status_code=422, detail="Unsupported thread kind")
     return await list_threads_query(
         session,
         account_id=account_id,
         kind=kind,
         unread_only=unread_only,
-        query=query.strip() if query and query.strip() else None,
+        query=query,
         offset=offset,
         limit=limit,
     )
@@ -356,7 +372,6 @@ async def mark_communication_thread_read(
     thread = await _thread(session, thread_id)
     account = await _account(session, thread.account_id)
     await mark_thread_read(session, thread, account=account, cipher=cipher)
-    await session.refresh(thread)
     return await thread_detail(session, thread, account.name)
 
 
@@ -376,18 +391,21 @@ async def reply_to_communication_thread(
     try:
         message = await reply_to_thread(
             session,
-            thread=thread,
             account=account,
+            thread=thread,
             content=payload.content,
             cipher=cipher,
-            settings=settings,
+            timeout_seconds=settings.aster_integration_timeout_seconds,
         )
     except CommunicationServiceError as error:
-        raise HTTPException(status_code=422, detail=error.message) from error
+        status_code = 409 if error.code == "delivery_unavailable" else 502
+        raise HTTPException(status_code=status_code, detail=error.message) from error
     return await message_response(session, message)
 
 
-@router.get("/communication-attachments/{attachment_id}/content")
+@router.get(
+    "/communication-attachments/{attachment_id}/content",
+)
 async def read_communication_attachment(
     attachment_id: UUID,
     session: SessionDep,
@@ -395,18 +413,17 @@ async def read_communication_attachment(
 ) -> Response:
     attachment = await session.get(CommunicationAttachment, attachment_id)
     if attachment is None:
-        raise HTTPException(status_code=404, detail="Communication attachment not found")
+        raise HTTPException(status_code=404, detail="Attachment not found")
     try:
         content = store.read(attachment.storage_key)
     except CommunicationStorageError as error:
-        raise HTTPException(status_code=404, detail=str(error)) from error
-    safe_name = attachment.filename.replace('"', "'")
+        raise HTTPException(status_code=404, detail=error.message) from error
     return Response(
         content=content,
         media_type=attachment.media_type,
         headers={
-            "Content-Disposition": f'attachment; filename="{safe_name}"',
             "Cache-Control": "private, no-store",
+            "Content-Disposition": f'attachment; filename="{attachment.filename}"',
             "X-Content-Type-Options": "nosniff",
         },
     )
@@ -443,7 +460,11 @@ async def create_communication_rule(
     )
     rule = CommunicationRule(**payload.model_dump())
     session.add(rule)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as error:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail="Communication rule name already exists") from error
     await session.refresh(rule)
     return await rule_response(session, rule)
 
@@ -463,10 +484,13 @@ async def update_communication_rule(
         account_id=payload.account_id,
         automation_id=payload.automation_id,
     )
-    for name, value in payload.model_dump().items():
-        setattr(rule, name, value)
-    await session.commit()
-    await session.refresh(rule)
+    for key, value in payload.model_dump().items():
+        setattr(rule, key, value)
+    try:
+        await session.commit()
+    except IntegrityError as error:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail="Communication rule name already exists") from error
     return await rule_response(session, rule)
 
 
@@ -482,32 +506,3 @@ async def delete_communication_rule(
     await session.delete(rule)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@router.get("/communication-summary")
-async def communication_summary(session: SessionDep) -> dict[str, int]:
-    return {
-        "accounts": int(
-            await session.scalar(select(func.count(CommunicationAccount.id))) or 0
-        ),
-        "threads": int(
-            await session.scalar(select(func.count(CommunicationThread.id))) or 0
-        ),
-        "unread": int(
-            await session.scalar(
-                select(func.coalesce(func.sum(CommunicationThread.unread_count), 0))
-            )
-            or 0
-        ),
-        "rules": int(
-            await session.scalar(select(func.count(CommunicationRule.id))) or 0
-        ),
-        "communication_automations": int(
-            await session.scalar(
-                select(func.count(Automation.id)).where(
-                    Automation.trigger_type == "communication"
-                )
-            )
-            or 0
-        ),
-    }

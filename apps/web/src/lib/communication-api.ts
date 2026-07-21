@@ -30,6 +30,14 @@ export type CommunicationAccountWrite = {
   preserve_credentials?: boolean;
 };
 
+export type CommunicationSyncResult = {
+  status: "ok";
+  messages_added: number;
+  automations_enqueued: number;
+  backfill_pending: boolean;
+  backfill_remaining: number;
+};
+
 export type CommunicationAttachment = {
   id: string;
   filename: string;
@@ -148,9 +156,7 @@ export function testCommunicationAccount(
   return apiRequest(`/api/communication-accounts/${id}/test`, { method: "POST" });
 }
 
-export function syncCommunicationAccount(
-  id: string,
-): Promise<{ status: "ok"; messages_added: number; automations_enqueued: number }> {
+export function syncCommunicationAccount(id: string): Promise<CommunicationSyncResult> {
   return apiRequest(`/api/communication-accounts/${id}/sync`, { method: "POST" });
 }
 
