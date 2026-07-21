@@ -35,6 +35,7 @@ from app.routes.memory import router as memory_router
 from app.routes.model_endpoints import router as model_endpoints_router
 from app.routes.model_profiles import router as model_profiles_router
 from app.routes.persona import router as persona_router
+from app.routes.tasks import router as tasks_router
 from app.routes.tools import router as tools_router
 from app.routes.webhooks import router as webhook_router
 
@@ -75,6 +76,7 @@ app.include_router(memory_router, dependencies=private_route_dependencies)
 app.include_router(knowledge_router, dependencies=private_route_dependencies)
 app.include_router(images_router, dependencies=private_route_dependencies)
 app.include_router(automations_router, dependencies=private_route_dependencies)
+app.include_router(tasks_router, dependencies=private_route_dependencies)
 app.include_router(communications_router, dependencies=private_route_dependencies)
 app.include_router(communication_drafts_router, dependencies=private_route_dependencies)
 app.include_router(agents_router, dependencies=private_route_dependencies)
