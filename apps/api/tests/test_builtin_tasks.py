@@ -1,4 +1,10 @@
-from app.builtin_tasks import BUILTIN_TASKS
+from sqlalchemy import func, select
+
+from app.automation_models import Automation, AutomationRun
+from app.builtin_tasks import BUILTIN_TASKS, execute_builtin_task
+from app.config import settings
+from app.dependencies import get_secret_cipher
+from app.retrieval_models import Memory
 
 
 def automation_update_payload(task: dict[str, object]) -> dict[str, object]:
@@ -97,3 +103,44 @@ async def test_builtin_tasks_can_be_paused_run_and_cannot_fake_skills(api_client
 
     legacy_run_skills = await client.post(f"/api/automations/{skills['id']}/run")
     assert legacy_run_skills.status_code == 409
+
+
+async def test_memory_tidy_removes_only_exact_scope_duplicates(api_client: tuple) -> None:
+    client, fake_client, session_factory = api_client
+    tasks = (await client.get("/api/tasks")).json()
+    memory_task = next(item for item in tasks if item["builtin_key"] == "memory_tidy")
+    queued = await client.post(f"/api/tasks/{memory_task['id']}/run")
+    assert queued.status_code == 202, queued.text
+
+    async with session_factory() as session:
+        session.add_all(
+            [
+                Memory(content="Keep PostgreSQL backups", category="instruction"),
+                Memory(content="  keep postgresql   backups  ", category="other"),
+                Memory(content="Use pnpm", category="instruction"),
+                Memory(content="Prefer Android", category="preference"),
+                Memory(content="Dwarf Fortress is the favorite game", category="preference"),
+                Memory(content="The project is named Aster", category="project"),
+            ]
+        )
+        await session.commit()
+
+        automation = await session.get(Automation, memory_task["id"])
+        run = await session.get(AutomationRun, queued.json()["id"])
+        assert automation is not None
+        assert run is not None
+
+        result = await execute_builtin_task(
+            session,
+            automation=automation,
+            run=run,
+            client=fake_client,
+            cipher=get_secret_cipher(),
+            settings=settings,
+        )
+        assert result.response == "Removed 1 exact duplicate memory record(s)."
+        assert int(await session.scalar(select(func.count(Memory.id))) or 0) == 5
+
+        remaining = list(await session.scalars(select(Memory).order_by(Memory.created_at)))
+        assert sum(item.content == "Keep PostgreSQL backups" for item in remaining) == 1
+        assert all(item.content.strip() != "keep postgresql   backups" for item in remaining)
