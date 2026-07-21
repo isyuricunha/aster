@@ -14,6 +14,10 @@ json_field() {
 test "$(curl -sS -o /dev/null -w '%{http_code}' "${api_url}/api/agents")" = "401"
 test "$(curl -sS -o /dev/null -w '%{http_code}' "${web_url}/api/agents")" = "401"
 
+starter_agents="$(curl -fsS -b "${cookie_jar}" "${web_url}/api/agents")"
+printf '%s' "${starter_agents}" | python -c \
+  'import json,sys; p=json.load(sys.stdin); a=next(x for x in p if x["name"] == "Task Planner"); assert a["trigger_type"] == "manual"; assert a["max_tool_calls"] == 0; assert a["max_steps"] == 4'
+
 agent_json="$(curl -fsS -b "${cookie_jar}" \
   -H 'Content-Type: application/json' \
   -H "Origin: ${origin}" \
@@ -172,6 +176,6 @@ curl -fsS -b "${cookie_jar}" "${web_url}/api/agent-communication-rules" \
 curl -fsS -b "${cookie_jar}" "${web_url}/agents" \
   | grep --quiet 'Agents'
 
-docker compose exec -T api alembic current | grep --quiet '0018_skills'
+docker compose exec -T api alembic current | grep --quiet '0019_product_templates'
 docker compose config | grep --quiet 'ASTER_AGENT_LEASE_SECONDS'
 docker compose config | grep --quiet 'ASTER_AGENT_LOOP_REPEAT_LIMIT'
