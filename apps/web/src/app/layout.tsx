@@ -16,6 +16,7 @@ import "./command-palette.css";
 import "./application-sidebar.css";
 import "./workspace-modes.css";
 import "./product-polish.css";
+import "./odysseus-workspace.css";
 import { ApplicationSidebarHostV2 } from "./ui/application-sidebar-host-v2";
 import { ChatDocumentTitle } from "./ui/chat-document-title";
 import { CommandPaletteHostV2 } from "./ui/command-palette-host-v2";
