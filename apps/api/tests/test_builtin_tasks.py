@@ -1,6 +1,27 @@
 from app.builtin_tasks import BUILTIN_TASKS
 
 
+def automation_update_payload(task: dict[str, object]) -> dict[str, object]:
+    return {
+        "name": task["name"],
+        "description": task["description"],
+        "instruction": task["instruction"],
+        "enabled": task["enabled"],
+        "trigger_type": task["trigger_type"],
+        "timezone": task["timezone"],
+        "schedule": task["schedule"],
+        "model_id": task["model_id"],
+        "persona_id": task["persona_id"],
+        "use_default_persona": False,
+        "notify_on_success": task["notify_on_success"],
+        "notify_on_failure": task["notify_on_failure"],
+        "max_attempts": task["max_attempts"],
+        "retry_delay_seconds": task["retry_delay_seconds"],
+        "timeout_seconds": task["timeout_seconds"],
+        "deliveries": [],
+    }
+
+
 async def test_builtin_tasks_are_seeded_with_stable_defaults(api_client: tuple) -> None:
     client, _, _ = api_client
 
@@ -49,6 +70,15 @@ async def test_builtin_tasks_can_be_paused_run_and_cannot_fake_skills(api_client
     assert activated.json()["enabled"] is True
     assert activated.json()["next_run_at"] is not None
 
+    legacy_update = await client.put(
+        f"/api/automations/{summary['id']}",
+        json=automation_update_payload(summary),
+    )
+    assert legacy_update.status_code == 409
+
+    legacy_delete = await client.delete(f"/api/automations/{summary['id']}")
+    assert legacy_delete.status_code == 409
+
     memory = by_key["memory_tidy"]
     queued = await client.post(f"/api/tasks/{memory['id']}/run")
     assert queued.status_code == 202, queued.text
@@ -64,3 +94,6 @@ async def test_builtin_tasks_can_be_paused_run_and_cannot_fake_skills(api_client
 
     run_skills = await client.post(f"/api/tasks/{skills['id']}/run")
     assert run_skills.status_code == 409
+
+    legacy_run_skills = await client.post(f"/api/automations/{skills['id']}/run")
+    assert legacy_run_skills.status_code == 409
