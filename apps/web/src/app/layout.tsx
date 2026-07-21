@@ -14,9 +14,10 @@ import "./settings-window.css";
 import "./email-reader.css";
 import "./command-palette.css";
 import "./application-sidebar.css";
-import { ApplicationSidebarHost } from "./ui/application-sidebar-host";
+import "./workspace-modes.css";
+import { ApplicationSidebarHostV2 } from "./ui/application-sidebar-host-v2";
 import { ChatDocumentTitle } from "./ui/chat-document-title";
-import { CommandPaletteHost } from "./ui/command-palette-host";
+import { CommandPaletteHostV2 } from "./ui/command-palette-host-v2";
 import { ConversationRouteSync } from "./ui/conversation-route-sync";
 import { WorkspaceWindowHost } from "./ui/workspace-window-host";
 
@@ -48,10 +49,10 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         <ConversationRouteSync />
         <Suspense fallback={null}>
           <ChatDocumentTitle />
-          <ApplicationSidebarHost />
+          <ApplicationSidebarHostV2 />
         </Suspense>
         <WorkspaceWindowHost />
-        <CommandPaletteHost />
+        <CommandPaletteHostV2 />
       </body>
     </html>
   );

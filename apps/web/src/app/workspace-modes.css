@@ -1,0 +1,21 @@
+.immersive-workspace-content,
+.immersive-workspace-page {
+  min-width: 0;
+  min-height: calc(100vh - var(--window-height) - 46px);
+  padding: 0;
+  overflow: hidden;
+}
+
+.immersive-application-shell .application-main {
+  min-height: calc(100vh - var(--window-height));
+  overflow: hidden;
+}
+
+@media (max-width: 620px) {
+  .immersive-workspace-content,
+  .immersive-workspace-page,
+  .immersive-application-shell .application-main {
+    min-height: auto;
+    overflow: visible;
+  }
+}

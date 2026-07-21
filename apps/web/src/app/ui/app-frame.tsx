@@ -16,6 +16,7 @@ export function AppFrame({
   description,
   children,
   embedded = false,
+  immersive = false,
 }: {
   active: NavigationKey;
   kicker: string;
@@ -23,26 +24,31 @@ export function AppFrame({
   description: string;
   children: ReactNode;
   embedded?: boolean;
+  immersive?: boolean;
 }) {
   if (embedded) {
     return (
       <main
-        className="embedded-workspace-page embedded-settings-page"
+        className={`embedded-workspace-page embedded-settings-page ${
+          immersive ? "immersive-workspace-page" : ""
+        }`}
         id="main-content"
         tabIndex={-1}
       >
-        <header className="settings-hero">
-          <p>{kicker}</p>
-          <h1 className="shimmer-text">{title}</h1>
-          <span>{description}</span>
-        </header>
+        {!immersive ? (
+          <header className="settings-hero">
+            <p>{kicker}</p>
+            <h1 className="shimmer-text">{title}</h1>
+            <span>{description}</span>
+          </header>
+        ) : null}
         {children}
       </main>
     );
   }
 
   return (
-    <div className="application-shell">
+    <div className={`application-shell ${immersive ? "immersive-application-shell" : ""}`}>
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
@@ -74,12 +80,18 @@ export function AppFrame({
           </div>
         </header>
 
-        <main className="settings-content" id="main-content" tabIndex={-1}>
-          <header className="settings-hero">
-            <p>{kicker}</p>
-            <h1 className="shimmer-text">{title}</h1>
-            <span>{description}</span>
-          </header>
+        <main
+          className={immersive ? "immersive-workspace-content" : "settings-content"}
+          id="main-content"
+          tabIndex={-1}
+        >
+          {!immersive ? (
+            <header className="settings-hero">
+              <p>{kicker}</p>
+              <h1 className="shimmer-text">{title}</h1>
+              <span>{description}</span>
+            </header>
+          ) : null}
           {children}
         </main>
       </div>
