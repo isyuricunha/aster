@@ -13,14 +13,17 @@ import {
   Inbox,
   LockKeyhole,
   Mail,
+  Maximize2,
   Menu,
   MessageCircleMore,
   MessageSquareText,
+  Minimize2,
   MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
   PencilLine,
   RefreshCw,
+  Reply,
   Search,
   Send,
   ShieldX,
@@ -28,6 +31,8 @@ import {
   Sparkles,
   Square,
   SquarePen,
+  ThumbsDown,
+  ThumbsUp,
   Trash2,
   Upload,
   UserRound,
@@ -51,6 +56,7 @@ export type IconName =
   | "edit"
   | "email"
   | "expand-panel"
+  | "focus"
   | "folder"
   | "hash"
   | "images"
@@ -61,9 +67,12 @@ export type IconName =
   | "menu"
   | "models"
   | "more"
+  | "negative"
   | "new-chat"
   | "persona"
+  | "positive"
   | "refresh"
+  | "reply"
   | "search"
   | "sent"
   | "settings"
@@ -71,6 +80,7 @@ export type IconName =
   | "stop"
   | "tools"
   | "trash"
+  | "unfocus"
   | "upload";
 
 type IconProps = Omit<LucideProps, "children" | "size"> & {
@@ -92,6 +102,7 @@ const ICONS: Record<IconName, LucideIcon> = {
   edit: PencilLine,
   email: Mail,
   "expand-panel": PanelLeftOpen,
+  focus: Maximize2,
   folder: Folder,
   hash: Hash,
   images: Image,
@@ -102,9 +113,12 @@ const ICONS: Record<IconName, LucideIcon> = {
   menu: Menu,
   models: Blocks,
   more: MoreHorizontal,
+  negative: ThumbsDown,
   "new-chat": SquarePen,
   persona: Sparkles,
+  positive: ThumbsUp,
   refresh: RefreshCw,
+  reply: Reply,
   search: Search,
   sent: Send,
   settings: SlidersHorizontal,
@@ -112,6 +126,7 @@ const ICONS: Record<IconName, LucideIcon> = {
   stop: Square,
   tools: Wrench,
   trash: Trash2,
+  unfocus: Minimize2,
   upload: Upload,
 };
 

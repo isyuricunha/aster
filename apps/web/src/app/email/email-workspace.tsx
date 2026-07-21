@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import {
   draftCommunicationReply,
@@ -20,6 +20,7 @@ import styles from "./email-workspace.module.css";
 
 type SystemMailboxKey = "inbox" | "sent" | "spam" | "junk" | "trash";
 type MailboxKey = SystemMailboxKey | "all";
+type AiReplyTone = "positive" | "neutral" | "negative";
 
 type MailboxDefinition = {
   key: SystemMailboxKey;
@@ -34,6 +35,15 @@ const MAILBOXES: readonly MailboxDefinition[] = [
   { key: "junk", label: "Junk", icon: "junk" },
   { key: "trash", label: "Trash", icon: "trash" },
 ];
+
+const AI_REPLY_GUIDANCE: Record<AiReplyTone, string> = {
+  positive:
+    "Write a positive, friendly, and receptive reply. Express interest or agreement when supported by the thread. Do not invent commitments, dates, prices, or completed actions.",
+  neutral:
+    "Write a neutral, professional, and concise reply that directly addresses the latest relevant message. Ask for missing information only when it is necessary.",
+  negative:
+    "Write a polite but clear negative reply. Decline, disagree, or say the owner is not interested without being rude and without inventing reasons or commitments.",
+};
 
 const NAVIGATION_STORAGE_KEY = "aster.email-navigation-collapsed";
 const MAILBOXES_STORAGE_KEY = "aster.email-mailboxes-open";
@@ -125,11 +135,17 @@ export function EmailWorkspace({
   const [foldersOpen, setFoldersOpen] = useState(() =>
     storedBoolean(FOLDERS_STORAGE_KEY, true),
   );
+  const [readerFocused, setReaderFocused] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
   const [reply, setReply] = useState("");
   const [draftInstruction, setDraftInstruction] = useState("");
+  const [activeTone, setActiveTone] = useState<AiReplyTone | null>(null);
+  const [draftSource, setDraftSource] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(initialError);
+  const replyRef = useRef<HTMLTextAreaElement>(null);
+  const guidanceRef = useRef<HTMLInputElement>(null);
 
   const folderNames = useMemo(() => {
     const values = threads
@@ -252,10 +268,30 @@ export function EmailWorkspace({
     setSelectedThreadId(threadId);
     setThread(null);
     setThreadLoading(true);
+    setComposerOpen(false);
     setReply("");
     setDraftInstruction("");
+    setActiveTone(null);
+    setDraftSource(null);
     setNotice(null);
     setError(null);
+  }
+
+  function focusReplyEditor() {
+    setComposerOpen(true);
+    window.requestAnimationFrame(() => replyRef.current?.focus());
+  }
+
+  function openManualReply() {
+    setActiveTone(null);
+    setDraftSource(null);
+    focusReplyEditor();
+  }
+
+  function openCustomInstruction() {
+    setComposerOpen(true);
+    setActiveTone(null);
+    window.requestAnimationFrame(() => guidanceRef.current?.focus());
   }
 
   async function syncAccounts() {
@@ -295,15 +331,26 @@ export function EmailWorkspace({
     }
   }
 
-  async function generateDraft() {
+  async function generateDraft({
+    instruction,
+    tone,
+  }: {
+    instruction?: string;
+    tone?: AiReplyTone;
+  } = {}) {
     if (!thread || busy) return;
+    const guidance = instruction?.trim() || AI_REPLY_GUIDANCE[tone ?? "neutral"];
+    setComposerOpen(true);
+    setActiveTone(tone ?? null);
+    setDraftSource(null);
     setBusy("draft");
     setNotice(null);
     setError(null);
     try {
-      const generated = await draftCommunicationReply(thread.id, draftInstruction);
+      const generated = await draftCommunicationReply(thread.id, guidance);
       setReply(generated.draft);
-      setNotice(`Draft generated with ${generated.model}. Review it before sending.`);
+      setDraftSource(`${generated.model} via ${generated.endpoint}`);
+      window.requestAnimationFrame(() => replyRef.current?.focus());
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not generate a reply draft.");
     } finally {
@@ -321,6 +368,9 @@ export function EmailWorkspace({
       await replyToCommunicationThread(thread.id, reply);
       setReply("");
       setDraftInstruction("");
+      setActiveTone(null);
+      setDraftSource(null);
+      setComposerOpen(false);
       setThread(await readCommunicationThread(thread.id));
       await refreshThreads();
       setNotice("Reply sent.");
@@ -336,12 +386,16 @@ export function EmailWorkspace({
     : mailbox === "all"
       ? "All mail"
       : MAILBOXES.find((item) => item.key === mailbox)?.label ?? "Inbox";
+  const workspaceClassName = [
+    styles.workspace,
+    navigationCollapsed ? styles.navigationCollapsed : "",
+    readerFocused ? styles.readerFocused : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <div
-      aria-busy={Boolean(busy) || threadLoading}
-      className={`${styles.workspace} ${navigationCollapsed ? styles.navigationCollapsed : ""}`}
-    >
+    <div aria-busy={Boolean(busy) || threadLoading} className={workspaceClassName}>
       <aside aria-label="Email mailboxes" className={styles.mailNavigation}>
         <div className={styles.navigationHeader}>
           <strong>Email</strong>
@@ -555,12 +609,78 @@ export function EmailWorkspace({
                   {thread.message_count} message(s) · {thread.participants.length} participant(s)
                 </span>
               </div>
-              {thread.unread_count ? (
-                <button disabled={Boolean(busy)} onClick={() => void markRead()} type="button">
-                  Mark read
+              <div className={styles.readerActions}>
+                <button
+                  aria-label={readerFocused ? "Restore email columns" : "Focus email reader"}
+                  aria-pressed={readerFocused}
+                  onClick={() => setReaderFocused((current) => !current)}
+                  title={readerFocused ? "Restore columns" : "Focus reader"}
+                  type="button"
+                >
+                  <Icon name={readerFocused ? "unfocus" : "focus"} size={14} />
+                  <span>{readerFocused ? "Restore" : "Focus"}</span>
                 </button>
-              ) : null}
+                {thread.unread_count ? (
+                  <button disabled={Boolean(busy)} onClick={() => void markRead()} type="button">
+                    Mark read
+                  </button>
+                ) : null}
+                <button
+                  className={styles.primaryReply}
+                  disabled={Boolean(busy)}
+                  onClick={openManualReply}
+                  type="button"
+                >
+                  <Icon name="reply" size={14} />
+                  Reply
+                </button>
+              </div>
             </header>
+
+            <section aria-label="AI reply actions" className={styles.replyActionBar}>
+              <div className={styles.aiActionIntro}>
+                <Icon name="persona" size={15} />
+                <div>
+                  <strong>Reply with AI</strong>
+                  <span>Creates an editable draft. It never sends automatically.</span>
+                </div>
+              </div>
+              <div className={styles.aiActionButtons}>
+                <button
+                  aria-pressed={activeTone === "neutral"}
+                  disabled={Boolean(busy)}
+                  onClick={() => void generateDraft({ tone: "neutral" })}
+                  type="button"
+                >
+                  <Icon name="persona" size={13} />
+                  {busy === "draft" && activeTone === "neutral" ? "Drafting…" : "AI reply"}
+                </button>
+                <button
+                  aria-pressed={activeTone === "positive"}
+                  className={styles.positiveAction}
+                  disabled={Boolean(busy)}
+                  onClick={() => void generateDraft({ tone: "positive" })}
+                  type="button"
+                >
+                  <Icon name="positive" size={13} />
+                  {busy === "draft" && activeTone === "positive" ? "Drafting…" : "Positive"}
+                </button>
+                <button
+                  aria-pressed={activeTone === "negative"}
+                  className={styles.negativeAction}
+                  disabled={Boolean(busy)}
+                  onClick={() => void generateDraft({ tone: "negative" })}
+                  type="button"
+                >
+                  <Icon name="negative" size={13} />
+                  {busy === "draft" && activeTone === "negative" ? "Drafting…" : "Negative"}
+                </button>
+                <button disabled={Boolean(busy)} onClick={openCustomInstruction} type="button">
+                  <Icon name="edit" size={13} />
+                  Custom
+                </button>
+              </div>
+            </section>
 
             <div className={styles.messageList}>
               {thread.messages.map((message) => (
@@ -592,36 +712,80 @@ export function EmailWorkspace({
               ))}
             </div>
 
-            <form className={styles.replyComposer} onSubmit={(event) => void sendReply(event)}>
-              <div className={styles.draftTools}>
-                <input
-                  maxLength={4000}
-                  onChange={(event) => setDraftInstruction(event.target.value)}
-                  placeholder="Optional AI guidance"
-                  value={draftInstruction}
+            {composerOpen ? (
+              <form className={styles.replyComposer} onSubmit={(event) => void sendReply(event)}>
+                <header className={styles.replyComposerHeader}>
+                  <div>
+                    <Icon name="reply" size={15} />
+                    <div>
+                      <strong>Reply</strong>
+                      <span>
+                        {busy === "draft"
+                          ? "Aster is drafting an editable reply…"
+                          : draftSource
+                            ? `AI draft · ${draftSource}`
+                            : "Manual draft · nothing is sent automatically"}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    aria-label="Hide reply editor"
+                    disabled={busy === "reply"}
+                    onClick={() => setComposerOpen(false)}
+                    type="button"
+                  >
+                    <Icon name="close" size={14} />
+                  </button>
+                </header>
+
+                <section className={styles.aiPrompt}>
+                  <label htmlFor="email-ai-guidance">
+                    <Icon name="persona" size={13} />
+                    Tell Aster how to answer
+                  </label>
+                  <div className={styles.draftTools}>
+                    <input
+                      id="email-ai-guidance"
+                      maxLength={4000}
+                      onChange={(event) => setDraftInstruction(event.target.value)}
+                      placeholder="Example: Say I want more information and ask about pricing."
+                      ref={guidanceRef}
+                      value={draftInstruction}
+                    />
+                    <button
+                      disabled={Boolean(busy)}
+                      onClick={() => void generateDraft({ instruction: draftInstruction })}
+                      type="button"
+                    >
+                      <Icon name="persona" size={13} />
+                      {busy === "draft" && activeTone === null
+                        ? "Generating…"
+                        : reply.trim()
+                          ? "Rewrite"
+                          : "Generate"}
+                    </button>
+                  </div>
+                </section>
+
+                {error ? <div className={styles.composerError}>{error}</div> : null}
+
+                <textarea
+                  aria-label="Reply draft"
+                  onChange={(event) => setReply(event.target.value)}
+                  placeholder="Write or review the reply here. Nothing is sent until you press Send reply."
+                  ref={replyRef}
+                  rows={5}
+                  value={reply}
                 />
-                <button
-                  disabled={Boolean(busy)}
-                  onClick={() => void generateDraft()}
-                  type="button"
-                >
-                  {busy === "draft" ? "Drafting…" : reply.trim() ? "Rewrite" : "Draft with AI"}
-                </button>
-              </div>
-              <textarea
-                aria-label="Reply draft"
-                onChange={(event) => setReply(event.target.value)}
-                placeholder="Write a reply. Nothing is sent until you press Send reply."
-                rows={6}
-                value={reply}
-              />
-              <footer>
-                <span>Review the final text before sending.</span>
-                <button disabled={!reply.trim() || Boolean(busy)} type="submit">
-                  {busy === "reply" ? "Sending…" : "Send reply"}
-                </button>
-              </footer>
-            </form>
+                <footer>
+                  <span>Review and edit the final text before sending.</span>
+                  <button disabled={!reply.trim() || Boolean(busy)} type="submit">
+                    <Icon name="sent" size={13} />
+                    {busy === "reply" ? "Sending…" : "Send reply"}
+                  </button>
+                </footer>
+              </form>
+            ) : null}
           </>
         )}
       </article>

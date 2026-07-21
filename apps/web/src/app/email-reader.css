@@ -56,18 +56,29 @@
 }
 
 .communication-message-body {
-  display: grid;
   min-width: 0;
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: #090a0b;
 }
 
 .communication-body-toggle {
+  min-height: 40px;
   display: flex;
-  min-height: 38px;
   align-items: center;
-  gap: 5px;
-  padding: 6px 10px;
+  gap: 7px;
+  padding: 6px 8px;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--surface-raised);
+}
+
+.communication-view-switch,
+.communication-zoom-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .communication-body-toggle button {
@@ -83,32 +94,67 @@
 }
 
 .communication-body-toggle button:hover,
-.communication-body-toggle button.active {
+.communication-body-toggle button.active,
+.communication-body-toggle button[aria-pressed="true"] {
   border-color: var(--border-subtle);
   background: var(--surface-soft);
   color: var(--text-primary);
 }
 
-.communication-body-toggle span {
+.communication-body-toggle button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.communication-body-status {
+  min-width: 0;
   margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--text-muted);
   font-size: 10px;
 }
 
+.communication-zoom-controls {
+  flex: 0 0 auto;
+  padding: 2px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  background: var(--surface-base);
+}
+
+.communication-zoom-controls button {
+  min-width: 27px;
+  padding: 0;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.communication-zoom-controls output {
+  min-width: 42px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
 .communication-html-frame {
   width: 100%;
-  min-height: 360px;
+  height: clamp(500px, 66dvh, 860px);
+  min-height: 500px;
   border: 0;
   background: transparent;
 }
 
 .communication-plain-body {
-  min-height: 72px;
-  padding: 15px;
+  min-height: 180px;
+  padding: 20px;
   overflow-wrap: anywhere;
   color: var(--text-primary);
   font: inherit;
-  line-height: 1.58;
+  font-size: 13px;
+  line-height: 1.62;
   white-space: pre-wrap;
 }
 
@@ -217,13 +263,20 @@
     flex-wrap: wrap;
   }
 
-  .communication-body-toggle span {
+  .communication-body-status {
     width: 100%;
     margin-left: 0;
+    order: 3;
+    white-space: normal;
+  }
+
+  .communication-zoom-controls {
+    margin-left: auto;
   }
 
   .communication-html-frame {
-    min-height: 440px;
+    height: 540px;
+    min-height: 540px;
   }
 
   .communication-reply-actions {
