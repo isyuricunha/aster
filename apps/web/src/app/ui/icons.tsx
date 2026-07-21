@@ -19,8 +19,10 @@ import {
   MessageSquareText,
   Minimize2,
   MoreHorizontal,
+  PanelLeft,
   PanelLeftClose,
   PanelLeftOpen,
+  PanelRight,
   PencilLine,
   RefreshCw,
   Reply,
@@ -52,6 +54,8 @@ export type IconName =
   | "collapse-panel"
   | "copy"
   | "discord"
+  | "dock-left"
+  | "dock-right"
   | "download"
   | "edit"
   | "email"
@@ -99,6 +103,8 @@ const ICONS: Record<IconName, LucideIcon> = {
   "collapse-panel": PanelLeftClose,
   copy: Copy,
   discord: MessageCircleMore,
+  "dock-left": PanelLeft,
+  "dock-right": PanelRight,
   download: Download,
   edit: PencilLine,
   email: Mail,
