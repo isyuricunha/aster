@@ -15,7 +15,7 @@ import {
 export type NavigationKey =
   | "chat"
   | "email"
-  | "discord"
+  | "connections"
   | "communications"
   | "agents"
   | "images"
@@ -51,7 +51,12 @@ const NAVIGATION_SECTIONS: readonly NavigationSection[] = [
     items: [
       { key: "chat", href: "/", icon: "chat", label: "Chat" },
       { key: "email", href: "/email", icon: "email", label: "Email" },
-      { key: "discord", href: "/discord", icon: "discord", label: "Discord" },
+      {
+        key: "connections",
+        href: "/connections",
+        icon: "tools",
+        label: "Connections",
+      },
       { key: "skills", href: "/skills", icon: "skills", label: "Skills" },
       {
         key: "agents",
@@ -98,7 +103,7 @@ const NAVIGATION_SECTIONS: readonly NavigationSection[] = [
         key: "tools",
         href: "/settings/tools",
         icon: "tools",
-        label: "Tools",
+        label: "MCP tools",
         settingsSection: "tools",
       },
       {
@@ -180,14 +185,11 @@ export function WorkspaceChrome({
 
   return (
     <header className="workspace-window-bar">
-      <div aria-hidden="true" className="window-controls" />
-      <Link aria-label="Open chat" className="window-home" href="/">
-        <AsterMark size={16} />
-      </Link>
       <div className="window-tab" title={title}>
         <Icon name={activeItem?.icon ?? "chat"} size={14} />
         <span>{title}</span>
       </div>
+      <span aria-hidden="true" className="window-tab-spacer" />
       <button
         aria-keyshortcuts="Control+K Meta+K"
         aria-label="Open command palette"
