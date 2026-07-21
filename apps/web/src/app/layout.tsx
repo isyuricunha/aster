@@ -14,6 +14,7 @@ import "./settings-window.css";
 import "./email-reader.css";
 import "./command-palette.css";
 import "./application-sidebar.css";
+import "./workspace-modes.css";
 import { ApplicationSidebarHost } from "./ui/application-sidebar-host";
 import { ChatDocumentTitle } from "./ui/chat-document-title";
 import { CommandPaletteHost } from "./ui/command-palette-host";
