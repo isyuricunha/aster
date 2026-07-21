@@ -35,10 +35,10 @@ type AccountDraft = {
   token: string;
 };
 
-function emptyDraft(): AccountDraft {
+function emptyDraft(kind: CommunicationKind): AccountDraft {
   return {
     name: "",
-    kind: "imap",
+    kind,
     enabled: true,
     pollIntervalSeconds: 60,
     host: "",
@@ -155,17 +155,27 @@ export function AccountPanel({
   integrations,
   onAccountsChange,
   onInboxChange,
+  allowedKinds = ["imap", "discord"],
 }: {
   initialAccounts: CommunicationAccount[];
   integrations: IntegrationConnection[];
   onAccountsChange: (accounts: CommunicationAccount[]) => void;
   onInboxChange: () => Promise<void>;
+  allowedKinds?: readonly CommunicationKind[];
 }) {
-  const [accounts, setAccounts] = useState(initialAccounts);
-  const [selectedId, setSelectedId] = useState<string | null>(initialAccounts[0]?.id ?? null);
-  const [creating, setCreating] = useState(initialAccounts.length === 0);
+  const defaultKind = allowedKinds[0] ?? "imap";
+  const visibleInitialAccounts = initialAccounts.filter((account) =>
+    allowedKinds.includes(account.kind),
+  );
+  const [accounts, setAccounts] = useState(visibleInitialAccounts);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    visibleInitialAccounts[0]?.id ?? null,
+  );
+  const [creating, setCreating] = useState(visibleInitialAccounts.length === 0);
   const [draft, setDraft] = useState<AccountDraft>(
-    initialAccounts[0] ? draftFromAccount(initialAccounts[0]) : emptyDraft(),
+    visibleInitialAccounts[0]
+      ? draftFromAccount(visibleInitialAccounts[0])
+      : emptyDraft(defaultKind),
   );
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -186,13 +196,15 @@ export function AccountPanel({
   function beginCreate() {
     setSelectedId(null);
     setCreating(true);
-    setDraft(emptyDraft());
+    setDraft(emptyDraft(defaultKind));
     setNotice(null);
     setError(null);
   }
 
   async function refreshAccounts(selectId?: string) {
-    const next = await listCommunicationAccounts();
+    const next = (await listCommunicationAccounts()).filter((account) =>
+      allowedKinds.includes(account.kind),
+    );
     setAccounts(next);
     onAccountsChange(next);
     const target = next.find((account) => account.id === selectId);
@@ -234,12 +246,14 @@ export function AccountPanel({
       } else if (action === "sync") {
         const result = await syncCommunicationAccount(selected.id);
         setNotice(
-          `Sync complete: ${result.messages_added} new message(s), ${result.automations_enqueued} automation(s) queued.`,
+          `Sync complete: ${result.messages_added} new message(s), ${result.automations_enqueued} task run(s) queued.`,
         );
         await onInboxChange();
       } else {
         await deleteCommunicationAccount(selected.id);
-        const next = await listCommunicationAccounts();
+        const next = (await listCommunicationAccounts()).filter((account) =>
+          allowedKinds.includes(account.kind),
+        );
         setAccounts(next);
         onAccountsChange(next);
         if (next[0]) choose(next[0]);
@@ -258,7 +272,7 @@ export function AccountPanel({
     <div className={styles.managementLayout}>
       <aside className={styles.sideList}>
         <button className={styles.newButton} onClick={beginCreate} type="button">
-          Add account
+          Add {defaultKind === "imap" ? "email account" : "Discord connection"}
         </button>
         {accounts.map((account) => (
           <button
@@ -270,7 +284,9 @@ export function AccountPanel({
             <span className={account.enabled ? styles.enabledDot : styles.disabledDot} />
             <div>
               <strong>{account.name}</strong>
-              <span>{account.kind} · {account.last_sync_status ?? "not tested"}</span>
+              <span>
+                {account.kind} · {account.last_sync_status ?? "not tested"}
+              </span>
             </div>
           </button>
         ))}
@@ -319,19 +335,19 @@ export function AccountPanel({
             <label>
               Type
               <select
-                disabled={!creating && Boolean(selected?.created_at)}
+                disabled={!creating || allowedKinds.length === 1}
                 onChange={(event) => {
                   const kind = event.target.value as CommunicationKind;
-                  setDraft({
-                    ...draft,
-                    kind,
-                    port: kind === "imap" ? 993 : draft.port,
-                  });
+                  setDraft({ ...emptyDraft(kind), name: draft.name });
                 }}
                 value={draft.kind}
               >
-                <option value="imap">Email inbox · IMAP</option>
-                <option value="discord">Discord bot</option>
+                {allowedKinds.includes("imap") ? (
+                  <option value="imap">Email account · IMAP</option>
+                ) : null}
+                {allowedKinds.includes("discord") ? (
+                  <option value="discord">Discord bot</option>
+                ) : null}
               </select>
             </label>
             <label>
@@ -359,8 +375,8 @@ export function AccountPanel({
         {draft.kind === "imap" ? (
           <section className={styles.formSection}>
             <div className={styles.sectionTitle}>
-              <p>Email inbox</p>
-              <h3>IMAP connection</h3>
+              <p>Email</p>
+              <h3>IMAP connection and mailbox discovery</h3>
             </div>
             <div className={styles.gridThree}>
               <label>
@@ -397,7 +413,7 @@ export function AccountPanel({
                 </select>
               </label>
               <label>
-                Folder
+                Primary mailbox fallback
                 <input
                   onChange={(event) => setDraft({ ...draft, folder: event.target.value })}
                   value={draft.folder}
@@ -449,6 +465,10 @@ export function AccountPanel({
                 Mark email as seen when read here
               </label>
             </div>
+            <p className={styles.help}>
+              Aster discovers every selectable IMAP mailbox during synchronization. The fallback is
+              used only when the server does not expose a mailbox list.
+            </p>
           </section>
         ) : (
           <section className={styles.formSection}>
@@ -494,18 +514,45 @@ export function AccountPanel({
               </label>
             </div>
             <p className={styles.help}>
-              Aster polls only the listed channels. Replies always disable Discord mention parsing,
-              including @everyone and role mentions.
+              Aster reads only the explicitly allowed channels, stores searchable message history,
+              can draft or send confirmed replies, and disables Discord mention parsing on every
+              outbound message. It does not provide voice, calls, roles, or server administration.
             </p>
           </section>
         )}
 
         {!creating && selected ? (
           <section className={styles.statusGrid}>
-            <div><span>Last sync</span><strong>{selected.last_sync_at ? new Date(selected.last_sync_at).toLocaleString() : "Never"}</strong></div>
-            <div><span>Next sync</span><strong>{selected.next_sync_at ? new Date(selected.next_sync_at).toLocaleString() : "Disabled"}</strong></div>
-            <div><span>Stored credentials</span><strong>{selected.credential_names.join(", ") || "None"}</strong></div>
-            <div><span>Identity</span><strong>{String(selected.external_identity.username ?? selected.external_identity.id ?? "Not tested")}</strong></div>
+            <div>
+              <span>Last sync</span>
+              <strong>
+                {selected.last_sync_at
+                  ? new Date(selected.last_sync_at).toLocaleString()
+                  : "Never"}
+              </strong>
+            </div>
+            <div>
+              <span>Next sync</span>
+              <strong>
+                {selected.next_sync_at
+                  ? new Date(selected.next_sync_at).toLocaleString()
+                  : "Disabled"}
+              </strong>
+            </div>
+            <div>
+              <span>Stored credentials</span>
+              <strong>{selected.credential_names.join(", ") || "None"}</strong>
+            </div>
+            <div>
+              <span>Identity</span>
+              <strong>
+                {String(
+                  selected.external_identity.username ??
+                    selected.external_identity.id ??
+                    "Not tested",
+                )}
+              </strong>
+            </div>
           </section>
         ) : null}
       </form>
